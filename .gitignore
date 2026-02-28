@@ -1,0 +1,4 @@
+# MicroPython build artifacts
+__pycache__/
+*.pyc
+*.mpy
