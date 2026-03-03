@@ -28,14 +28,15 @@
 #   6. Beim nächsten Boot: erneuter Versuch
 # ============================================================
 
-import machine
-import time
-import json
 import gc
+import json
 import os
-import sys
-import network
 import socket
+import sys
+import time
+
+import machine
+import network
 
 try:
     import asyncio
@@ -130,10 +131,10 @@ class WiFiManager:
         self.password = None
         self.mode = None
         self.ip = None
-    
+
     def load_credentials(self):
         try:
-            with open(WIFI_CONFIG_FILE, 'r') as f:
+            with open(WIFI_CONFIG_FILE) as f:
                 data = json.load(f)
                 self.ssid = data.get('ssid', '').strip()
                 self.password = data.get('password', '').strip()
@@ -147,7 +148,7 @@ class WiFiManager:
         except Exception as e:
             print(f"  wifi.json Fehler: {e}")
             return False
-    
+
     def save_credentials(self, ssid, password):
         self.ssid = ssid.strip()
         self.password = password.strip()
@@ -159,7 +160,7 @@ class WiFiManager:
         except Exception as e:
             print(f"  Speicherfehler: {e}")
             return False
-    
+
     def delete_credentials(self):
         try:
             os.remove(WIFI_CONFIG_FILE)
@@ -167,7 +168,7 @@ class WiFiManager:
             pass
         self.ssid = None
         self.password = None
-    
+
     def connect_station(self, timeout_ms=10000):
         if not self.ssid:
             return None
@@ -194,7 +195,7 @@ class WiFiManager:
         self.mode = 'station'
         print(f"  Verbunden: {self.ip}")
         return self.ip
-    
+
     def start_ap(self):
         self.sta.active(False)
         self.ap.active(True)
@@ -205,7 +206,7 @@ class WiFiManager:
         self.ip = self.ap.ifconfig()[0]
         self.mode = 'ap'
         return self.ip
-    
+
     def scan_networks(self):
         try:
             was_active = self.sta.active()
@@ -225,7 +226,7 @@ class WiFiManager:
         except Exception as e:
             print(f"  Scan Fehler: {e}")
             return []
-    
+
     def get_status(self):
         return {
             'mode': self.mode or 'disconnected',
@@ -234,7 +235,7 @@ class WiFiManager:
             'ap_ssid': AP_SSID,
             'connected': self.sta.isconnected() if self.mode == 'station' else False
         }
-    
+
     def startup(self):
         has_creds = self.load_credentials()
         if has_creds:
@@ -263,7 +264,7 @@ class CalibratedJoystick:
             self.adc_y.width(machine.ADC.WIDTH_12BIT)
         except:
             pass  # Neuere MicroPython brauchen das evtl. nicht
-        
+
         self.sw = machine.Pin(pin_sw, machine.Pin.IN, machine.Pin.PULL_UP)
         self.deadzone = deadzone
         self.center_x = 2048
@@ -273,7 +274,7 @@ class CalibratedJoystick:
         self.sw_last = 1
         self.sw_debounce_time = 0
         self.calibrate()
-    
+
     def calibrate(self, samples=CALIBRATION_SAMPLES):
         print("  Joystick Kalibrierung...")
         for _ in range(10):
@@ -286,14 +287,14 @@ class CalibratedJoystick:
         self.center_x = sx // samples
         self.center_y = sy // samples
         print(f"  Center=({self.center_x},{self.center_y}) dz=±{self.deadzone}")
-    
+
     def read_centered(self):
         dx = self.adc_x.read() - self.center_x
         dy = self.adc_y.read() - self.center_y
         if abs(dx) < self.deadzone: dx = 0
         if abs(dy) < self.deadzone: dy = 0
         return dx, dy
-    
+
     def get_direction(self):
         dx, dy = self.read_centered()
         if abs(dx) > abs(dy):
@@ -303,7 +304,7 @@ class CalibratedJoystick:
             if dy < -NAV_THRESHOLD: return 'up'
             elif dy > NAV_THRESHOLD: return 'down'
         return None
-    
+
     def poll_navigation(self):
         now = time.ticks_ms()
         d = self.get_direction()
@@ -315,7 +316,7 @@ class CalibratedJoystick:
             self.last_nav_time = now
             return d
         return None
-    
+
     def poll_button(self):
         now = time.ticks_ms()
         val = self.sw.value()
@@ -326,7 +327,7 @@ class CalibratedJoystick:
                 return True
         self.sw_last = val
         return False
-    
+
     def is_idle(self):
         dx, dy = self.read_centered()
         return abs(dx) < self.deadzone * 2 and abs(dy) < self.deadzone * 2
@@ -349,7 +350,7 @@ class PuffSensor:
         self.sample_idx = 0
         time.sleep_ms(100)
         self.calibrate_baseline()
-    
+
     def _read_raw(self):
         timeout = 0
         while self.data.value() == 1:
@@ -364,7 +365,7 @@ class PuffSensor:
         self.clk.value(0); time.sleep_us(1)
         if value & 0x800000: value -= 0x1000000
         return value
-    
+
     def calibrate_baseline(self, samples=30):
         print("  Drucksensor Kalibrierung...")
         readings = []
@@ -376,7 +377,7 @@ class PuffSensor:
             self.baseline = sum(readings) // len(readings)
             self.max_range = abs(self.baseline) * 0.5 if self.baseline != 0 else 100000
         print(f"  Baseline={self.baseline} range={self.max_range}")
-    
+
     def read_normalized(self):
         raw = self._read_raw()
         if raw == 0: return 0.0
@@ -385,7 +386,7 @@ class PuffSensor:
         self.samples_buf[self.sample_idx] = n
         self.sample_idx = (self.sample_idx + 1) % PUFF_SAMPLES
         return sum(self.samples_buf) / PUFF_SAMPLES
-    
+
     def detect_puff(self):
         now = time.ticks_ms()
         if time.ticks_diff(now, self.last_puff_time) < PUFF_COOLDOWN_MS: return False
@@ -393,7 +394,7 @@ class PuffSensor:
             self.last_puff_time = now
             return True
         return False
-    
+
     def get_level(self):
         return self.read_normalized()
 
@@ -452,13 +453,13 @@ def _generate_portal(wifi_ip):
                 games.append((entry, name))
     except OSError:
         pass
-    
+
     btns = ''
     for fn, name in sorted(games, key=lambda x: x[1]):
         btns += f'<a href="/{WWW_DIR}/{fn}" class="g">{name}</a>'
     if not btns:
         btns = '<p style="color:#78909c">Noch keine Spiele. Lade HTML in <code>www/</code></p>'
-    
+
     return f"""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MundMaus</title><style>
@@ -495,7 +496,7 @@ class MundMausServer:
         self.ws_server = None
         self.http_server = None
         self._pending_reboot = False
-    
+
     def start(self):
         self.http_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.http_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -503,14 +504,14 @@ class MundMausServer:
         self.http_server.listen(3)
         self.http_server.setblocking(False)
         print(f"  HTTP  :{self.http_port}")
-        
+
         self.ws_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.ws_server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.ws_server.bind(('0.0.0.0', self.ws_port))
         self.ws_server.listen(2)
         self.ws_server.setblocking(False)
         print(f"  WS    :{self.ws_port}")
-    
+
     def poll_http(self):
         try:
             client, addr = self.http_server.accept()
@@ -524,10 +525,10 @@ class MundMausServer:
                 client.close()
         except OSError:
             pass
-    
+
     def _handle_http(self, client, request):
         fl = request.split('\r\n')[0] if request else ''
-        
+
         if 'POST /api/wifi' in fl:
             self._api_wifi_config(client, request)
         elif 'GET /api/wifi' in fl:
@@ -559,7 +560,7 @@ class MundMausServer:
             client.send(b'HTTP/1.1 204 No Content\r\n\r\n')
         else:
             self._serve_setup(client)
-    
+
     def _api_wifi_config(self, client, request):
         try:
             body = request.split('\r\n\r\n', 1)
@@ -580,14 +581,14 @@ class MundMausServer:
             self._pending_reboot = True
         except Exception as e:
             self._send_json(client, {'ok': False, 'error': str(e)}, 500)
-    
+
     def _send_json(self, client, data, status=200):
         body = json.dumps(data)
         client.send(f'HTTP/1.1 {status} OK\r\n'.encode())
         client.send(b'Content-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n')
         client.send(f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n'.encode())
         client.send(body.encode())
-    
+
     def _serve_setup(self, client):
         html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -625,9 +626,9 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
         client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
         client.send(f'Content-Length: {len(html)}\r\nConnection: close\r\n\r\n'.encode())
         client.send(html.encode())
-    
+
     # --- WebSocket ---
-    
+
     def poll_ws(self):
         try:
             client, addr = self.ws_server.accept()
@@ -644,10 +645,11 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
                 client.close()
         except OSError:
             pass
-    
+
     def _ws_handshake(self, client):
         try:
-            import hashlib, binascii
+            import binascii
+            import hashlib
             client.settimeout(2)
             data = client.recv(1024).decode()
             if 'Upgrade: websocket' not in data: return False
@@ -668,7 +670,7 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             return True
         except:
             return False
-    
+
     def _ws_frame(self, payload):
         length = len(payload)
         frame = bytearray([0x81])
@@ -679,7 +681,7 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             frame.extend(length.to_bytes(2, 'big'))
         frame.extend(payload)
         return bytes(frame)
-    
+
     def ws_send_all(self, message):
         if not self.ws_clients: return
         frame = self._ws_frame(json.dumps(message).encode())
@@ -691,13 +693,13 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             try: self.ws_clients[i].close()
             except: pass
             self.ws_clients.pop(i)
-    
+
     def ws_send_one(self, client, message):
         try:
             client.send(self._ws_frame(json.dumps(message).encode()))
         except:
             pass
-    
+
     def ws_read_all(self):
         messages = []
         dead = []
@@ -718,7 +720,7 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             except: pass
             self.ws_clients.pop(i)
         return messages
-    
+
     def _ws_decode(self, data):
         try:
             if len(data) < 6: return None
@@ -737,12 +739,12 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             return data[idx:idx+length].decode('utf-8', 'ignore')
         except:
             return None
-    
+
     def check_reboot(self):
         if self._pending_reboot:
             time.sleep(2)
             machine.reset()
-    
+
     def send_nav(self, d): self.ws_send_all({"type": "nav", "dir": d})
     def send_action(self, k): self.ws_send_all({"type": "action", "kind": k})
     def send_puff_level(self, v): self.ws_send_all({"type": "puff_level", "value": round(v, 3)})
@@ -756,7 +758,6 @@ def init_display():
     if not USE_DISPLAY: return None
     try:
         from ST7735 import TFT
-        from sysfont import sysfont
         spi = machine.SPI(1, baudrate=20000000, polarity=0, phase=0,
             sck=machine.Pin(PIN_DISP_SCK), mosi=machine.Pin(PIN_DISP_SDA))
         tft = TFT(spi, PIN_DISP_A0, PIN_DISP_RST, PIN_DISP_CS)
@@ -769,8 +770,8 @@ def init_display():
 def display_status(tft, ip, mode, joy_cal, puff_bl, clients):
     if not tft: return
     try:
-        from sysfont import sysfont
         from ST7735 import TFT
+        from sysfont import sysfont
         tft.fill(TFT.BLACK)
         tft.text((5, 5), f"MundMaus v{VERSION}", TFT.WHITE, sysfont)
         tft.text((5, 20), f"{'WLAN' if mode=='station' else 'HOTSPOT'}: {ip}", TFT.CYAN, sysfont)
@@ -791,19 +792,19 @@ async def sensor_loop(joystick, puff, server):
     idle_start = time.ticks_ms()
     last_recal = time.ticks_ms()
     last_puff_send = 0
-    
+
     while True:
         now = time.ticks_ms()
-        
+
         nav = joystick.poll_navigation()
         if nav:
             server.send_nav(nav)
             idle_start = now
-        
+
         if joystick.poll_button():
             server.send_action('press')
             idle_start = now
-        
+
         if puff:
             if time.ticks_diff(now, last_puff_send) > PUFF_SEND_INTERVAL_MS:
                 level = puff.get_level()
@@ -813,7 +814,7 @@ async def sensor_loop(joystick, puff, server):
             if puff.detect_puff():
                 server.send_action('puff')
                 idle_start = now
-        
+
         if joystick.is_idle():
             if time.ticks_diff(now, idle_start) > RECAL_IDLE_MS:
                 if time.ticks_diff(now, last_recal) > 60000:
@@ -822,7 +823,7 @@ async def sensor_loop(joystick, puff, server):
                     idle_start = now
         else:
             idle_start = now
-        
+
         await asyncio.sleep_ms(SENSOR_POLL_MS)
 
 
@@ -832,7 +833,7 @@ async def server_loop(server, wifi):
     while True:
         server.poll_http()
         server.poll_ws()
-        
+
         for msg in server.ws_read_all():
             if msg.get('type') == 'wifi_config':
                 ssid = msg.get('ssid', '')
@@ -846,13 +847,13 @@ async def server_loop(server, wifi):
             elif msg.get('type') == 'wifi_scan':
                 server.ws_send_all({'type': 'wifi_networks',
                                     'networks': wifi.scan_networks()})
-        
+
         server.check_reboot()
-        
+
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
             gc.collect()
-        
+
         await asyncio.sleep_ms(10)
 
 
@@ -875,32 +876,32 @@ async def async_main():
     print(f"  MUNDMAUS v{VERSION}")
     print(f"  Board: {BOARD}")
     print("=" * 42)
-    
+
     # Ensure www/ exists
     try:
         os.stat(WWW_DIR)
     except OSError:
         try: os.mkdir(WWW_DIR)
         except: pass
-    
+
     # Hardware
     print("\n[Hardware]")
     joystick = CalibratedJoystick(PIN_VRX, PIN_VRY, PIN_SW)
-    
+
     puff = None
     try:
         puff = PuffSensor(PIN_PUFF_DATA, PIN_PUFF_CLK)
         print("  Drucksensor: OK")
     except Exception as e:
         print(f"  Drucksensor: {e}")
-    
+
     tft = init_display()
-    
+
     # WiFi
     print("\n[Netzwerk]")
     wifi = WiFiManager()
     ip, mode = wifi.startup()
-    
+
     print(f"\n  {'='*38}")
     if mode == 'ap':
         print(f"  HOTSPOT: {AP_SSID} / {AP_PASS}")
@@ -909,26 +910,26 @@ async def async_main():
     print(f"  IP: {ip}")
     print(f"  http://{ip}")
     print(f"  {'='*38}")
-    
+
     # Server
     print("\n[Server]")
     server = MundMausServer(wifi)
     server.start()
-    
+
     display_status(tft, ip, mode,
                    (joystick.center_x, joystick.center_y),
                    puff.baseline if puff else 0, 0)
-    
+
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
     print("Bereit.\n")
-    
+
     # Launch tasks
     asyncio.create_task(sensor_loop(joystick, puff, server))
     asyncio.create_task(server_loop(server, wifi))
     if tft:
         asyncio.create_task(display_loop(tft, ip, mode, joystick, puff, server))
-    
+
     while True:
         await asyncio.sleep_ms(60000)
 

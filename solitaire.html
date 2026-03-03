@@ -520,6 +520,25 @@
     margin-left: 1vw;
   }
 
+  /* Hint toggle button */
+  #hint-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4vw;
+    padding: 0.3vh 0.8vw;
+    border-radius: 4px;
+    font-size: 1.4vw;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: color 0.2s, background 0.2s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  #hint-toggle:hover { color: var(--text); }
+  #hint-toggle.active { color: var(--highlight); background: rgba(0, 212, 255, 0.1); }
+
   /* WiFi toggle button (always visible) */
   #wifi-toggle {
     position: fixed;
@@ -554,6 +573,7 @@
       <span>Punkte: <span class="score-val" id="score">0</span></span>
     </div>
     <span id="auto-hint"></span>
+    <div id="hint-toggle" onclick="toggleHints()" title="Hilfe ein/aus">Hilfe</div>
   </div>
 </div>
 
@@ -637,6 +657,7 @@ let stock=[], waste=[], foundations=[[],[],[],[]], tableau=[[],[],[],[],[],[],[]
 let moves=0, score=0, undoStack=[];
 let navZone='tableau', navCol=0, navCardIdx=-1, selectedCard=null, gameWon=false;
 let kioskMode=false, idleTimer=null;
+let hintsEnabled = localStorage.getItem('solitaire-hints') === 'true'; // default OFF
 const IDLE_TIMEOUT = 120000;
 
 function initGame() {
@@ -671,6 +692,18 @@ function toggleKiosk() {
 function toggleFullscreen() {
   if(!_isFullscreen()) _requestFullscreen();
   else _exitFullscreen();
+}
+function toggleHints() {
+  hintsEnabled=!hintsEnabled;
+  localStorage.setItem('solitaire-hints',hintsEnabled?'true':'false');
+  updateHintToggle();
+  render();
+}
+function updateHintToggle() {
+  const el=document.getElementById('hint-toggle');
+  if(!el)return;
+  el.classList.toggle('active',hintsEnabled);
+  el.textContent=hintsEnabled?'Hilfe \u2714':'Hilfe';
 }
 function resetIdleTimer() { if(!kioskMode)return; clearIdleTimer(); hideIdle(); idleTimer=setTimeout(showIdle,IDLE_TIMEOUT); }
 function clearIdleTimer() { if(idleTimer){clearTimeout(idleTimer);idleTimer=null;} }
@@ -781,7 +814,7 @@ function renderTopRow() {
     if(foundations[fi].length>0){const top=foundations[fi][foundations[fi].length-1],ce=mkFace(top);ce.style.position='relative';fs.appendChild(ce);}
     else{const l=document.createElement('div');l.className='empty-label';l.textContent=fS[fi];fs.appendChild(l);}
     if(navZone==='top'&&navCol===fi+2)fs.classList.add('nav-active');
-    if(selectedCard&&canPlaceSelOnFound(fi)){fs.classList.add('target');addBadge(fs,'target-mark');}
+    if(hintsEnabled&&selectedCard&&canPlaceSelOnFound(fi)){fs.classList.add('target');addBadge(fs,'target-mark');}
     row.appendChild(fs);
   }
 }
@@ -807,7 +840,7 @@ function renderTableau() {
     if(!col.length){
       const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:15.4vw;';
       if(navZone==='tableau'&&navCol===ci)slot.classList.add('nav-active');
-      if(selectedCard){const cards=getSelCards();if(cards&&cards.length&&cards[0].rank==='K'){slot.classList.add('target');addBadge(slot,'target-mark');}}
+      if(hintsEnabled&&selectedCard){const cards=getSelCards();if(cards&&cards.length&&cards[0].rank==='K'){slot.classList.add('target');addBadge(slot,'target-mark');}}
       const l=document.createElement('div');l.className='empty-label';l.textContent='K';slot.appendChild(l);cd.appendChild(slot);
     } else {
       const FDO=1.2,FUO=3.2;let y=0;
@@ -827,8 +860,8 @@ function renderTableau() {
           if(ri>=si&&card.faceUp){el.classList.remove('nav-cursor');el.classList.add('selected-state');if(ri===si)addBadge(el,'pick');}
         }
 
-        // Target hint
-        if(selectedCard&&ri===col.length-1&&card.faceUp){
+        // Target hint (only when hints enabled)
+        if(hintsEnabled&&selectedCard&&ri===col.length-1&&card.faceUp){
           const cards=getSelCards();
           if(cards&&cards.length&&canPlaceOnTableau(cards[0],ci)&&!(selectedCard.zone==='tableau'&&selectedCard.col===ci)){
             el.classList.add('target-hint');addBadge(el,'target-mark');
@@ -1073,6 +1106,7 @@ function wifiSave() {
 }
 
 // Start
+updateHintToggle();
 initGame();
 connectWebSocket();
 </script>
