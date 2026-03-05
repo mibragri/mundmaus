@@ -32,7 +32,7 @@ Assistive-Technology-Projekt: eine mundgesteuerte Spieleplattform für Menschen 
 └───────────────────────────┼──────────────────────────────┘
                             │
                 ┌───────────┴────────────┐
-                │  ESP32-S3 DevKitC-1    │
+                │  ESP32-WROOM-32        │
                 │  MicroPython v1.27+    │
                 │  (asyncio)             │
                 │                        │
@@ -44,11 +44,11 @@ Assistive-Technology-Projekt: eine mundgesteuerte Spieleplattform für Menschen 
                 │  │ HTTP File-Server │  │  www/*.html → Spiele
                 │  │ WebSocket Server │  │  Joystick/Puff Events
                 │  ├──────────────────┤  │
-                │  │ CalibratedJoy    │──┼── KY-023 (S3: G1,G2,G42)
+                │  │ CalibratedJoy    │──┼── KY-023 (WROOM: G33,G35,G21)
                 │  │ + AutoCal        │  │
                 │  ├──────────────────┤  │
                 │  │ PuffSensor       │──┼── MPS20N0040D-S + HX710B
-                │  │ (HX710B 24-bit)  │  │   (S3: G4,G5)
+                │  │ (HX710B 24-bit)  │  │   (WROOM: G32,G25)
                 │  ├──────────────────┤  │
                 │  │ Display (opt.)   │──┼── ST7735 1.8" TFT
                 │  └──────────────────┘  │
@@ -95,21 +95,18 @@ Datenfluss (asyncio):
 
 | Komponente | Modell | Preis | Bezugsquelle |
 |-----------|--------|-------|--------------|
-| ⭐ Mikrocontroller | Waveshare ESP32-S3-DEV-KIT-N16R8-**M** (mit Pins) | ~16 EUR | [Amazon.de B0DKSZ7J3S](https://www.amazon.de/dp/B0DKSZ7J3S) |
-| Alternative | Heemol ESP32-S3 N16R8 DevKitC-1 (mit Pins + IPEX-Antenne) | ~14 EUR | [Amazon.de B0FKFXC6F8](https://www.amazon.de/dp/B0FKFXC6F8) |
+| Mikrocontroller | ESP32-WROOM-32 DevKitC V4 (z.B. AZ-Delivery) | ~8 EUR | Amazon/eBay |
 | Joystick | KY-023 Thumb Joystick | ~2 EUR | Amazon/eBay |
 | Drucksensor | MPS20N0040D-S + HX710B 24-bit ADC | ~4,30 EUR | [eBay 284856729901](https://ebay.de/itm/284856729901) |
 | Display (optional) | ST7735 1.8" TFT SPI | ~7,50 EUR | Amazon/eBay |
 | Silikonschlauch | ID 5-7mm, ~50cm | ~3 EUR | Baumarkt/Amazon |
 | Breadboard | 830 Kontakte | ~3 EUR | Amazon |
 | Kabel | DuPont Jumper Wires (M-F, M-M, F-F) | ~7 EUR | Amazon (Elegoo 120er Set) |
-| USB-C Kabel | Daten + Strom | ~5 EUR | – |
+| USB Micro-B Kabel | Daten + Strom | ~3 EUR | – |
 
-**Gesamt: ~40 EUR** (mit Breadboard/Kabel, ohne Display) | **~26 EUR** (nur Kernkomponenten)
+**Gesamt: ~30 EUR** (mit Breadboard/Kabel, ohne Display) | **~20 EUR** (nur Kernkomponenten)
 
-> ⚠️ **Wichtig beim ESP32-S3:** Unbedingt die Variante **mit vorverlöteten Pins** kaufen (Waveshare: "-M" Suffix, Heemol: steht in der Beschreibung). Sonst muss man selbst löten!
-
-> ❌ **Nicht empfohlen:** AZ-Delivery DevKitC V4 (ESP32-WROOM-32) – nur 4MB Flash, kein PSRAM, Micro-USB. Funktioniert mit der Firmware (auto-erkannt), aber für das Open-Source-Projekt sollte ESP32-S3 empfohlen werden.
+> **Hinweis:** ESP32-S3 (z.B. N16R8 DevKitC-1) wird ebenfalls unterstuetzt — automatische Board-Erkennung in der Firmware. Bietet 16MB Flash, 8MB PSRAM und USB-C, ist aber nicht noetig fuer den Grundbetrieb.
 
 ### Pin-Belegung
 
@@ -117,18 +114,18 @@ Die Firmware erkennt automatisch das Board und setzt die Pins:
 
 | Funktion | ESP32-WROOM (V4) | ESP32-S3 (N16R8) | Hinweis |
 |----------|-------------------|-------------------|---------|
-| Joystick VRX | GPIO33 | **GPIO1** | ADC1 |
-| Joystick VRY | GPIO35 | **GPIO2** | ADC1 |
-| Joystick SW | GPIO21 | **GPIO42** | Digital, Pull-Up |
-| Puff DATA | GPIO32 | **GPIO4** | Digital (HX710B) |
-| Puff CLK | GPIO25 | **GPIO5** | Digital (HX710B) |
-| Display A0 | GPIO2 | **GPIO6** | Data/Command |
+| Joystick VRX | **GPIO33** | GPIO1 | ADC1 |
+| Joystick VRY | **GPIO35** | GPIO2 | ADC1 |
+| Joystick SW | **GPIO21** | GPIO42 | Digital, Pull-Up |
+| Puff DATA | **GPIO32** | GPIO4 | Digital (HX710B) |
+| Puff CLK | **GPIO25** | GPIO5 | Digital (HX710B) |
+| Display A0 | **GPIO2** | GPIO6 | Data/Command |
 | Display RST | GPIO14 | GPIO14 | Reset |
 | Display CS | GPIO17 | GPIO17 | SPI CS |
 | Display SCK | GPIO18 | GPIO18 | SPI CLK |
 | Display SDA | GPIO23 | GPIO23 | SPI MOSI |
 
-**ESP32-S3: GPIO33-39 existieren NICHT.** ADC1-Kanäle liegen auf GPIO1-10.
+**Hinweis:** ESP32-S3 hat keine GPIO33-39. Die Firmware erkennt das Board automatisch und setzt die richtigen Pins.
 
 ### Board-Erkennung in der Firmware
 
@@ -422,7 +419,7 @@ Parametrisches OpenSCAD-Design. Alle Maße als Variablen.
 
 ```
 WiFi "MundMaus" (PW: mundmaus1)
-  ESP32-S3: 192.168.4.1 (HTTP :80 + WS :81)
+  ESP32: 192.168.4.1 (HTTP :80 + WS :81)
   Raspberry Pi: verbindet sich, öffnet Chromium im Kiosk
   TV/Monitor: HDMI am Pi
 ```
@@ -440,9 +437,9 @@ WiFi "MundMaus" (PW: mundmaus1)
 
 ### Empfohlene Version: v1.27.0 (Dezember 2025)
 
-Download: https://micropython.org/download/ESP32_GENERIC_S3/
+Download: https://micropython.org/download/ESP32_GENERIC/
 
-Für ESP32-S3 N16R8 die **SPIRAM_OCT** Variante verwenden (Octal PSRAM).
+Fuer ESP32-S3 N16R8 stattdessen: https://micropython.org/download/ESP32_GENERIC_S3/ (Variante **SPIRAM_OCT**).
 
 ### Relevante Features für MundMaus
 
@@ -458,10 +455,10 @@ Für ESP32-S3 N16R8 die **SPIRAM_OCT** Variante verwenden (Octal PSRAM).
 ### Flashen
 
 ```bash
-# ESP32-S3 mit Octal PSRAM (N16R8):
-esptool.py --chip esp32s3 --port /dev/ttyUSB0 erase_flash
-esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 \
-  write_flash -z 0x0 ESP32_GENERIC_S3-SPIRAM_OCT-20251209-v1.27.0.bin
+# ESP32-WROOM-32:
+esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
+  write_flash -z 0x1000 ESP32_GENERIC-20251209-v1.27.0.bin
 
 # Dateien hochladen:
 rshell -p /dev/ttyUSB0
@@ -499,7 +496,7 @@ cp solitaire.html /pyboard/www/
 ```
 # Serial Monitor:
 #   MundMaus v3.0
-#   Board: ESP32-S3
+#   Board: ESP32-WROOM
 #   [Hardware]
 #     Joystick Kalibrierung...
 #     Center=(1847,1923) dz=±150
@@ -542,11 +539,11 @@ WIFI_SCAN:  {"type":"wifi_scan"}
 
 ### v3.0 (aktuell)
 
-- Automatische Board-Erkennung (ESP32 vs ESP32-S3)
+- Automatische Board-Erkennung (ESP32-WROOM vs ESP32-S3)
 - asyncio-basierte Hauptschleife (drei unabhängige Tasks)
 - File-Server: serviert HTML-Spiele aus `www/` Ordner
 - Spiele-Portal auf `/` als Launcher
-- ESP32-S3 N16R8 als empfohlene Hardware (16MB Flash, 8MB PSRAM)
+- ESP32-WROOM-32 DevKitC V4 als primaere Hardware, ESP32-S3 als Alternative
 - Kein Löten: nur Boards mit vorverlöteten Pins empfohlen
 - Display-Pins über Board-spezifische Konstanten
 - `/api/info` Endpoint für Board/Version/RAM

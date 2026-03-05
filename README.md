@@ -1,13 +1,13 @@
 # MundMaus
 
-Assistive Mundsteuerung fuer Tetraplegiker. Ein ESP32-S3 mit Joystick und Drucksensor steuert browserbasierte Spiele ueber WebSocket — ohne Installation, ohne App, nur WLAN und Browser.
+Assistive Mundsteuerung fuer Tetraplegiker. Ein ESP32-WROOM-32 (DevKitC V4) mit Joystick und Drucksensor steuert browserbasierte Spiele ueber WebSocket — ohne Installation, ohne App, nur WLAN und Browser.
 
 Pusten statt Klicken. Joystick statt Maus.
 
 ## Features
 
 - **Mundsteuerung** — KY-023 Joystick fuer Navigation, MPS20N0040D-S Drucksensor fuer Aktionen (Pusten = Klick)
-- **Kabellos** — ESP32-S3 eroeffnet eigenen WLAN-Hotspot oder verbindet sich mit bestehendem Netzwerk
+- **Kabellos** — ESP32 eroeffnet eigenen WLAN-Hotspot oder verbindet sich mit bestehendem Netzwerk
 - **Browser-Spiele** — HTML5-Spiele werden direkt vom ESP32 ausgeliefert, kein Internet noetig
 - **Klondike Solitaire** — Vollstaendiges Kartenspiel mit Undo, Auto-Solve, Scoring und Kiosk-Modus
 - **Barrierefreiheit** — Farbenblind-sichere Markierungen (Cyan/Magenta + Symbole), Audio-Feedback via Web Audio API
@@ -18,7 +18,7 @@ Pusten statt Klicken. Joystick statt Maus.
 
 ```
 ┌──────────────┐         WebSocket :81         ┌──────────────┐
-│   ESP32-S3   │◄────────────────────────────►│   Browser     │
+│    ESP32     │◄────────────────────────────►│   Browser     │
 │              │         HTTP :80              │              │
 │  Joystick ───┤  ┌──────────────────────┐    │  Solitaire   │
 │  Puff-Sensor─┤  │ Spiele-Portal (/)    │───►│  (HTML5)     │
@@ -48,7 +48,7 @@ Browser → ESP32:
 
 | Komponente | Typ | Zweck | ca. Preis |
 |------------|-----|-------|-----------|
-| Microcontroller | ESP32-S3-DevKitC-1 N16R8 | WiFi + Firmware | ~12 EUR |
+| Microcontroller | ESP32-WROOM-32 DevKitC V4 | WiFi + Firmware | ~8 EUR |
 | Joystick | KY-023 | 2-Achsen-Navigation + Button | ~3 EUR |
 | Drucksensor | MPS20N0040D-S + HX710B | Puff-Erkennung (24-bit ADC) | ~5 EUR |
 | Silikonschlauch | 4mm ID | Mundstueck → Sensor | ~3 EUR |
@@ -56,17 +56,17 @@ Browser → ESP32:
 
 **Gesamtkosten: ~25 EUR** (ohne Display, ohne Gehaeuse). Kein Loeten noetig — alle Verbindungen ueber DuPont-Kabel.
 
-### Pin-Belegung (ESP32-S3)
+### Pin-Belegung (ESP32-WROOM-32)
 
 | Funktion | GPIO | Typ |
 |----------|------|-----|
-| Joystick VRX | 1 | ADC |
-| Joystick VRY | 2 | ADC |
-| Joystick SW | 42 | Digital |
-| Puff DATA | 4 | Digital |
-| Puff CLK | 5 | Digital |
+| Joystick VRX | 33 | ADC |
+| Joystick VRY | 35 | ADC |
+| Joystick SW | 21 | Digital |
+| Puff DATA | 32 | Digital |
+| Puff CLK | 25 | Digital |
 
-ESP32-WROOM wird ebenfalls unterstuetzt (automatische Board-Erkennung, andere Pins).
+ESP32-S3 wird ebenfalls unterstuetzt (automatische Board-Erkennung, andere Pins).
 
 ## Tech Stack
 
@@ -83,12 +83,12 @@ ESP32-WROOM wird ebenfalls unterstuetzt (automatische Board-Erkennung, andere Pi
 ```bash
 pip3 install esptool rshell
 
-esptool.py --chip esp32s3 --port /dev/ttyUSB0 erase_flash
-esptool.py --chip esp32s3 --port /dev/ttyUSB0 --baud 460800 \
-  write_flash -z 0x0 ESP32_GENERIC_S3-SPIRAM_OCT-20251209-v1.27.0.bin
+esptool.py --chip esp32 --port /dev/ttyUSB0 erase_flash
+esptool.py --chip esp32 --port /dev/ttyUSB0 --baud 460800 \
+  write_flash -z 0x1000 ESP32_GENERIC-20251209-v1.27.0.bin
 ```
 
-Firmware-Download: [micropython.org/download/ESP32_GENERIC_S3](https://micropython.org/download/ESP32_GENERIC_S3/) — Variante **SPIRAM_OCT** fuer N16R8.
+Firmware-Download: [micropython.org/download/ESP32_GENERIC](https://micropython.org/download/ESP32_GENERIC/)
 
 ### 2. Dateien hochladen
 
