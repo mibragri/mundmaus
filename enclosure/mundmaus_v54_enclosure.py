@@ -183,24 +183,22 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
     ).extrude(guide_total)
     return base.union(stop)
 def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
-    rear = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+    # Overlap 0.5mm into floor to avoid OCCT coplanar-face boolean failure
+    _floor_overlap = 0.5
+    rear = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
         JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y
-    ).rect(JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y).extrude(JOY_PLATFORM_H)
+    ).rect(JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y).extrude(JOY_PLATFORM_H + _floor_overlap)
     # Clamp front block to inner cavity wall (avoid protruding into +Y shell wall)
     front_max_y = INNER_POS_Y - 0.2  # 0.2mm clearance to wall
     front_raw_cy = JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y
     front_raw_min_y = front_raw_cy - JOY_PLATFORM_FRONT_Y / 2
     front_clamped_h = min(JOY_PLATFORM_FRONT_Y, front_max_y - front_raw_min_y)
     front_clamped_cy = front_raw_min_y + front_clamped_h / 2
-    front = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+    front = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
         JOY_POS_X, front_clamped_cy
-    ).rect(JOY_PLATFORM_FRONT_X, front_clamped_h).extrude(JOY_PLATFORM_H)
-    platform = rear.union(front)
-    try:
-        platform = platform.edges("|Z").fillet(2.5)
-    except Exception:
-        pass
-    base = base.union(platform)
+    ).rect(JOY_PLATFORM_FRONT_X, front_clamped_h).extrude(JOY_PLATFORM_H + _floor_overlap)
+    # Union rear and front individually to base (combined fillet corrupts OCCT boolean)
+    base = base.union(rear).union(front)
     for dx in [-1, 1]:
         for dy in [-1, 1]:
             px = JOY_POS_X + dx * (JOY_PCB_L / 2 - 2.5)
@@ -470,11 +468,18 @@ def render_pngs(base: cq.Workplane, lid: cq.Workplane, outdir: Path) -> None:
 def write_report(report_path: Path) -> None:
     report = textwrap.dedent(
         f"""\
-        # MundMaus v5.4 Enclosure
+        # MundMaus v5.4c Enclosure
         ## Summary
-        v5.4 replaces the v5.3 USB-C panel-mount on the +Y wall with an asymmetric +X adapter bay.
-        The ESP32 remains on the v5.3 left-shifted X=28 layout and gains a protected adapter cradle,
-        while the 3/8"-16 gooseneck mount moves to the -X short wall opposite the adapter bay.
+        v5.4c is the current production design. Key changes across the v5.4 series:
+        - **v5.4**: Replaced v5.3 USB-C panel-mount (+Y wall) with asymmetric +X adapter bay
+        - **v5.4b**: Corrected mount position to -X short wall
+        - **v5.4c**: Pressure sensor side-mounted at +Y wall with external barb, joystick at upper edge (+Y)
+
+        The ESP32 sits at X=28 with a protected adapter cradle on the +X bay.
+        The 3/8"-16 gooseneck mount is on the -X short wall (internal collar, flat exterior).
+        The pressure sensor (MPS20N0040D-S) mounts against the +Y inner wall; its barb
+        protrudes through the +Y wall so the silicone tube runs externally from the mouthpiece.
+        The joystick sits at the upper edge (Y={JOY_POS_Y:.1f}) for maximum sight clearance.
         ## Clearance Analysis
         | Item | Value |
         |---|---:|
@@ -526,7 +531,7 @@ def write_report(report_path: Path) -> None:
         - [x] Nearest -X screw boss remains outside the collar envelope by {NEAREST_BOSS_Y_CLEARANCE:.1f} mm in Y
         - [x] Hex-nut pocket opens toward the cavity on the -X wall and remains insertable from the top during assembly
         ## Changes vs v5.3
-        | Feature | v5.3 | v5.4 |
+        | Feature | v5.3 | v5.4c |
         |---|---|---|
         | USB solution | +Y bulkhead panel mount | +X direct adapter bay |
         | Internal cable | short USB-C to Micro-B | none |
@@ -535,6 +540,9 @@ def write_report(report_path: Path) -> None:
         | -Y wall | vents only | vents only |
         | Shell width in X | {BASE_EXT_X:.0f} mm symmetric | {TOTAL_EXT_X:.0f} mm asymmetric |
         | Adapter retention | cable clips for loose lead | shelf, side rails, capture hood |
+        | Pressure sensor | internal mount, tube feedthrough | +Y wall side-mount, external barb |
+        | Joystick Y position | centered | upper edge (Y={JOY_POS_Y:.1f}), max sight clearance |
+        | Pneumatic path | internal tube routing | external: mouthpiece → outside → +Y barb |
         ## External Dimensions
         - Base footprint: {TOTAL_EXT_X:.1f} x {EXT_Y:.1f} mm
         - Closed enclosure height: {EXT_H_BASE + EXT_H_LID:.1f} mm

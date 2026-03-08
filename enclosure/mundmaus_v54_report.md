@@ -66,13 +66,13 @@ can run leftward from the mouthpiece without entering the enclosure.
 | USB solution | +Y bulkhead panel mount | +X direct adapter bay |
 | Internal cable | short USB-C to Micro-B | none |
 | -X wall | plain short wall | gooseneck mount collar + hex pocket |
-| +Y wall | joystick opening + USB panel legacy zone | joystick opening + external pressure barb (4.5mm) |
+| +Y wall | joystick opening + USB panel legacy zone | joystick opening + external pressure barb |
 | -Y wall | vents only | vents only |
 | Shell width in X | 136 mm symmetric | 168 mm asymmetric |
 | Adapter retention | cable clips for loose lead | shelf, side rails, capture hood |
-| Pressure sensor | internal ledge + tube feedthrough | +Y wall side-mount, barb exits externally |
-| Joystick Y position | centered | upper edge (Y=10.8), wall relief for PCB |
-| Pneumatic path | internal tube routing | external: mouthpiece → tube LEFT (+X) → barb on +Y wall |
+| Pressure sensor | internal mount, tube feedthrough | +Y wall side-mount, external barb |
+| Joystick Y position | centered | upper edge (Y=10.8), max sight clearance |
+| Pneumatic path | internal tube routing | external: mouthpiece → outside → +Y barb |
 ## External Dimensions
 - Base footprint: 168.0 x 50.0 mm
 - Closed enclosure height: 41.0 mm
@@ -84,8 +84,8 @@ can run leftward from the mouthpiece without entering the enclosure.
 - Lid orientation: flip 180 deg, ceiling-down
 - Adapter retainer hood bridges 12.6 mm; this stays inside
   the PETG 10-15 mm bridge guideline
-- **Pneumatic path**: Mouthpiece on joystick stub → silicone tube exits LEFT (+X from patient) → runs OUTSIDE enclosure → plugs onto barb on +Y wall. Tube must not be bent sharply (impairs joystick navigation)
-- The pressure sensor holder is a U-bracket against the +Y inner wall; install sensor, then close lid
+- External hose path: mouthpiece over joystick, then leftward (+X) outside the enclosure into the +Y wall barb
+- The pressure sensor holder is a U-bracket; install the sensor against the +Y wall
+  and let the lid retain it from above
 - The -X collar remains internal-only; the outer -X wall stays flat for the microphone stand interface
-- Joystick platform front block clamped to 0.2mm before inner wall (no wall protrusion)
 - Suggested slicer baseline: 0.2 mm layer height, 4 walls, 25% gyroid, 240 C nozzle, 75 C bed, 40% fan
