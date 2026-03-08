@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """MundMaus Enclosure v5.4 - Adapter bay redesign in CadQuery."""
 from __future__ import annotations
+
 import argparse
 import logging
 import math
@@ -8,10 +9,13 @@ import re
 import textwrap
 import warnings
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 from xml.etree import ElementTree as ET
+
 import cadquery as cq  # type: ignore[import-not-found]
 from PIL import Image, ImageDraw  # type: ignore[import-not-found]
+
 warnings.filterwarnings("ignore")
 logging.getLogger("OCC").setLevel(logging.ERROR)
 # Core shell
@@ -47,12 +51,17 @@ JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
 JOY_PLATFORM_H = 22.5
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_OPENING = 17.0
-JOY_POS_X, JOY_POS_Y = -15.0, -4.0
+JOY_POS_X, JOY_POS_Y = -15.0, 10.8
+JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 5.0, JOY_PCB_W - 6.0
+JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
+JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L - 8.0, 6.0
+JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
 # Pressure Sensor
 PRES_L, PRES_W, PRES_H = 20.0, 15.0, 5.0
-PRES_POS_X, PRES_POS_Y = -42.0, -2.0
-# Tube feedthrough (-Y wall, near -X corner)
-TUBE_HOLE_D, TUBE_POS_X, TUBE_POS_Z = 6.5, -48.0, 13.0
+PRES_POS_X, PRES_POS_Z = 18.0, 22.0
+PRES_SENSOR_WALL_GAP = 0.3
+PRES_HOLDER_T, PRES_HOLDER_DEPTH = 2.0, 7.0
+PRES_BARB_HOLE_D, PRES_BARB_CHAMFER_D = 4.5, 7.0
 CABLE_NOTCH_W, CABLE_NOTCH_H = 8.0, 4.0
 # M3 screw bosses
 SCREW_D, SCREW_BOSS_D, SCREW_BOSS_H = 3.4, 7.0, 10.0
@@ -85,22 +94,39 @@ USB_OUTER_MARGIN = OUTER_POS_X - ADAPTER_BODY_END_X
 MIC_WALL_OUTER_X, MIC_WALL_INNER_X = OUTER_NEG_X, OUTER_NEG_X + WALL
 MIC_COLLAR_INNER_X = MIC_WALL_INNER_X + MIC_NUT_POCKET_D
 MIC_Y_EDGE_MARGIN = (EXT_Y - MIC_COLLAR_D) / 2
-TUBE_WALL_OUTER_Y, TUBE_WALL_INNER_Y = -OUTER_POS_Y, -INNER_POS_Y
-PRESSURE_LEDGE_L = PRES_L + 4.0
-PRESSURE_LEDGE_LEFT_X = PRES_POS_X - PRESSURE_LEDGE_L / 2
-PRESSURE_COLLAR_CLEARANCE_X = PRESSURE_LEDGE_LEFT_X - MIC_COLLAR_INNER_X
-TUBE_TO_COLLAR_CLEARANCE_X = (TUBE_POS_X - TUBE_HOLE_D / 2) - MIC_COLLAR_INNER_X
-TUBE_TO_COLLAR_CLEARANCE_Y = abs(TUBE_WALL_INNER_Y) - MIC_COLLAR_D / 2
-TUBE_TO_COLLAR_CLEARANCE = math.hypot(TUBE_TO_COLLAR_CLEARANCE_X, TUBE_TO_COLLAR_CLEARANCE_Y)
-NOTCH_TO_COLLAR_CLEARANCE_X = (TUBE_POS_X - CABLE_NOTCH_W / 2) - MIC_COLLAR_INNER_X
-NOTCH_TO_COLLAR_CLEARANCE_Y = abs(TUBE_WALL_INNER_Y) - MIC_COLLAR_D / 2
-NOTCH_TO_COLLAR_CLEARANCE = math.hypot(NOTCH_TO_COLLAR_CLEARANCE_X, NOTCH_TO_COLLAR_CLEARANCE_Y)
+JOY_PCB_TOP_Y = JOY_POS_Y + JOY_PCB_W / 2
+JOY_WALL_RELIEF_DEPTH = max(0.0, JOY_PCB_TOP_Y - INNER_POS_Y)
+JOY_REMAINING_TOP_WALL = WALL - JOY_WALL_RELIEF_DEPTH
+JOY_FRONT_PIN_Y = JOY_POS_Y + (JOY_PCB_W / 2 - 2.5)
+JOY_FRONT_PIN_TO_WALL_CLEAR = INNER_POS_Y - JOY_FRONT_PIN_Y
+JOY_PLATFORM_MIN_X = JOY_POS_X - JOY_PLATFORM_MAIN_X / 2
+JOY_PLATFORM_MAX_X = JOY_POS_X + JOY_PLATFORM_MAIN_X / 2
+JOY_PLATFORM_MIN_Y = min(
+    JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y - JOY_PLATFORM_MAIN_Y / 2,
+    JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y - JOY_PLATFORM_FRONT_Y / 2,
+)
+JOY_PLATFORM_MAX_Y = max(
+    JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y + JOY_PLATFORM_MAIN_Y / 2,
+    JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y + JOY_PLATFORM_FRONT_Y / 2,
+)
+PRES_POS_Y = INNER_POS_Y - PRES_H / 2 - PRES_SENSOR_WALL_GAP
+PRES_HOLDER_OUTER_X = PRES_L + 2 * PRES_HOLDER_T
+PRES_HOLDER_MIN_X = PRES_POS_X - PRES_HOLDER_OUTER_X / 2
+PRES_HOLDER_MAX_X = PRES_POS_X + PRES_HOLDER_OUTER_X / 2
+PRES_HOLDER_MIN_Z = PRES_POS_Z - PRES_W / 2 - PRES_HOLDER_T
+PRES_HOLDER_MAX_Z = PRES_POS_Z + PRES_W / 2
+PRES_TO_JOY_PLATFORM_CLEARANCE_X = PRES_HOLDER_MIN_X - JOY_PLATFORM_MAX_X
+BARB_TO_JOYSTICK_OFFSET_X = PRES_POS_X - JOY_POS_X
+BARB_TO_LID_RIM_CLEARANCE_Z = EXT_H_BASE - PRES_HOLDER_MAX_Z
 SCREW_POSITIONS = [
     (CAV_X / 2 + ADAPTER_BAY_L - SCREW_INSET, CAV_Y / 2 - SCREW_INSET),
     (CAV_X / 2 + ADAPTER_BAY_L - SCREW_INSET, -CAV_Y / 2 + SCREW_INSET),
     (-CAV_X / 2 + SCREW_INSET, CAV_Y / 2 - SCREW_INSET),
     (-CAV_X / 2 + SCREW_INSET, -CAV_Y / 2 + SCREW_INSET),
 ]
+JOY_TO_LEFT_BOSS_CLEARANCE_X = (
+    JOY_POS_X - JOY_PCB_L / 2
+) - (SCREW_POSITIONS[2][0] + SCREW_BOSS_D / 2)
 NEAREST_BOSS_Y_CLEARANCE = abs(SCREW_POSITIONS[2][1]) - (MIC_COLLAR_D / 2 + SCREW_BOSS_D / 2)
 @dataclass(frozen=True)
 class RenderView:
@@ -157,10 +183,17 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
     ).extrude(guide_total)
     return base.union(stop)
 def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
-    plat_x, plat_y = JOY_PCB_L + 5.0, JOY_PCB_W + 5.0
-    platform = cq.Workplane("XY").workplane(offset=FLOOR_T).center(JOY_POS_X, JOY_POS_Y).rect(
-        plat_x, plat_y
-    ).extrude(JOY_PLATFORM_H).edges("|Z").fillet(2.5)
+    rear = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+        JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y
+    ).rect(JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y).extrude(JOY_PLATFORM_H)
+    front = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+        JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y
+    ).rect(JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y).extrude(JOY_PLATFORM_H)
+    platform = rear.union(front)
+    try:
+        platform = platform.edges("|Z").fillet(2.5)
+    except Exception:
+        pass
     base = base.union(platform)
     for dx in [-1, 1]:
         for dy in [-1, 1]:
@@ -171,23 +204,29 @@ def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
             ).circle(JOY_PIN_D / 2).workplane(offset=JOY_PIN_H).circle(JOY_PIN_D / 2 - 0.2).loft()
             base = base.union(pin)
     return base
-def _add_pressure_sensor_ledge(base: cq.Workplane) -> cq.Workplane:
-    lx, ly, lh, lip_h = PRES_L + 4.0, PRES_W + 4.0, 3.0, 1.5
-    platform = cq.Workplane("XY").workplane(offset=FLOOR_T).center(PRES_POS_X, PRES_POS_Y).rect(
-        lx, ly
-    ).extrude(lh).edges("|Z").fillet(1.5)
-    base = base.union(platform)
-    for cx, cy, sx, sy in [
-        (PRES_POS_X, PRES_POS_Y + ly / 2 - 0.75, lx, 1.5),
-        (PRES_POS_X, PRES_POS_Y - ly / 2 + 0.75, lx, 1.5),
-        (PRES_POS_X + lx / 2 - 0.75, PRES_POS_Y, 1.5, ly),
-    ]:
-        base = base.union(
-            cq.Workplane("XY").workplane(offset=FLOOR_T + lh).center(cx, cy).rect(sx, sy).extrude(
-                PRES_H + lip_h
-            )
-        )
-    return base
+def _relieve_joystick_wall(base: cq.Workplane) -> cq.Workplane:
+    if JOY_WALL_RELIEF_DEPTH <= 0.0:
+        return base
+    relief = cq.Workplane("XZ").workplane(offset=INNER_POS_Y).center(
+        JOY_POS_X, FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H / 2
+    ).rect(JOY_PCB_L + 2.0, JOY_PCB_H + 2.4).extrude(JOY_WALL_RELIEF_DEPTH + 0.02)
+    return base.cut(relief)
+def _add_pressure_sensor_mount(base: cq.Workplane) -> cq.Workplane:
+    shelf = cq.Workplane("XY").workplane(offset=PRES_HOLDER_MIN_Z).center(
+        PRES_POS_X, INNER_POS_Y - PRES_HOLDER_DEPTH / 2
+    ).rect(PRES_HOLDER_OUTER_X, PRES_HOLDER_DEPTH).extrude(PRES_HOLDER_T)
+    side_height = PRES_W
+    for side in [-1, 1]:
+        rail = cq.Workplane("XY").workplane(offset=PRES_POS_Z - PRES_W / 2).center(
+            PRES_POS_X + side * (PRES_L / 2 + PRES_HOLDER_T / 2),
+            INNER_POS_Y - PRES_HOLDER_DEPTH / 2,
+        ).rect(PRES_HOLDER_T, PRES_HOLDER_DEPTH).extrude(side_height)
+        shelf = shelf.union(rail)
+    notch = cq.Workplane("YZ").workplane(offset=PRES_POS_X + PRES_L / 2 - CABLE_NOTCH_W / 2).center(
+        INNER_POS_Y - PRES_HOLDER_DEPTH / 2,
+        PRES_POS_Z - PRES_W / 2 + CABLE_NOTCH_H / 2,
+    ).rect(PRES_HOLDER_DEPTH + 0.02, CABLE_NOTCH_H).extrude(CABLE_NOTCH_W + PRES_HOLDER_T + 0.04)
+    return base.union(shelf).cut(notch)
 def _cut_usb_opening(base: cq.Workplane) -> cq.Workplane:
     opening = cq.Workplane("YZ").workplane(offset=OUTER_POS_X + 0.01).center(
         ESP_POS_Y, USB_CENTER_Z
@@ -232,29 +271,28 @@ def _add_adapter_retainer(base: cq.Workplane) -> cq.Workplane:
         ESP_POS_Y, USB_CENTER_Z
     ).rect(USB_GUIDE_W, USB_GUIDE_H).extrude(-(ADAPTER_WEB_T + 0.02))
     return base.union(hood).cut(aperture)
-def _cut_tube_feedthrough(base: cq.Workplane) -> cq.Workplane:
-    tube_cut = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
-        TUBE_POS_X, FLOOR_T + TUBE_POS_Z
-    ).circle(TUBE_HOLE_D / 2).extrude(-WALL * 3)
-    base = base.cut(tube_cut)
+def _cut_pressure_barb_port(base: cq.Workplane) -> cq.Workplane:
+    barb_cut = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
+        PRES_POS_X, PRES_POS_Z
+    ).circle(PRES_BARB_HOLE_D / 2).extrude(-(WALL + 0.02))
+    base = base.cut(barb_cut)
     try:
-        funnel = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - 0.5).center(
-            TUBE_POS_X, FLOOR_T + TUBE_POS_Z
-        ).circle(TUBE_HOLE_D / 2 + 1.5).workplane(offset=-1.5).circle(TUBE_HOLE_D / 2).loft()
-        base = base.cut(funnel)
+        chamfer = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y - 0.8).center(
+            PRES_POS_X, PRES_POS_Z
+        ).circle(PRES_BARB_CHAMFER_D / 2).workplane(offset=-1.0).circle(PRES_BARB_HOLE_D / 2).loft()
+        base = base.cut(chamfer)
     except Exception:
         pass
     return base
 def _cut_cable_notches(base: cq.Workplane) -> cq.Workplane:
-    tube_notch = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
-        TUBE_POS_X, EXT_H_BASE - CABLE_NOTCH_H / 2
-    ).rect(CABLE_NOTCH_W, CABLE_NOTCH_H).extrude(-WALL * 3)
-    return base.cut(tube_notch)
+    return base
 def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
     nut_ac_tol = MIC_NUT_SW_TOL / math.cos(math.radians(30))
-    collar = cq.Workplane("YZ").workplane(offset=MIC_WALL_INNER_X).center(
+    # Overlap collar 0.5mm into wall to avoid OCCT coplanar-face boolean failure
+    _collar_overlap = 0.5
+    collar = cq.Workplane("YZ").workplane(offset=MIC_WALL_INNER_X - _collar_overlap).center(
         MIC_POS_Y, MIC_POS_Z
-    ).circle(MIC_COLLAR_D / 2).extrude(MIC_NUT_POCKET_D)
+    ).circle(MIC_COLLAR_D / 2).extrude(MIC_NUT_POCKET_D + _collar_overlap)
     try:
         collar = collar.faces(">X").chamfer(1.0)
     except Exception:
@@ -270,9 +308,9 @@ def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
 def _cut_vent_slots(base: cq.Workplane) -> cq.Workplane:
     for idx in range(VENT_N):
         slot_x = (idx - (VENT_N - 1) / 2.0) * VENT_PITCH
-        vent = cq.Workplane("XZ").workplane(offset=CAV_Y / 2 - WALL * 0.5).center(
+        vent = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
             slot_x, EXT_H_BASE * 0.55
-        ).rect(VENT_W, VENT_LEN).extrude(WALL * 3)
+        ).rect(VENT_W, VENT_LEN).extrude(WALL + 0.02)
         base = base.cut(vent)
     return base
 def make_base() -> cq.Workplane:
@@ -287,10 +325,11 @@ def make_base() -> cq.Workplane:
         _add_screw_bosses,
         _add_esp_cradle,
         _add_joystick_platform,
-        _add_pressure_sensor_ledge,
+        _relieve_joystick_wall,
+        _add_pressure_sensor_mount,
         _cut_usb_opening,
         _add_adapter_retainer,
-        _cut_tube_feedthrough,
+        _cut_pressure_barb_port,
         _cut_cable_notches,
         _add_mic_mount,
         _cut_vent_slots,
@@ -326,10 +365,6 @@ def make_lid() -> cq.Workplane:
         lid = lid.cut(joy_chamfer)
     except Exception:
         pass
-    tube_lip = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
-        TUBE_POS_X, -LIP_H / 2
-    ).rect(CABLE_NOTCH_W, LIP_H + 0.02).extrude(-WALL * 3)
-    lid = lid.cut(tube_lip)
     for px, py in SCREW_POSITIONS:
         lid = lid.cut(
             cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(px, py).circle(
@@ -369,14 +404,18 @@ def _parse_svg_path(path_data: str) -> list[tuple[float, float]]:
 def _rgb(stroke: str) -> tuple[int, int, int]:
     match = re.match(r"rgb\((\d+),(\d+),(\d+)\)", stroke.replace(" ", ""))
     return (int(match.group(1)), int(match.group(2)), int(match.group(3))) if match else (0, 0, 0)
-def _collect_svg_lines(node: ET.Element, stroke: str, hidden: bool,
-                       lines: list[tuple[tuple[float, float], tuple[float, float], tuple[int, int, int], bool]]) -> None:
+def _collect_svg_lines(
+    node: ET.Element,
+    stroke: str,
+    hidden: bool,
+    lines: list[tuple[tuple[float, float], tuple[float, float], tuple[int, int, int], bool]],
+) -> None:
     tag = node.tag.rsplit("}", 1)[-1]
     stroke = node.attrib.get("stroke", stroke)
     hidden = hidden or "stroke-dasharray" in node.attrib
     if tag == "path":
         points = _parse_svg_path(node.attrib.get("d", ""))
-        for start, end in zip(points, points[1:]):
+        for start, end in pairwise(points):
             lines.append((start, end, _rgb(stroke), hidden))
     for child in list(node):
         _collect_svg_lines(child, stroke, hidden, lines)
@@ -406,8 +445,8 @@ def render_pngs(base: cq.Workplane, lid: cq.Workplane, outdir: Path) -> None:
     views = [
         RenderView("mundmaus_v54_assembly.png", (1.0, -1.0, 0.8), True),
         RenderView("mundmaus_v54_top.png", (0.0, 0.0, 1.0), True),
-        RenderView("mundmaus_v54_side.png", (-1.0, 0.0, 0.0), False),
-        RenderView("mundmaus_v54_back.png", (1.0, 0.0, 0.0), False),
+        RenderView("mundmaus_v54_side.png", (0.0, 1.0, 0.0), False),
+        RenderView("mundmaus_v54_back.png", (-1.0, 0.0, 0.0), False),
     ]
     assembly = _assembly_shape(base, lid)
     for view in views:
@@ -440,25 +479,41 @@ def write_report(report_path: Path) -> None:
         | USB-C insertion depth target | {USB_CABLE_INSERT_D:.2f} mm |
         | Remaining alignment margin | {USB_ALIGN_MARGIN:.2f} mm |
         | Adapter body to outer wall | {USB_OUTER_MARGIN:.2f} mm |
+        | Joystick center Y | {JOY_POS_Y:.2f} mm |
+        | Joystick PCB overrun past +Y inner wall | {JOY_WALL_RELIEF_DEPTH:.2f} mm |
+        | Remaining +Y wall behind PCB relief | {JOY_REMAINING_TOP_WALL:.2f} mm |
+        | Front joystick posts to +Y wall | {JOY_FRONT_PIN_TO_WALL_CLEAR:.2f} mm |
+        | Sensor barb X offset from joystick | {BARB_TO_JOYSTICK_OFFSET_X:.2f} mm |
+        | Sensor holder to joystick platform in X | {PRES_TO_JOY_PLATFORM_CLEARANCE_X:.2f} mm |
+        | Sensor holder top to lid rim | {BARB_TO_LID_RIM_CLEARANCE_Z:.2f} mm |
+        | Joystick PCB to nearest left screw boss in X | {JOY_TO_LEFT_BOSS_CLEARANCE_X:.2f} mm |
         | Mount center on -X wall | Y={MIC_POS_Y:.2f} mm, Z={MIC_POS_Z:.2f} mm |
         | Mount collar edge margin on 50 mm wall | {MIC_Y_EDGE_MARGIN:.2f} mm each side |
-        | Tube exit wall | -Y |
-        | Tube-to-collar clearance | {TUBE_TO_COLLAR_CLEARANCE:.2f} mm |
-        | Cable notch-to-collar clearance | {NOTCH_TO_COLLAR_CLEARANCE:.2f} mm |
-        | Pressure ledge to collar clearance in X | {PRESSURE_COLLAR_CLEARANCE_X:.2f} mm |
+        | Vent slots wall | -Y |
+        | Pressure barb wall | +Y |
         | Nearest -X screw boss clearance in Y | {NEAREST_BOSS_Y_CLEARANCE:.2f} mm |
         Assumptions: typical direct adapter body {ADAPTER_L:.0f}x{ADAPTER_W:.0f}x{ADAPTER_H:.0f} mm,
         receptacle setback {ADAPTER_RECEPTACLE_SETBACK:.1f} mm, USB-C plug insertion depth {USB_CABLE_INSERT_D:.1f} mm.
         The old SCAD failure mode came from using the pre-v5.3 ESP32 position; keeping X=28 and extending the bay
         to {ADAPTER_BAY_L:.0f} mm leaves >10 mm of insertion/alignment reserve after wall thickness is accounted for.
-        The tube and lid notch move to the -Y wall near X={TUBE_POS_X:.1f} mm so the new -X collar stays clear,
-        and the pressure sensor ledge shifts to X={PRES_POS_X:.1f} mm to restore internal service access to the nut pocket.
+        The joystick now sits at the upper feasible limit for the fixed 44 mm cavity:
+        the PCB center moves to Y={JOY_POS_Y:.1f} and uses a shallow
+        {JOY_WALL_RELIEF_DEPTH:.1f} mm relief pocket in the +Y wall, leaving
+        {JOY_REMAINING_TOP_WALL:.1f} mm of PETG behind the board while keeping
+        the support posts {JOY_FRONT_PIN_TO_WALL_CLEAR:.1f} mm off the wall.
+        The pressure sensor moves to the +Y wall at X={PRES_POS_X:.1f}, Z={PRES_POS_Z:.1f};
+        its 4.5 mm barb port now exits directly to the outside so the silicone tube
+        can run leftward from the mouthpiece without entering the enclosure.
         ## Mount Checklist
         - [x] Mount-collar centered on -X wall at Y={MIC_POS_Y:.1f}, Z={MIC_POS_Z:.1f}
         - [x] 24 mm collar on 50 mm wall leaves {MIC_Y_EDGE_MARGIN:.1f} mm edge margin per side
-        - [x] Tube-feedthrough on -Y wall clears collar by {TUBE_TO_COLLAR_CLEARANCE:.1f} mm
-        - [x] Cable-notch on -Y wall clears collar by {NOTCH_TO_COLLAR_CLEARANCE:.1f} mm
-        - [x] Pressure-sensor ledge shifted to X={PRES_POS_X:.1f} leaves {PRESSURE_COLLAR_CLEARANCE_X:.1f} mm X-clearance to collar
+        - [x] Joystick opening moved to the upper band at Y={JOY_POS_Y:.1f}; only the PCB overhang uses a wall relief
+        - [x] Joystick PCB front posts retain {JOY_FRONT_PIN_TO_WALL_CLEAR:.1f} mm clearance to the +Y wall
+        - [x] Pressure sensor bracket relocated to the +Y inner wall at X={PRES_POS_X:.1f}, Z={PRES_POS_Z:.1f}
+        - [x] Pressure barb hole is 4.5 mm and accessible from outside on the +Y wall
+        - [x] Sensor holder stays {PRES_TO_JOY_PLATFORM_CLEARANCE_X:.1f} mm clear of the joystick platform in X
+        - [x] HX710B cable notch remains open inside the sensor holder and does not break the outer wall
+        - [x] Vent slots stay on the -Y wall, so they cannot collide with the +Y barb port
         - [x] Nearest -X screw boss remains outside the collar envelope by {NEAREST_BOSS_Y_CLEARANCE:.1f} mm in Y
         - [x] Hex-nut pocket opens toward the cavity on the -X wall and remains insertable from the top during assembly
         ## Changes vs v5.3
@@ -467,7 +522,8 @@ def write_report(report_path: Path) -> None:
         | USB solution | +Y bulkhead panel mount | +X direct adapter bay |
         | Internal cable | short USB-C to Micro-B | none |
         | -X wall | plain short wall | gooseneck mount collar + hex pocket |
-        | -Y wall | vents only | vents + tube exit + tube notch |
+        | +Y wall | joystick opening + USB panel legacy zone | joystick opening + external pressure barb |
+        | -Y wall | vents only | vents only |
         | Shell width in X | {BASE_EXT_X:.0f} mm symmetric | {TOTAL_EXT_X:.0f} mm asymmetric |
         | Adapter retention | cable clips for loose lead | shelf, side rails, capture hood |
         ## External Dimensions
@@ -479,8 +535,11 @@ def write_report(report_path: Path) -> None:
         - Material: PETG preferred, PLA acceptable for quick fit checks
         - Base orientation: floor-down, no support intended
         - Lid orientation: flip 180 deg, ceiling-down
-        - Adapter retainer hood bridges {ADAPTER_GUIDE_CLEAR_W:.1f} mm; this stays inside the PETG 10-15 mm bridge guideline
-        - Tube exit and lid notch are both on the -Y wall, reducing hose bend radius toward the patient side
+        - Adapter retainer hood bridges {ADAPTER_GUIDE_CLEAR_W:.1f} mm; this stays inside
+          the PETG 10-15 mm bridge guideline
+        - External hose path: mouthpiece over joystick, then leftward (+X) outside the enclosure into the +Y wall barb
+        - The pressure sensor holder is a U-bracket; install the sensor against the +Y wall
+          and let the lid retain it from above
         - The -X collar remains internal-only; the outer -X wall stays flat for the microphone stand interface
         - Suggested slicer baseline: 0.2 mm layer height, 4 walls, 25% gyroid, 240 C nozzle, 75 C bed, 40% fan
         """
