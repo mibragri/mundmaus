@@ -17,10 +17,14 @@
 - HTTP File-Server + WebSocket Server auf ESP32
 - Spiele (Solitaire etc.) als HTML im `www/` Verzeichnis, laufen im Browser
 
-## Endnutzer
+## Endnutzer & Bedienung
 - **Papa** ist der Endnutzer — Tetraplegie, kann nur Gesichtsmuskulatur nutzen
 - UX muss extrem simpel und zuverlaessig sein
 - Kein Loeten, nur Breadboard + DuPont-Jumper
+- **Mundsteuerung**: Joystick mit Mundstück, Lippen/Zunge fuer Navigation
+- **Drucksensor**: Pusten/Saugen ins Mundstück → Silikonschlauch geht seitlich ab nach links (+X) → läuft AUSSEN am Gehäuse → wird von aussen auf Sensor-Barb gesteckt
+- **Schlauch-Constraint**: Darf nicht stark gebogen sein (zieht am Joystick, beeinträchtigt Navigation)
+- **Sichtfeld**: Joystick am oberen Rand (+Y) des Gehäuses, Gehäuse erstreckt sich unterhalb → maximale Sichtfreiheit
 
 ## Agent-Flow
 - **micropython-Agent** direkt, kein Coordinator
