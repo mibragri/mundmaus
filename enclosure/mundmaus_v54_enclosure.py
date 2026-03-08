@@ -50,17 +50,17 @@ JOY_OPENING = 17.0
 JOY_POS_X, JOY_POS_Y = -15.0, -4.0
 # Pressure Sensor
 PRES_L, PRES_W, PRES_H = 20.0, 15.0, 5.0
-PRES_POS_X, PRES_POS_Y = -48.0, -2.0
-# Tube feedthrough (-X wall)
-TUBE_HOLE_D, TUBE_POS_Y, TUBE_POS_Z = 6.5, PRES_POS_Y, 13.0
+PRES_POS_X, PRES_POS_Y = -42.0, -2.0
+# Tube feedthrough (-Y wall, near -X corner)
+TUBE_HOLE_D, TUBE_POS_X, TUBE_POS_Z = 6.5, -48.0, 13.0
 CABLE_NOTCH_W, CABLE_NOTCH_H = 8.0, 4.0
 # M3 screw bosses
 SCREW_D, SCREW_BOSS_D, SCREW_BOSS_H = 3.4, 7.0, 10.0
 SCREW_PILOT_D, SCREW_INSET = 2.5, 6.0
-# 3/8"-16 UNC mic stand mount (+Y wall)
+# 3/8"-16 UNC mic stand mount (-X wall)
 MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 14.29, 5.56
 MIC_NUT_TOL, MIC_NUT_POCKET_D, MIC_COLLAR_D = 0.205, 7.9, 24.0
-MIC_POS_X = 0.0
+MIC_POS_Y = 0.0
 # Ventilation
 VENT_N, VENT_W, VENT_LEN, VENT_PITCH = 6, 1.6, 14.0, 6.0
 # Derived geometry
@@ -82,12 +82,26 @@ ADAPTER_BODY_END_X = ESP_USB_FACE_X + ADAPTER_L
 ADAPTER_RECEPTACLE_X = ADAPTER_BODY_END_X - ADAPTER_RECEPTACLE_SETBACK
 USB_ALIGN_MARGIN = INNER_POS_X - (ADAPTER_RECEPTACLE_X + USB_CABLE_INSERT_D)
 USB_OUTER_MARGIN = OUTER_POS_X - ADAPTER_BODY_END_X
+MIC_WALL_OUTER_X, MIC_WALL_INNER_X = OUTER_NEG_X, OUTER_NEG_X + WALL
+MIC_COLLAR_INNER_X = MIC_WALL_INNER_X + MIC_NUT_POCKET_D
+MIC_Y_EDGE_MARGIN = (EXT_Y - MIC_COLLAR_D) / 2
+TUBE_WALL_OUTER_Y, TUBE_WALL_INNER_Y = -OUTER_POS_Y, -INNER_POS_Y
+PRESSURE_LEDGE_L = PRES_L + 4.0
+PRESSURE_LEDGE_LEFT_X = PRES_POS_X - PRESSURE_LEDGE_L / 2
+PRESSURE_COLLAR_CLEARANCE_X = PRESSURE_LEDGE_LEFT_X - MIC_COLLAR_INNER_X
+TUBE_TO_COLLAR_CLEARANCE_X = (TUBE_POS_X - TUBE_HOLE_D / 2) - MIC_COLLAR_INNER_X
+TUBE_TO_COLLAR_CLEARANCE_Y = abs(TUBE_WALL_INNER_Y) - MIC_COLLAR_D / 2
+TUBE_TO_COLLAR_CLEARANCE = math.hypot(TUBE_TO_COLLAR_CLEARANCE_X, TUBE_TO_COLLAR_CLEARANCE_Y)
+NOTCH_TO_COLLAR_CLEARANCE_X = (TUBE_POS_X - CABLE_NOTCH_W / 2) - MIC_COLLAR_INNER_X
+NOTCH_TO_COLLAR_CLEARANCE_Y = abs(TUBE_WALL_INNER_Y) - MIC_COLLAR_D / 2
+NOTCH_TO_COLLAR_CLEARANCE = math.hypot(NOTCH_TO_COLLAR_CLEARANCE_X, NOTCH_TO_COLLAR_CLEARANCE_Y)
 SCREW_POSITIONS = [
     (CAV_X / 2 + ADAPTER_BAY_L - SCREW_INSET, CAV_Y / 2 - SCREW_INSET),
     (CAV_X / 2 + ADAPTER_BAY_L - SCREW_INSET, -CAV_Y / 2 + SCREW_INSET),
     (-CAV_X / 2 + SCREW_INSET, CAV_Y / 2 - SCREW_INSET),
     (-CAV_X / 2 + SCREW_INSET, -CAV_Y / 2 + SCREW_INSET),
 ]
+NEAREST_BOSS_Y_CLEARANCE = abs(SCREW_POSITIONS[2][1]) - (MIC_COLLAR_D / 2 + SCREW_BOSS_D / 2)
 @dataclass(frozen=True)
 class RenderView:
     filename: str
@@ -219,42 +233,39 @@ def _add_adapter_retainer(base: cq.Workplane) -> cq.Workplane:
     ).rect(USB_GUIDE_W, USB_GUIDE_H).extrude(-(ADAPTER_WEB_T + 0.02))
     return base.union(hood).cut(aperture)
 def _cut_tube_feedthrough(base: cq.Workplane) -> cq.Workplane:
-    tube_cut = cq.Workplane("YZ").workplane(offset=OUTER_NEG_X + WALL * 1.5).center(
-        TUBE_POS_Y, FLOOR_T + TUBE_POS_Z
+    tube_cut = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
+        TUBE_POS_X, FLOOR_T + TUBE_POS_Z
     ).circle(TUBE_HOLE_D / 2).extrude(-WALL * 3)
     base = base.cut(tube_cut)
     try:
-        funnel = cq.Workplane("YZ").workplane(offset=OUTER_NEG_X + 0.5).center(
-            TUBE_POS_Y, FLOOR_T + TUBE_POS_Z
+        funnel = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - 0.5).center(
+            TUBE_POS_X, FLOOR_T + TUBE_POS_Z
         ).circle(TUBE_HOLE_D / 2 + 1.5).workplane(offset=-1.5).circle(TUBE_HOLE_D / 2).loft()
         base = base.cut(funnel)
     except Exception:
         pass
     return base
 def _cut_cable_notches(base: cq.Workplane) -> cq.Workplane:
-    tube_notch = cq.Workplane("YZ").workplane(offset=OUTER_NEG_X + WALL * 1.5).center(
-        TUBE_POS_Y, EXT_H_BASE - CABLE_NOTCH_H / 2
+    tube_notch = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
+        TUBE_POS_X, EXT_H_BASE - CABLE_NOTCH_H / 2
     ).rect(CABLE_NOTCH_W, CABLE_NOTCH_H).extrude(-WALL * 3)
     return base.cut(tube_notch)
 def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
     nut_ac_tol = MIC_NUT_SW_TOL / math.cos(math.radians(30))
-    collar = _solid_along_y(
-        cq.Workplane("XY").circle(MIC_COLLAR_D / 2), MIC_NUT_POCKET_D, MIC_POS_X,
-        INNER_POS_Y - MIC_NUT_POCKET_D, MIC_POS_Z
-    )
+    collar = cq.Workplane("YZ").workplane(offset=MIC_WALL_INNER_X).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).circle(MIC_COLLAR_D / 2).extrude(MIC_NUT_POCKET_D)
     try:
-        collar = collar.faces("<Y").chamfer(1.0)
+        collar = collar.faces(">X").chamfer(1.0)
     except Exception:
         pass
     base = base.union(collar)
-    bolt_hole = _solid_along_y(
-        cq.Workplane("XY").circle(MIC_CLEAR_D / 2), WALL + 0.02, MIC_POS_X,
-        OUTER_POS_Y - WALL - 0.02, MIC_POS_Z
-    )
-    pocket = _solid_along_y(
-        cq.Workplane("XY").polygon(6, nut_ac_tol), MIC_NUT_POCKET_D + 0.02, MIC_POS_X,
-        INNER_POS_Y - MIC_NUT_POCKET_D - 0.01, MIC_POS_Z
-    )
+    bolt_hole = cq.Workplane("YZ").workplane(offset=MIC_WALL_OUTER_X - 0.01).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).circle(MIC_CLEAR_D / 2).extrude(WALL + 0.02)
+    pocket = cq.Workplane("YZ").workplane(offset=MIC_COLLAR_INNER_X + 0.01).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).polygon(6, nut_ac_tol).extrude(-(MIC_NUT_POCKET_D + 0.02))
     return base.cut(bolt_hole).cut(pocket)
 def _cut_vent_slots(base: cq.Workplane) -> cq.Workplane:
     for idx in range(VENT_N):
@@ -315,8 +326,8 @@ def make_lid() -> cq.Workplane:
         lid = lid.cut(joy_chamfer)
     except Exception:
         pass
-    tube_lip = cq.Workplane("YZ").workplane(offset=OUTER_NEG_X + WALL * 1.5).center(
-        TUBE_POS_Y, -LIP_H / 2
+    tube_lip = cq.Workplane("XZ").workplane(offset=EXT_Y / 2 - WALL * 1.5).center(
+        TUBE_POS_X, -LIP_H / 2
     ).rect(CABLE_NOTCH_W, LIP_H + 0.02).extrude(-WALL * 3)
     lid = lid.cut(tube_lip)
     for px, py in SCREW_POSITIONS:
@@ -395,8 +406,8 @@ def render_pngs(base: cq.Workplane, lid: cq.Workplane, outdir: Path) -> None:
     views = [
         RenderView("mundmaus_v54_assembly.png", (1.0, -1.0, 0.8), True),
         RenderView("mundmaus_v54_top.png", (0.0, 0.0, 1.0), True),
-        RenderView("mundmaus_v54_side.png", (1.0, -0.2, 0.15), False),
-        RenderView("mundmaus_v54_back.png", (0.0, -1.0, 0.0), False),
+        RenderView("mundmaus_v54_side.png", (-1.0, 0.0, 0.0), False),
+        RenderView("mundmaus_v54_back.png", (1.0, 0.0, 0.0), False),
     ]
     assembly = _assembly_shape(base, lid)
     for view in views:
@@ -415,7 +426,7 @@ def write_report(report_path: Path) -> None:
         ## Summary
         v5.4 replaces the v5.3 USB-C panel-mount on the +Y wall with an asymmetric +X adapter bay.
         The ESP32 remains on the v5.3 left-shifted X=28 layout and gains a protected adapter cradle,
-        while the 3/8"-16 gooseneck mount moves back to the +Y wall.
+        while the 3/8"-16 gooseneck mount moves to the -X short wall opposite the adapter bay.
         ## Clearance Analysis
         | Item | Value |
         |---|---:|
@@ -429,16 +440,34 @@ def write_report(report_path: Path) -> None:
         | USB-C insertion depth target | {USB_CABLE_INSERT_D:.2f} mm |
         | Remaining alignment margin | {USB_ALIGN_MARGIN:.2f} mm |
         | Adapter body to outer wall | {USB_OUTER_MARGIN:.2f} mm |
+        | Mount center on -X wall | Y={MIC_POS_Y:.2f} mm, Z={MIC_POS_Z:.2f} mm |
+        | Mount collar edge margin on 50 mm wall | {MIC_Y_EDGE_MARGIN:.2f} mm each side |
+        | Tube exit wall | -Y |
+        | Tube-to-collar clearance | {TUBE_TO_COLLAR_CLEARANCE:.2f} mm |
+        | Cable notch-to-collar clearance | {NOTCH_TO_COLLAR_CLEARANCE:.2f} mm |
+        | Pressure ledge to collar clearance in X | {PRESSURE_COLLAR_CLEARANCE_X:.2f} mm |
+        | Nearest -X screw boss clearance in Y | {NEAREST_BOSS_Y_CLEARANCE:.2f} mm |
         Assumptions: typical direct adapter body {ADAPTER_L:.0f}x{ADAPTER_W:.0f}x{ADAPTER_H:.0f} mm,
         receptacle setback {ADAPTER_RECEPTACLE_SETBACK:.1f} mm, USB-C plug insertion depth {USB_CABLE_INSERT_D:.1f} mm.
         The old SCAD failure mode came from using the pre-v5.3 ESP32 position; keeping X=28 and extending the bay
         to {ADAPTER_BAY_L:.0f} mm leaves >10 mm of insertion/alignment reserve after wall thickness is accounted for.
+        The tube and lid notch move to the -Y wall near X={TUBE_POS_X:.1f} mm so the new -X collar stays clear,
+        and the pressure sensor ledge shifts to X={PRES_POS_X:.1f} mm to restore internal service access to the nut pocket.
+        ## Mount Checklist
+        - [x] Mount-collar centered on -X wall at Y={MIC_POS_Y:.1f}, Z={MIC_POS_Z:.1f}
+        - [x] 24 mm collar on 50 mm wall leaves {MIC_Y_EDGE_MARGIN:.1f} mm edge margin per side
+        - [x] Tube-feedthrough on -Y wall clears collar by {TUBE_TO_COLLAR_CLEARANCE:.1f} mm
+        - [x] Cable-notch on -Y wall clears collar by {NOTCH_TO_COLLAR_CLEARANCE:.1f} mm
+        - [x] Pressure-sensor ledge shifted to X={PRES_POS_X:.1f} leaves {PRESSURE_COLLAR_CLEARANCE_X:.1f} mm X-clearance to collar
+        - [x] Nearest -X screw boss remains outside the collar envelope by {NEAREST_BOSS_Y_CLEARANCE:.1f} mm in Y
+        - [x] Hex-nut pocket opens toward the cavity on the -X wall and remains insertable from the top during assembly
         ## Changes vs v5.3
         | Feature | v5.3 | v5.4 |
         |---|---|---|
         | USB solution | +Y bulkhead panel mount | +X direct adapter bay |
         | Internal cable | short USB-C to Micro-B | none |
-        | +Y wall | panel hole + nut recess | gooseneck mount collar + hex pocket |
+        | -X wall | plain short wall | gooseneck mount collar + hex pocket |
+        | -Y wall | vents only | vents + tube exit + tube notch |
         | Shell width in X | {BASE_EXT_X:.0f} mm symmetric | {TOTAL_EXT_X:.0f} mm asymmetric |
         | Adapter retention | cable clips for loose lead | shelf, side rails, capture hood |
         ## External Dimensions
@@ -451,6 +480,8 @@ def write_report(report_path: Path) -> None:
         - Base orientation: floor-down, no support intended
         - Lid orientation: flip 180 deg, ceiling-down
         - Adapter retainer hood bridges {ADAPTER_GUIDE_CLEAR_W:.1f} mm; this stays inside the PETG 10-15 mm bridge guideline
+        - Tube exit and lid notch are both on the -Y wall, reducing hose bend radius toward the patient side
+        - The -X collar remains internal-only; the outer -X wall stays flat for the microphone stand interface
         - Suggested slicer baseline: 0.2 mm layer height, 4 walls, 25% gyroid, 240 C nozzle, 75 C bed, 40% fan
         """
     )
@@ -468,7 +499,7 @@ def main() -> None:
     print(f"MundMaus v5.4 - CadQuery {cq.__version__}")
     print(f"  External: {TOTAL_EXT_X:.1f} x {EXT_Y:.1f} x {EXT_H_BASE + EXT_H_LID:.1f} mm")
     print(f"  Adapter bay: +X {ADAPTER_BAY_L:.1f} mm, USB margin {USB_ALIGN_MARGIN:.1f} mm")
-    print(f"  Mount: +Y wall, collar {MIC_COLLAR_D:.1f} mm, nut SW {MIC_NUT_SW_TOL:.1f} mm")
+    print(f"  Mount: -X wall, collar {MIC_COLLAR_D:.1f} mm, nut SW {MIC_NUT_SW_TOL:.1f} mm")
     base = make_base()
     lid = make_lid()
     export_stl(base, base_path)
