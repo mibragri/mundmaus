@@ -186,9 +186,15 @@ def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
     rear = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
         JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y
     ).rect(JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y).extrude(JOY_PLATFORM_H)
+    # Clamp front block to inner cavity wall (avoid protruding into +Y shell wall)
+    front_max_y = INNER_POS_Y - 0.2  # 0.2mm clearance to wall
+    front_raw_cy = JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y
+    front_raw_min_y = front_raw_cy - JOY_PLATFORM_FRONT_Y / 2
+    front_clamped_h = min(JOY_PLATFORM_FRONT_Y, front_max_y - front_raw_min_y)
+    front_clamped_cy = front_raw_min_y + front_clamped_h / 2
     front = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
-        JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y
-    ).rect(JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y).extrude(JOY_PLATFORM_H)
+        JOY_POS_X, front_clamped_cy
+    ).rect(JOY_PLATFORM_FRONT_X, front_clamped_h).extrude(JOY_PLATFORM_H)
     platform = rear.union(front)
     try:
         platform = platform.edges("|Z").fillet(2.5)
@@ -199,6 +205,9 @@ def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
         for dy in [-1, 1]:
             px = JOY_POS_X + dx * (JOY_PCB_L / 2 - 2.5)
             py = JOY_POS_Y + dy * (JOY_PCB_W / 2 - 2.5)
+            # Skip pins that would be inside the +Y wall relief zone
+            if py > INNER_POS_Y - 0.5:
+                continue
             pin = cq.Workplane("XY").workplane(offset=FLOOR_T + JOY_PLATFORM_H).center(
                 px, py
             ).circle(JOY_PIN_D / 2).workplane(offset=JOY_PIN_H).circle(JOY_PIN_D / 2 - 0.2).loft()
