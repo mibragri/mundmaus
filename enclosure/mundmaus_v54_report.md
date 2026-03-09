@@ -9,7 +9,7 @@ The ESP32 sits at X=28 with a protected adapter cradle on the +X bay.
 The 3/8"-16 gooseneck mount is on the -X short wall (internal collar, flat exterior).
 The pressure sensor (MPS20N0040D-S) mounts against the +Y inner wall; its barb
 protrudes through the +Y wall so the silicone tube runs externally from the mouthpiece.
-The joystick sits at the upper edge (Y=10.8) for maximum sight clearance.
+The joystick sits at the upper edge (Y=8.0) for maximum sight clearance.
 ## Clearance Analysis
 | Item | Value |
 |---|---:|
@@ -23,10 +23,10 @@ The joystick sits at the upper edge (Y=10.8) for maximum sight clearance.
 | USB-C insertion depth target | 6.80 mm |
 | Remaining alignment margin | 10.25 mm |
 | Adapter body to outer wall | 18.85 mm |
-| Joystick center Y | 10.80 mm |
-| Joystick PCB overrun past +Y inner wall | 1.80 mm |
-| Remaining +Y wall behind PCB relief | 1.20 mm |
-| Front joystick posts to +Y wall | 0.70 mm |
+| Joystick center Y | 8.00 mm |
+| Joystick PCB overrun past +Y inner wall | 0.00 mm |
+| Remaining +Y wall behind PCB relief | 3.00 mm |
+| Front joystick posts to +Y wall | 3.50 mm |
 | Sensor barb X offset from joystick | 33.00 mm |
 | Sensor holder to joystick platform in X | 1.50 mm |
 | Sensor holder top to lid rim | 1.50 mm |
@@ -41,18 +41,18 @@ receptacle setback 1.2 mm, USB-C plug insertion depth 6.8 mm.
 The old SCAD failure mode came from using the pre-v5.3 ESP32 position; keeping X=28 and extending the bay
 to 32 mm leaves >10 mm of insertion/alignment reserve after wall thickness is accounted for.
 The joystick now sits at the upper feasible limit for the fixed 44 mm cavity:
-the PCB center moves to Y=10.8 and uses a shallow
-1.8 mm relief pocket in the +Y wall, leaving
-1.2 mm of PETG behind the board while keeping
-the support posts 0.7 mm off the wall.
+the PCB center moves to Y=8.0 and uses a shallow
+0.0 mm relief pocket in the +Y wall, leaving
+3.0 mm of PETG behind the board while keeping
+the support posts 3.5 mm off the wall.
 The pressure sensor moves to the +Y wall at X=18.0, Z=22.0;
 its 4.5 mm barb port now exits directly to the outside so the silicone tube
 can run leftward from the mouthpiece without entering the enclosure.
 ## Mount Checklist
 - [x] Mount-collar centered on -X wall at Y=0.0, Z=15.5
 - [x] 24 mm collar on 50 mm wall leaves 13.0 mm edge margin per side
-- [x] Joystick opening moved to the upper band at Y=10.8; only the PCB overhang uses a wall relief
-- [x] Joystick PCB front posts retain 0.7 mm clearance to the +Y wall
+- [x] Joystick opening moved to the upper band at Y=8.0; only the PCB overhang uses a wall relief
+- [x] Joystick PCB front posts retain 3.5 mm clearance to the +Y wall
 - [x] Pressure sensor bracket relocated to the +Y inner wall at X=18.0, Z=22.0
 - [x] Pressure barb hole is 4.5 mm and accessible from outside on the +Y wall
 - [x] Sensor holder stays 1.5 mm clear of the joystick platform in X
@@ -71,7 +71,7 @@ can run leftward from the mouthpiece without entering the enclosure.
 | Shell width in X | 136 mm symmetric | 168 mm asymmetric |
 | Adapter retention | cable clips for loose lead | shelf, side rails, capture hood |
 | Pressure sensor | internal mount, tube feedthrough | +Y wall side-mount, external barb |
-| Joystick Y position | centered | upper edge (Y=10.8), max sight clearance |
+| Joystick Y position | centered | upper edge (Y=8.0), max sight clearance |
 | Pneumatic path | internal tube routing | external: mouthpiece → outside → +Y barb |
 ## External Dimensions
 - Base footprint: 168.0 x 50.0 mm
