@@ -579,7 +579,12 @@ def main() -> None:
     base = make_base()
     lid = make_lid()
     export_stl(base, base_path)
-    export_stl(lid.rotateAboutCenter((1, 0, 0), 180).translate((0, 0, EXT_H_LID)), lid_path)
+    # Flip lid for printing (ceiling-down). Use explicit rotation center (Y=0)
+    # to avoid Y-offset from rotateAboutCenter with asymmetric features.
+    lid_flipped = lid.rotate((0, 0, 0), (1, 0, 0), 180)
+    bb = lid_flipped.val().BoundingBox()
+    lid_flipped = lid_flipped.translate((0, 0, -bb.zmin))
+    export_stl(lid_flipped, lid_path)
     write_report(report_path)
     if not args.skip_renders:
         render_pngs(base, lid, outdir)
