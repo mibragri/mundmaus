@@ -27,7 +27,7 @@ logging.getLogger("OCC").setLevel(logging.ERROR)
 
 # ── Core shell ──────────────────────────────────────────────────────
 CAV_X, CAV_Y, WALL = 130.0, 44.0, 3.0
-FLOOR_T, CEIL_T, INNER_R = 3.0, 3.0, 2.5
+FLOOR_T, CEIL_T, INNER_R = 3.0, 3.0, 9.0  # INNER_R = CORNER_R - WALL
 BASE_INNER_H, LID_INNER_H = 28.0, 7.0
 CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 3.5, 2.0
 LIP_H, LIP_T, LIP_GAP = 4.0, 1.8, 0.15
