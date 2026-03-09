@@ -45,7 +45,7 @@ JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
 JOY_PLATFORM_H = 22.5
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_OPENING = 17.0
-JOY_POS_X, JOY_POS_Y = 18.0, 8.0
+JOY_POS_X, JOY_POS_Y = 18.0, 5.0
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
 JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L - 8.0, 6.0
@@ -62,6 +62,9 @@ CABLE_NOTCH_W, CABLE_NOTCH_H = 8.0, 4.0
 # ── USB cable exit notch (-Y wall, at lid seam) ────────────────────
 USB_NOTCH_W, USB_NOTCH_H = 8.0, 5.0
 USB_NOTCH_X = ESP_POS_X + ESP_L / 2  # aligned with ESP32 USB end
+
+# ── USB plug channel (cut into joystick platform base) ─────────────
+USB_PLUG_W, USB_PLUG_H, USB_PLUG_DEPTH = 12.0, 9.0, 15.0
 
 # ── M3 screw bosses ────────────────────────────────────────────────
 SCREW_D, SCREW_BOSS_D, SCREW_BOSS_H = 3.4, 7.0, 10.0
@@ -117,8 +120,7 @@ BARB_TO_JOYSTICK_OFFSET_X = PRES_POS_X - JOY_POS_X
 BARB_TO_LID_RIM_CLEARANCE_Z = EXT_H_BASE - PRES_HOLDER_MAX_Z
 
 # Clearances
-ESP_ENDSTOP_X = ESP_POS_X - ESP_L / 2 - TOL_LOOSE - 1.5 / 2  # end stop left face
-ESP_TO_COLLAR_CLEARANCE = ESP_ENDSTOP_X - 1.5 / 2 - MIC_COLLAR_INNER_X
+ESP_TO_COLLAR_CLEARANCE = (ESP_POS_X - ESP_L / 2) - MIC_COLLAR_INNER_X
 ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
 ESP_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - ESP_RIGHT_EDGE_X
 PRES_TO_WALL_CLEARANCE = INNER_POS_X - PRES_HOLDER_MAX_X
@@ -200,12 +202,7 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
             ESP_L * 0.55, rail_t
         ).extrude(guide_total)
         base = base.union(rail)
-    # End stop on -X side only (+X side faces joystick, cable provides retention)
-    stop_x = ESP_POS_X - ESP_L / 2 - TOL_LOOSE - rail_t / 2
-    stop = cq.Workplane("XY").workplane(offset=FLOOR_T).center(stop_x, ESP_POS_Y).rect(
-        rail_t, ESP_W * 0.55
-    ).extrude(guide_total)
-    return base.union(stop)
+    return base
 
 
 def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
@@ -297,6 +294,17 @@ def _cut_usb_cable_notch(base: cq.Workplane) -> cq.Workplane:
     return base.cut(notch)
 
 
+def _cut_usb_plug_channel(base: cq.Workplane) -> cq.Workplane:
+    """Cut a channel in the joystick platform for USB Micro-B plug access."""
+    plug_z = FLOOR_T + ESP_STANDOFF_H + ESP_H / 2 + 1.5
+    ch_x0 = JOY_PLATFORM_MIN_X - 0.5  # 0.5mm overlap past platform face
+    ch_x1 = JOY_PLATFORM_MIN_X + USB_PLUG_DEPTH
+    channel = cq.Workplane("XY").workplane(offset=plug_z - USB_PLUG_H / 2).center(
+        (ch_x0 + ch_x1) / 2, ESP_POS_Y
+    ).rect(ch_x1 - ch_x0, USB_PLUG_W).extrude(USB_PLUG_H)
+    return base.cut(channel)
+
+
 def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
     nut_ac_tol = MIC_NUT_SW_TOL / math.cos(math.radians(30))
     # Overlap collar 0.5mm into wall to avoid OCCT coplanar-face boolean failure
@@ -344,6 +352,7 @@ def make_base() -> cq.Workplane:
         _add_pressure_sensor_mount,
         _cut_pressure_barb_port,
         _cut_usb_cable_notch,
+        _cut_usb_plug_channel,
         _add_mic_mount,
         _cut_vent_slots,
     ]:
