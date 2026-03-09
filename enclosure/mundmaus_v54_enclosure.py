@@ -279,14 +279,15 @@ def _add_adapter_retainer(base: cq.Workplane) -> cq.Workplane:
     ).rect(USB_GUIDE_W, USB_GUIDE_H).extrude(-(ADAPTER_WEB_T + 0.02))
     return base.union(hood).cut(aperture)
 def _cut_pressure_barb_port(base: cq.Workplane) -> cq.Workplane:
-    barb_cut = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
+    # XZ workplane normal is -Y, so negate offset to reach +Y wall
+    barb_cut = cq.Workplane("XZ").workplane(offset=-(OUTER_POS_Y + 0.01)).center(
         PRES_POS_X, PRES_POS_Z
-    ).circle(PRES_BARB_HOLE_D / 2).extrude(-(WALL + 0.02))
+    ).circle(PRES_BARB_HOLE_D / 2).extrude(WALL + 0.02)
     base = base.cut(barb_cut)
     try:
-        chamfer = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y - 0.8).center(
+        chamfer = cq.Workplane("XZ").workplane(offset=-(OUTER_POS_Y + 0.01)).center(
             PRES_POS_X, PRES_POS_Z
-        ).circle(PRES_BARB_CHAMFER_D / 2).workplane(offset=-1.0).circle(PRES_BARB_HOLE_D / 2).loft()
+        ).circle(PRES_BARB_CHAMFER_D / 2).workplane(offset=1.0).circle(PRES_BARB_HOLE_D / 2).loft()
         base = base.cut(chamfer)
     except Exception:
         pass
