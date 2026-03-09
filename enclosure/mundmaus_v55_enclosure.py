@@ -243,23 +243,11 @@ def _relieve_joystick_wall(base: cq.Workplane) -> cq.Workplane:
 
 
 def _add_pressure_sensor_mount(base: cq.Workplane) -> cq.Workplane:
+    """Simple shelf — sensor sits on ledge against +Y wall, lid retains from above."""
     shelf = cq.Workplane("XY").workplane(offset=PRES_HOLDER_MIN_Z).center(
         PRES_POS_X, INNER_POS_Y - PRES_HOLDER_DEPTH / 2
-    ).rect(PRES_HOLDER_OUTER_X, PRES_HOLDER_DEPTH).extrude(PRES_HOLDER_T)
-    side_height = PRES_W
-    for side in [-1, 1]:
-        rail = cq.Workplane("XY").workplane(offset=PRES_POS_Z - PRES_W / 2).center(
-            PRES_POS_X + side * (PRES_L / 2 + PRES_HOLDER_T / 2),
-            INNER_POS_Y - PRES_HOLDER_DEPTH / 2,
-        ).rect(PRES_HOLDER_T, PRES_HOLDER_DEPTH).extrude(side_height)
-        shelf = shelf.union(rail)
-    notch = cq.Workplane("YZ").workplane(
-        offset=PRES_POS_X + PRES_L / 2 - CABLE_NOTCH_W / 2
-    ).center(
-        INNER_POS_Y - PRES_HOLDER_DEPTH / 2,
-        PRES_POS_Z - PRES_W / 2 + CABLE_NOTCH_H / 2,
-    ).rect(PRES_HOLDER_DEPTH + 0.02, CABLE_NOTCH_H).extrude(CABLE_NOTCH_W + PRES_HOLDER_T + 0.04)
-    return base.union(shelf).cut(notch)
+    ).rect(PRES_L + 2 * PRES_HOLDER_T, PRES_HOLDER_DEPTH).extrude(PRES_HOLDER_T)
+    return base.union(shelf)
 
 
 def _cut_pressure_barb_port(base: cq.Workplane) -> cq.Workplane:
