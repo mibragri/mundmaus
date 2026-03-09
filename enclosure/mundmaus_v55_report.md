@@ -30,7 +30,7 @@ Component positions along X axis:
 | USB cable notch wall | -Y |
 | Vent slots wall | -Y |
 | Pressure barb wall | +Y |
-| +X+Y screw boss Y (shifted) | 10.50 mm |
+| Screw bosses | 3 (no +X+Y — sensor cable clearance) |
 | Nearest -X screw boss clearance in Y | 0.50 mm |
 ## Changes vs v5.4c
 | Feature | v5.4c | v5.5 |
@@ -42,7 +42,7 @@ Component positions along X axis:
 | ESP32 X position | 28.0 | -28.0 |
 | Joystick X position | -15.0 | 18.0 |
 | Sensor X position | 18.0 | 50.0 |
-| +X+Y screw boss | standard corner | Y shifted to 10.5 (sensor clearance) |
+| +X+Y screw boss | standard corner | removed (sensor cable clearance) |
 | Vent slot wall | -Y (fixed) | -Y |
 | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
 | Joystick Y position | upper edge (Y=8.0) | upper edge (Y=5.0) |

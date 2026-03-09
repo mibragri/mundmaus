@@ -31,7 +31,7 @@ FLOOR_T, CEIL_T, INNER_R = 3.0, 3.0, 2.5
 BASE_INNER_H, LID_INNER_H = 28.0, 7.0
 CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 3.5, 2.0
 LIP_H, LIP_T, LIP_GAP = 4.0, 1.8, 0.15
-TOL, TOL_LOOSE = 0.2, 0.3
+TOL, TOL_LOOSE = 0.2, 0.5
 
 # ── ESP32-WROOM-32 DevKitC V4 ──────────────────────────────────────
 ESP_L, ESP_W, ESP_H = 51.5, 28.0, 1.2
@@ -48,7 +48,7 @@ JOY_OPENING = 17.0
 JOY_POS_X, JOY_POS_Y = 18.0, 5.0
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
-JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L - 8.0, 6.0
+JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L, 6.0
 JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
 
 # ── Pressure Sensor (MPS20N0040D-S + HX710B) ───────────────────────
@@ -125,13 +125,10 @@ ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
 ESP_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - ESP_RIGHT_EDGE_X
 PRES_TO_WALL_CLEARANCE = INNER_POS_X - PRES_HOLDER_MAX_X
 
-# Screw positions — +X+Y boss shifted in Y to clear sensor bracket
+# Screw positions — 3 bosses; +X+Y removed for pressure sensor cable clearance
 _STD_X = CAV_X / 2 - SCREW_INSET
 _STD_Y = CAV_Y / 2 - SCREW_INSET
-_PRES_BRACKET_MIN_Y = INNER_POS_Y - PRES_HOLDER_DEPTH
-_PX_PY_BOSS_Y = min(_STD_Y, _PRES_BRACKET_MIN_Y - SCREW_BOSS_D / 2 - 1.0)
 SCREW_POSITIONS = [
-    (_STD_X, _PX_PY_BOSS_Y),   # +X +Y — shifted down to avoid sensor bracket
     (_STD_X, -_STD_Y),          # +X -Y
     (-_STD_X, _STD_Y),          # -X +Y
     (-_STD_X, -_STD_Y),         # -X -Y
@@ -199,7 +196,7 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
     for side in [-1, 1]:
         gy = ESP_POS_Y + side * (ESP_W / 2 + TOL_LOOSE + rail_t / 2)
         rail = cq.Workplane("XY").workplane(offset=FLOOR_T).center(ESP_POS_X, gy).rect(
-            ESP_L * 0.55, rail_t
+            ESP_L * 0.4, rail_t
         ).extrude(guide_total)
         base = base.union(rail)
     return base
@@ -557,7 +554,7 @@ def write_report(report_path: Path) -> None:
         | USB cable notch wall | -Y |
         | Vent slots wall | -Y |
         | Pressure barb wall | +Y |
-        | +X+Y screw boss Y (shifted) | {_PX_PY_BOSS_Y:.2f} mm |
+        | Screw bosses | 3 (no +X+Y — sensor cable clearance) |
         | Nearest -X screw boss clearance in Y | {NEAREST_BOSS_Y_CLEARANCE:.2f} mm |
         ## Changes vs v5.4c
         | Feature | v5.4c | v5.5 |
@@ -569,7 +566,7 @@ def write_report(report_path: Path) -> None:
         | ESP32 X position | 28.0 | {ESP_POS_X:.1f} |
         | Joystick X position | -15.0 | {JOY_POS_X:.1f} |
         | Sensor X position | 18.0 | {PRES_POS_X:.1f} |
-        | +X+Y screw boss | standard corner | Y shifted to {_PX_PY_BOSS_Y:.1f} (sensor clearance) |
+        | +X+Y screw boss | standard corner | removed (sensor cable clearance) |
         | Vent slot wall | -Y (fixed) | -Y |
         | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
         | Joystick Y position | upper edge (Y=8.0) | upper edge (Y={JOY_POS_Y:.1f}) |
