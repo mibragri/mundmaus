@@ -115,6 +115,12 @@ client.loop_stop()
 "
 ```
 
+## Firewall
+Port 9994 muss für den Drucker offen sein (temporärer HTTP-Server für Dateitransfer):
+```bash
+sudo ufw allow from 192.168.178.135 to any port 9994 proto tcp comment 'bambu P2S file download'
+```
+
 ## Abhängigkeiten
 - `BambuStudio.AppImage` → `~/.local/bin/BambuStudio.AppImage`
 - `libwebkit2gtk-4.1-0` (apt)
