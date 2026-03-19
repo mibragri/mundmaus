@@ -8,20 +8,20 @@ v5.5 is a compact symmetric redesign. Key changes from v5.4c:
 
 Component positions along X axis:
 - Mic mount collar: -X wall (internal, -58.1 inner edge)
-- Joystick center: X=7.8 (platform -10.7 to 26.3)
+- Joystick center: X=-19.0 (platform -37.5 to -0.5)
 - Sensor bracket: X=42.0 (bracket 30.0 to 54.0)
 - ESP32 center: X=35.0 (PCB 7.8 to 62.2, USB at -X end)
 ## Clearance Analysis
 | Item | Value |
 |---|---:|
-| Mic collar to joystick platform | 47.40 mm |
-| Joystick platform to sensor bracket | 3.70 mm |
+| Mic collar to joystick platform | 20.60 mm |
+| Joystick platform to sensor bracket | 30.50 mm |
 | ESP32 right edge to +X inner wall | 3.80 mm |
 | Joystick center Y | 5.00 mm |
 | Joystick PCB overrun past +Y inner wall | 0.00 mm |
 | Remaining +Y wall behind PCB relief | 2.00 mm |
 | Front joystick posts to +Y wall | 7.50 mm |
-| Sensor barb X offset from joystick | 34.20 mm |
+| Sensor barb X offset from joystick | 61.00 mm |
 | Sensor holder top to lid rim | 2.50 mm |
 | Mount center on -X wall | Y=0.00 mm, Z=15.00 mm |
 | Mount collar edge margin on 50 mm wall | 13.00 mm each side |
@@ -39,7 +39,7 @@ Component positions along X axis:
 | Component order | Mount, Joystick, Sensor, ESP32+Adapter | Mount, Joystick, Sensor, ESP32 |
 | USB solution | +X adapter bay, direct plug | USB faces -X, -Y cable notch + lid strain relief |
 | ESP32 X position | 28.0 | 35.0 |
-| Joystick X position | -15.0 | 7.8 |
+| Joystick X position | -15.0 | -19.0 |
 | Sensor X position | 18.0 | 42.0 |
 | +X+Y screw boss | standard corner | restored (sensor moved to center) |
 | Vent slot wall | -Y (fixed) | -Y |

@@ -46,7 +46,7 @@ JOY_PLATFORM_H = 22.5
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
 JOY_OPENING = 17.0
-JOY_POS_X, JOY_POS_Y = 7.8, 5.0  # centered on ESP32 USB port for cable access between pillars
+JOY_POS_X, JOY_POS_Y = -19.0, 5.0  # left side, 20mm clearance for mic nut insertion
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
 JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L, 6.0
@@ -54,7 +54,7 @@ JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
 
 # ── Pressure Sensor (MPS20N0040D-S + HX710B) ───────────────────────
 PRES_L, PRES_W, PRES_H = 20.0, 15.0, 5.0
-PRES_POS_X, PRES_POS_Z = 42.0, 20.0  # right of joystick pillars, +Y wall shelf (overlaps ESP in X, separated in Y/Z)
+PRES_POS_X, PRES_POS_Z = 42.0, 20.0  # right of ESP32, +Y wall shelf
 PRES_SENSOR_WALL_GAP = 0.3
 PRES_HOLDER_T, PRES_HOLDER_DEPTH = 2.0, 7.0
 PRES_BARB_HOLE_D, PRES_BARB_CHAMFER_D = 3.0, 5.0
@@ -206,7 +206,7 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
 
 
 def _add_joystick_pillars(base: cq.Workplane) -> cq.Workplane:
-    """4 pillar feet instead of solid platform — open space for cables + USB plug."""
+    """4 pillar feet — USB cable routes between pillars (plug first, then seat joystick)."""
     _floor_overlap = 0.5
     pillar_d = 8.0       # pillar diameter — sturdy enough for lateral force
     base_flare_d = 11.0  # wider base for stability
