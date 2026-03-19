@@ -26,17 +26,17 @@ warnings.filterwarnings("ignore")
 logging.getLogger("OCC").setLevel(logging.ERROR)
 
 # ── Core shell ──────────────────────────────────────────────────────
-CAV_X, CAV_Y, WALL = 130.0, 44.0, 3.0
-FLOOR_T, CEIL_T, INNER_R = 3.0, 3.0, 9.0  # INNER_R = CORNER_R - WALL
+CAV_X, CAV_Y, WALL = 132.0, 46.0, 2.0  # thinner walls (5 perimeters @ 0.4mm)
+FLOOR_T, CEIL_T, INNER_R = 2.0, 2.0, 10.0  # INNER_R = CORNER_R - WALL
 BASE_INNER_H, LID_INNER_H = 28.0, 7.0
 CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 3.5, 2.0
 LIP_H, LIP_T, LIP_GAP = 4.0, 1.8, 0.15
 TOL, TOL_LOOSE = 0.2, 0.5
 
 # ── ESP32-WROOM-32 DevKitC V4 ──────────────────────────────────────
-ESP_L, ESP_W, ESP_H = 51.5, 28.0, 1.2
+ESP_L, ESP_W, ESP_H = 54.4, 28.0, 1.2  # Espressif DevKitC V4 spec (was 51.5)
 ESP_STANDOFF_H, ESP_GUIDE_H = 3.0, 3.0
-ESP_POS_X, ESP_POS_Y = -28.0, -2.0
+ESP_POS_X, ESP_POS_Y = 35.0, -2.0  # right side; USB faces -X (center)
 ESP_USB_PROTRUSION = 2.4
 
 # ── KY-023 Joystick ────────────────────────────────────────────────
@@ -44,8 +44,9 @@ JOY_PCB_L, JOY_PCB_W, JOY_PCB_H = 34.0, 26.0, 1.6
 JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
 JOY_PLATFORM_H = 22.5
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
+JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
 JOY_OPENING = 17.0
-JOY_POS_X, JOY_POS_Y = 18.0, 5.0
+JOY_POS_X, JOY_POS_Y = 7.8, 5.0  # centered on ESP32 USB port for cable access between pillars
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
 JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L, 6.0
@@ -53,7 +54,7 @@ JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
 
 # ── Pressure Sensor (MPS20N0040D-S + HX710B) ───────────────────────
 PRES_L, PRES_W, PRES_H = 20.0, 15.0, 5.0
-PRES_POS_X, PRES_POS_Z = 50.0, 22.0
+PRES_POS_X, PRES_POS_Z = 42.0, 20.0  # right of joystick pillars, +Y wall shelf (overlaps ESP in X, separated in Y/Z)
 PRES_SENSOR_WALL_GAP = 0.3
 PRES_HOLDER_T, PRES_HOLDER_DEPTH = 2.0, 7.0
 PRES_BARB_HOLE_D, PRES_BARB_CHAMFER_D = 3.0, 5.0
@@ -61,7 +62,7 @@ CABLE_NOTCH_W, CABLE_NOTCH_H = 8.0, 4.0
 
 # ── USB cable exit notch (-Y wall, at lid seam) ────────────────────
 USB_NOTCH_W, USB_NOTCH_H = 8.0, 5.0
-USB_NOTCH_X = ESP_POS_X + ESP_L / 2  # aligned with ESP32 USB end
+USB_NOTCH_X = ESP_POS_X - ESP_L / 2  # USB faces -X (center), cable routes left
 
 # ── USB plug channel (cut into joystick platform base) ─────────────
 USB_PLUG_W, USB_PLUG_H, USB_PLUG_DEPTH = 12.0, 9.0, 15.0
@@ -97,7 +98,7 @@ STICK_TIP_Z = FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H + JOY_STICK_H
 LID_TOP_Z = EXT_H_BASE + EXT_H_LID
 STICK_PROTRUSION = STICK_TIP_Z - LID_TOP_Z
 
-ESP_USB_FACE_X = ESP_POS_X + ESP_L / 2 + ESP_USB_PROTRUSION
+ESP_USB_FACE_X = ESP_POS_X - ESP_L / 2 - ESP_USB_PROTRUSION  # USB faces -X
 
 # Joystick derived
 JOY_PCB_TOP_Y = JOY_POS_Y + JOY_PCB_W / 2
@@ -119,17 +120,19 @@ PRES_TO_JOY_PLATFORM_CLEARANCE_X = PRES_HOLDER_MIN_X - JOY_PLATFORM_MAX_X
 BARB_TO_JOYSTICK_OFFSET_X = PRES_POS_X - JOY_POS_X
 BARB_TO_LID_RIM_CLEARANCE_Z = EXT_H_BASE - PRES_HOLDER_MAX_Z
 
-# Clearances
-ESP_TO_COLLAR_CLEARANCE = (ESP_POS_X - ESP_L / 2) - MIC_COLLAR_INNER_X
+# Clearances (new layout: Collar → Joy → Sensor → ESP32)
+COLLAR_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - MIC_COLLAR_INNER_X
+JOY_TO_PRES_CLEARANCE = PRES_HOLDER_MIN_X - JOY_PLATFORM_MAX_X
+ESP_LEFT_EDGE_X = ESP_POS_X - ESP_L / 2
 ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
-ESP_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - ESP_RIGHT_EDGE_X
-PRES_TO_WALL_CLEARANCE = INNER_POS_X - PRES_HOLDER_MAX_X
+ESP_TO_WALL_CLEARANCE = INNER_POS_X - ESP_RIGHT_EDGE_X
 
-# Screw positions — 3 bosses; +X+Y removed for pressure sensor cable clearance
+# Screw positions — 4 bosses (restored +X+Y, sensor moved to center)
 _STD_X = CAV_X / 2 - SCREW_INSET
 _STD_Y = CAV_Y / 2 - SCREW_INSET
 SCREW_POSITIONS = [
     (_STD_X, -_STD_Y),          # +X -Y
+    (_STD_X, _STD_Y),           # +X +Y (restored)
     (-_STD_X, _STD_Y),          # -X +Y
     (-_STD_X, -_STD_Y),         # -X -Y
 ]
@@ -202,34 +205,36 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
     return base
 
 
-def _add_joystick_platform(base: cq.Workplane) -> cq.Workplane:
-    # Overlap 0.5mm into floor to avoid OCCT coplanar-face boolean failure
+def _add_joystick_pillars(base: cq.Workplane) -> cq.Workplane:
+    """4 pillar feet instead of solid platform — open space for cables + USB plug."""
     _floor_overlap = 0.5
-    rear = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
-        JOY_POS_X, JOY_POS_Y + JOY_PLATFORM_MAIN_SHIFT_Y
-    ).rect(JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y).extrude(JOY_PLATFORM_H + _floor_overlap)
-    # Clamp front block to inner cavity wall
-    front_max_y = INNER_POS_Y - 0.2
-    front_raw_cy = JOY_POS_Y + JOY_PLATFORM_FRONT_SHIFT_Y
-    front_raw_min_y = front_raw_cy - JOY_PLATFORM_FRONT_Y / 2
-    front_clamped_h = min(JOY_PLATFORM_FRONT_Y, front_max_y - front_raw_min_y)
-    front_clamped_cy = front_raw_min_y + front_clamped_h / 2
-    front = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
-        JOY_POS_X, front_clamped_cy
-    ).rect(JOY_PLATFORM_FRONT_X, front_clamped_h).extrude(JOY_PLATFORM_H + _floor_overlap)
-    # Union sequentially (combined fillet corrupts OCCT booleans)
-    base = base.union(rear).union(front)
-    # Alignment pins (skip any in +Y wall zone)
+    pillar_d = 8.0       # pillar diameter — sturdy enough for lateral force
+    base_flare_d = 11.0  # wider base for stability
+    base_flare_h = 3.0   # flare height
+
     for dx in [-1, 1]:
         for dy in [-1, 1]:
-            px = JOY_POS_X + dx * (JOY_PCB_L / 2 - 2.5)
-            py = JOY_POS_Y + dy * (JOY_PCB_W / 2 - 2.5)
+            px = JOY_POS_X + dx * (JOY_HOLE_GRID_X / 2)
+            py = JOY_POS_Y + dy * (JOY_HOLE_GRID_Y / 2)
             if py > INNER_POS_Y - 0.5:
                 continue
+            # Flared base for stability
+            flare = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
+                px, py
+            ).circle(base_flare_d / 2).workplane(offset=base_flare_h + _floor_overlap).circle(
+                pillar_d / 2
+            ).loft()
+            # Main pillar shaft
+            shaft = cq.Workplane("XY").workplane(offset=FLOOR_T + base_flare_h).center(
+                px, py
+            ).circle(pillar_d / 2).extrude(JOY_PLATFORM_H - base_flare_h)
+            # Alignment pin on top (tapered for easy PCB insertion)
             pin = cq.Workplane("XY").workplane(offset=FLOOR_T + JOY_PLATFORM_H).center(
                 px, py
-            ).circle(JOY_PIN_D / 2).workplane(offset=JOY_PIN_H).circle(JOY_PIN_D / 2 - 0.2).loft()
-            base = base.union(pin)
+            ).circle(JOY_PIN_D / 2).workplane(offset=JOY_PIN_H).circle(
+                JOY_PIN_D / 2 - 0.2
+            ).loft()
+            base = base.union(flare).union(shaft).union(pin)
     return base
 
 
@@ -332,12 +337,10 @@ def make_base() -> cq.Workplane:
     for fn in [
         _add_screw_bosses,
         _add_esp_cradle,
-        _add_joystick_platform,
-        _relieve_joystick_wall,
+        _add_joystick_pillars,
         _add_pressure_sensor_mount,
         _cut_pressure_barb_port,
         _cut_usb_cable_notch,
-        _cut_usb_plug_channel,
         _add_mic_mount,
         _cut_vent_slots,
     ]:
@@ -514,22 +517,21 @@ def write_report(report_path: Path) -> None:
         ## Summary
         v5.5 is a compact symmetric redesign. Key changes from v5.4c:
         - **Removed adapter bay** — enclosure shrinks from 168 to {EXT_X:.0f} mm
-        - **New component order**: Mount(-X) → ESP32 → Joystick → Sensor(+X)
-        - **USB cable notch** on -Y wall at seam height; lid provides strain relief
-        - No internal USB cable routing; plug with lid open, close for retention
+        - **New component order**: Mount(-X) → Joystick → Sensor → ESP32(+X)
+        - **ESP32 USB faces -X** (center) for plug access; cable routes to -Y wall notch
+        - 4 screw bosses (restored +X+Y, sensor moved to center)
 
         Component positions along X axis:
         - Mic mount collar: -X wall (internal, {MIC_COLLAR_INNER_X:.1f} inner edge)
-        - ESP32 center: X={ESP_POS_X:.1f} (PCB {ESP_POS_X - ESP_L / 2:.1f} to {ESP_POS_X + ESP_L / 2:.1f})
         - Joystick center: X={JOY_POS_X:.1f} (platform {JOY_PLATFORM_MIN_X:.1f} to {JOY_PLATFORM_MAX_X:.1f})
         - Sensor bracket: X={PRES_POS_X:.1f} (bracket {PRES_HOLDER_MIN_X:.1f} to {PRES_HOLDER_MAX_X:.1f})
+        - ESP32 center: X={ESP_POS_X:.1f} (PCB {ESP_LEFT_EDGE_X:.1f} to {ESP_RIGHT_EDGE_X:.1f}, USB at -X end)
         ## Clearance Analysis
         | Item | Value |
         |---|---:|
-        | ESP32 end stop to collar | {ESP_TO_COLLAR_CLEARANCE:.2f} mm |
-        | ESP32 right edge to joystick platform | {ESP_TO_JOY_CLEARANCE:.2f} mm |
-        | Joystick platform to sensor bracket | {PRES_TO_JOY_PLATFORM_CLEARANCE_X:.2f} mm |
-        | Sensor bracket to +X inner wall | {PRES_TO_WALL_CLEARANCE:.2f} mm |
+        | Mic collar to joystick platform | {COLLAR_TO_JOY_CLEARANCE:.2f} mm |
+        | Joystick platform to sensor bracket | {JOY_TO_PRES_CLEARANCE:.2f} mm |
+        | ESP32 right edge to +X inner wall | {ESP_TO_WALL_CLEARANCE:.2f} mm |
         | Joystick center Y | {JOY_POS_Y:.2f} mm |
         | Joystick PCB overrun past +Y inner wall | {JOY_WALL_RELIEF_DEPTH:.2f} mm |
         | Remaining +Y wall behind PCB relief | {JOY_REMAINING_TOP_WALL:.2f} mm |
@@ -542,19 +544,19 @@ def write_report(report_path: Path) -> None:
         | USB cable notch wall | -Y |
         | Vent slots wall | -Y |
         | Pressure barb wall | +Y |
-        | Screw bosses | 3 (no +X+Y — sensor cable clearance) |
+        | Screw bosses | 4 (all corners restored) |
         | Nearest -X screw boss clearance in Y | {NEAREST_BOSS_Y_CLEARANCE:.2f} mm |
         ## Changes vs v5.4c
         | Feature | v5.4c | v5.5 |
         |---|---|---|
         | Shell width in X | 168 mm asymmetric | {EXT_X:.0f} mm symmetric |
         | Adapter bay | +X, 32 mm | removed |
-        | Component order | Mount, Joystick, Sensor, ESP32+Adapter | Mount, ESP32, Joystick, Sensor |
-        | USB solution | +X adapter bay, direct plug | -Y cable notch + lid strain relief |
+        | Component order | Mount, Joystick, Sensor, ESP32+Adapter | Mount, Joystick, Sensor, ESP32 |
+        | USB solution | +X adapter bay, direct plug | USB faces -X, -Y cable notch + lid strain relief |
         | ESP32 X position | 28.0 | {ESP_POS_X:.1f} |
         | Joystick X position | -15.0 | {JOY_POS_X:.1f} |
         | Sensor X position | 18.0 | {PRES_POS_X:.1f} |
-        | +X+Y screw boss | standard corner | removed (sensor cable clearance) |
+        | +X+Y screw boss | standard corner | restored (sensor moved to center) |
         | Vent slot wall | -Y (fixed) | -Y |
         | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
         | Joystick Y position | upper edge (Y=8.0) | upper edge (Y={JOY_POS_Y:.1f}) |
@@ -594,7 +596,7 @@ def main() -> None:
 
     print(f"MundMaus v5.5 — CadQuery {cq.__version__}")
     print(f"  External: {EXT_X:.1f} x {EXT_Y:.1f} x {EXT_H_BASE + EXT_H_LID:.1f} mm")
-    print(f"  Layout: Mount(-X) → ESP32(X={ESP_POS_X:.0f}) → Joy(X={JOY_POS_X:.0f}) → Sensor(X={PRES_POS_X:.0f})")
+    print(f"  Layout: Mount(-X) → Joy(X={JOY_POS_X:.0f}) → Sensor(X={PRES_POS_X:.0f}) → ESP32(X={ESP_POS_X:.0f})")
     print(f"  Mount: -X wall, collar {MIC_COLLAR_D:.1f} mm")
 
     base = make_base()
