@@ -46,7 +46,7 @@ JOY_PLATFORM_H = 22.5
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
 JOY_OPENING = 17.0
-JOY_POS_X, JOY_POS_Y = -19.0, 5.0  # left side, 20mm clearance for mic nut insertion
+JOY_POS_X, JOY_POS_Y = -19.0, -2.0  # left side, Y=-2 = centered on USB plug Y for equal clearance
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
 JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L, 6.0
@@ -208,8 +208,8 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
 def _add_joystick_pillars(base: cq.Workplane) -> cq.Workplane:
     """4 pillar feet — USB cable routes between pillars (plug first, then seat joystick)."""
     _floor_overlap = 0.5
-    pillar_d = 8.0       # pillar diameter — sturdy enough for lateral force
-    base_flare_d = 11.0  # wider base for stability
+    pillar_d = 6.0       # thinner for USB plug clearance (1.7mm/side)
+    base_flare_d = 9.0   # wider base for stability
     base_flare_h = 3.0   # flare height
 
     for dx in [-1, 1]:

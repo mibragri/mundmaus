@@ -17,10 +17,10 @@ Component positions along X axis:
 | Mic collar to joystick platform | 20.60 mm |
 | Joystick platform to sensor bracket | 30.50 mm |
 | ESP32 right edge to +X inner wall | 3.80 mm |
-| Joystick center Y | 5.00 mm |
+| Joystick center Y | -2.00 mm |
 | Joystick PCB overrun past +Y inner wall | 0.00 mm |
 | Remaining +Y wall behind PCB relief | 2.00 mm |
-| Front joystick posts to +Y wall | 7.50 mm |
+| Front joystick posts to +Y wall | 14.50 mm |
 | Sensor barb X offset from joystick | 61.00 mm |
 | Sensor holder top to lid rim | 2.50 mm |
 | Mount center on -X wall | Y=0.00 mm, Z=15.00 mm |
@@ -44,7 +44,7 @@ Component positions along X axis:
 | +X+Y screw boss | standard corner | restored (sensor moved to center) |
 | Vent slot wall | -Y (fixed) | -Y |
 | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
-| Joystick Y position | upper edge (Y=8.0) | upper edge (Y=5.0) |
+| Joystick Y position | upper edge (Y=8.0) | upper edge (Y=-2.0) |
 | Pneumatic path | external: mouthpiece → +Y barb | external: mouthpiece → +Y barb |
 ## External Dimensions
 - Base footprint: 136.0 x 50.0 mm
