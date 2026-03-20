@@ -11,8 +11,7 @@
 - [ ] Raspberry Pi Kiosk — Auto-Start-Script für Kiosk-Modus (#low)
 
 ## In Progress
-- [ ] Bambu Studio CLI Setup — headless Slicing + Direktdruck auf P2S
-- [ ] Gehäuse v5.5 Erstdruck — Grau PETG, Slot 4
+- [ ] Gehäuse v5.5 Lid drucken — Grau PETG, Slot 4
 
 ## Done (2026-03-19)
 - [x] Solitaire: Key-Repeat-Bug behoben (e.repeat Guard)
@@ -29,3 +28,8 @@
 - [x] Gehäuse v5.5: Mic-Nut Insertion Clearance Check im Validator
 - [x] Gehäuse v5.5: Validierung komplett (Maße, Clearances, Druckbarkeit)
 - [x] P2S: MQTT-Verbindung hergestellt, AMS ausgelesen, Seriennummer ermittelt
+- [x] Bambu Studio CLI: P2S-Profile korrekt aufgelöst (Templates statt generisch)
+- [x] Bambu Print: Profil-Validierung vor jedem Druck (validate-profiles.sh)
+- [x] Bambu Print: Thumbnail-Injection (CadQuery-Render → 3MF)
+- [x] Bambu Print: iPhone-Notification bei Start/Fertig/Fehler (bambu-monitor.py)
+- [x] Gehäuse v5.5 Base gedruckt — Grau PETG, Slot 4, ~1h33m (2026-03-20)

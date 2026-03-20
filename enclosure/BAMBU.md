@@ -115,10 +115,52 @@ client.loop_stop()
 "
 ```
 
+## Monitoring
+Das Print-Script startet automatisch `bambu-monitor.py` im Hintergrund:
+- Pollt alle 30s den Drucker-Status via MQTT
+- Sendet iPhone-Notification bei **Fertigstellung** oder **Fehler**
+- Loggt Fortschritt alle 10% in `/tmp/bambu-monitor.log`
+- Beendet sich automatisch nach Druckende
+
+Manuell starten:
+```bash
+python3 tools/bambu-monitor.py
+```
+
+## Profil-Validierung
+Vor jedem Druck prüft `validate-profiles.sh` automatisch:
+- Start-GCode enthält `P2S start gcode` Marker (kein generischer Code)
+- Bed Type ist PETG-kompatibel
+- Nozzle-Temperatur realistisch
+- Smoke Test: sliced einen Test-Cube und prüft den Output-GCode
+
+Manuell:
+```bash
+tools/bambu-profiles/validate-profiles.sh
+```
+
+## Thumbnail
+BambuStudio CLI kann auf headless Linux keine OpenGL-Thumbnails rendern.
+Das Print-Script injiziert automatisch CadQuery-Renders (512x512 PNG) als
+`Metadata/plate_1.png` in die 3MF-Datei → Vorschaubild auf dem P2S Display.
+
 ## Firewall
 Port 9994 muss für den Drucker offen sein (temporärer HTTP-Server für Dateitransfer):
 ```bash
 sudo ufw allow from 192.168.178.135 to any port 9994 proto tcp comment 'bambu P2S file download'
+```
+
+## Tools
+```
+tools/
+├── bambu-print.sh          # Slice + Upload + Print + Monitor
+├── bambu-monitor.py        # Hintergrund-Monitoring mit iPhone-Notification
+└── bambu-profiles/
+    ├── printer.env          # IP, Access Code, Serial
+    ├── machine-resolved.json    # P2S 0.4mm + Template-GCodes
+    ├── filament-resolved.json   # Generic PETG HF
+    ├── process-resolved.json    # 0.20mm, 5 Wände, 25% Gyroid
+    └── validate-profiles.sh     # Pre-Print Validierung
 ```
 
 ## Abhängigkeiten
@@ -126,3 +168,4 @@ sudo ufw allow from 192.168.178.135 to any port 9994 proto tcp comment 'bambu P2
 - `libwebkit2gtk-4.1-0` (apt)
 - `mosquitto-clients` (apt)
 - `paho-mqtt` (pip)
+- `Pillow` (pip, für Thumbnail-Injection)
