@@ -38,7 +38,7 @@
 - **Generieren**: `/home/ai/.local/share/mamba/envs/cadquery/bin/python enclosure/mundmaus_v55_enclosure.py --outdir enclosure/output`
 
 ## 3D-Drucker (Bambu Lab P2S)
-- **Details**: siehe [`enclosure/BAMBU.md`](enclosure/BAMBU.md)
+- **Details**: siehe [`tools/BAMBU.md`](../../tools/BAMBU.md)
 - **Generisches Druck-Tool**: `tools/bambu-print.sh` (projektübergreifend, Config in `tools/bambu-profiles/`)
 - **MundMaus drucken**: `enclosure/print-p2s.sh base` / `enclosure/print-p2s.sh lid`
 - **AMS Slot 4**: Grau PETG
