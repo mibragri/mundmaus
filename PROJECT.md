@@ -29,6 +29,7 @@
 - **Sichtfeld**: Joystick am oberen Rand (+Y) des Gehäuses, Gehäuse erstreckt sich unterhalb → maximale Sichtfreiheit
 
 ## 3D-Gehäuse (v5.5)
+- **Prozess-Regeln**: siehe [`tools/3d-printing/CLAUDE.md`](../../tools/3d-printing/CLAUDE.md)
 - **CadQuery** — `enclosure/mundmaus_v55_enclosure.py`
 - **Validierung** — `enclosure/validate_enclosure.py` (Maße, Clearances, Druckbarkeit, Nut-Insertion)
 - **Ausgabe** — `enclosure/output/` (STL, PNG, Report)
