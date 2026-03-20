@@ -14,27 +14,28 @@ AMS_SLOT=4  # Grau PETG
 
 PART="${1:-base}"
 
+ACTION="${2:-preview}"
+
 case "$PART" in
-    base)
-        echo "=== MundMaus v5.5 — Base drucken ==="
-        "$BAMBU_PRINT" "${OUTPUT_DIR}/mundmaus_v55_base.stl" \
-            --slot "$AMS_SLOT" --profile "$PROFILE_DIR"
-        ;;
-    lid)
-        echo "=== MundMaus v5.5 — Lid drucken ==="
-        "$BAMBU_PRINT" "${OUTPUT_DIR}/mundmaus_v55_lid.stl" \
-            --slot "$AMS_SLOT" --profile "$PROFILE_DIR"
-        ;;
-    both)
-        echo "=== MundMaus v5.5 — Base drucken ==="
-        "$BAMBU_PRINT" "${OUTPUT_DIR}/mundmaus_v55_base.stl" \
-            --slot "$AMS_SLOT" --profile "$PROFILE_DIR"
+    base) STL_FILE="${OUTPUT_DIR}/mundmaus_v55_base.stl" ;;
+    lid)  STL_FILE="${OUTPUT_DIR}/mundmaus_v55_lid.stl" ;;
+    *)    echo "Usage: print-p2s.sh [base|lid] [preview|print]"; exit 1 ;;
+esac
+
+case "$ACTION" in
+    preview)
+        echo "=== MundMaus v5.5 — ${PART} Preview ==="
+        "$BAMBU_PRINT" "$STL_FILE" \
+            --slot "$AMS_SLOT" --profile "$PROFILE_DIR" --no-start
         echo ""
-        echo "Base-Druck gestartet. Lid wird nach Fertigstellung gedruckt."
-        echo "Starte 'print-p2s.sh lid' wenn die Base fertig ist."
+        echo "Preview only. Zum Drucken: print-p2s.sh $PART print"
+        ;;
+    print)
+        echo "=== MundMaus v5.5 — ${PART} Drucken ==="
+        "$BAMBU_PRINT" "$STL_FILE" \
+            --slot "$AMS_SLOT" --profile "$PROFILE_DIR"
         ;;
     *)
-        echo "Usage: print-p2s.sh [base|lid|both]"
-        exit 1
+        echo "Usage: print-p2s.sh [base|lid] [preview|print]"; exit 1
         ;;
 esac
