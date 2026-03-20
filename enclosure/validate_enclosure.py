@@ -347,6 +347,32 @@ ok(f"Cooling: 40-60% (PETG, enclosed P1S/P2S chamber)")
 ok(f"Arachne wall generator: enabled (default)")
 ok(f"Seam: aligned to back (-Y wall) to hide on visible surfaces")
 
+# ── 7. Visual Clearance (USB plug vs pillars) ────────────────────
+
+print("\n── 7. USB Plug vs Pillar Clearance ──")
+_usb_plug_w = 11.0
+_usb_plug_len = 20.0
+_usb_port_x2 = ESP_POS_X - ESP_L / 2
+_usb_plug_x1 = _usb_port_x2 - _usb_plug_len
+_usb_plug_y1 = ESP_POS_Y - _usb_plug_w / 2
+_usb_plug_y2 = ESP_POS_Y + _usb_plug_w / 2
+_pillar_sr = 3.0  # must match enclosure Ø6/2
+
+for _px, _py in _pillar_positions:
+    _ox = min(_usb_port_x2, _px + _pillar_sr) - max(_usb_plug_x1, _px - _pillar_sr)
+    if _ox <= 0:
+        continue
+    if _py > ESP_POS_Y:
+        _gap = (_py - _pillar_sr) - _usb_plug_y2
+    else:
+        _gap = _usb_plug_y1 - (_py + _pillar_sr)
+    if _gap < 0:
+        err(f"USB plug COLLIDES with pillar ({_px:+.0f},{_py:+.0f}) by {-_gap:.1f}mm!")
+    elif _gap < 1.5:
+        warn(f"USB plug ↔ pillar ({_px:+.0f},{_py:+.0f}): {_gap:.1f}mm")
+    else:
+        ok(f"USB plug ↔ pillar ({_px:+.0f},{_py:+.0f}): {_gap:.1f}mm ✓")
+
 # ── Summary ──────────────────────────────────────────────────────
 
 print("\n" + "=" * 65)
