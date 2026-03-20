@@ -35,9 +35,16 @@ TOL, TOL_LOOSE = 0.2, 0.5
 
 # ── ESP32-WROOM-32 DevKitC V4 ──────────────────────────────────────
 ESP_L, ESP_W, ESP_H = 54.4, 28.0, 1.2  # Espressif DevKitC V4 spec (was 51.5)
-ESP_STANDOFF_H, ESP_GUIDE_H = 3.0, 3.0
-ESP_POS_X, ESP_POS_Y = 35.0, -2.0  # right side; USB faces -X (center)
+ESP_MODULE_H = 3.1                      # WROOM-32 metal shield height
+ESP_STANDOFF_H, ESP_GUIDE_H = 0.5, 3.0  # minimal standoff — module faces floor for cooling
+ESP_POS_X, ESP_POS_Y = 35.0, -2.0      # right side; USB faces -X (center)
 ESP_USB_PROTRUSION = 2.4
+# ESP32 is mounted UPSIDE DOWN: WROOM module faces floor for cooling,
+# buttons (EN/BOOT) face floor, pin headers face up.
+# EN (reset) button position relative to USB end of PCB:
+ESP_EN_BTN_FROM_USB = 6.1   # mm from USB end along long axis
+ESP_EN_BTN_FROM_EDGE = 4.8  # mm from left edge (when USB faces you)
+ESP_EN_BTN_HOLE_D = 3.0     # access hole diameter in floor
 
 # ── KY-023 Joystick ────────────────────────────────────────────────
 JOY_PCB_L, JOY_PCB_W, JOY_PCB_H = 34.0, 26.0, 1.6
@@ -185,9 +192,15 @@ def _add_screw_bosses(base: cq.Workplane) -> cq.Workplane:
 
 
 def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
+    """ESP32 cradle — board mounted UPSIDE DOWN (WROOM module faces floor).
+
+    Minimal standoffs (0.5mm) keep module close to floor for cooling.
+    Guide rails hold PCB edges. EN reset button accessible through floor hole.
+    """
     post_sz, rail_t = 3.5, 1.5
     guide_total = ESP_STANDOFF_H + ESP_H + ESP_GUIDE_H
-    # Corner posts
+    # Corner posts (thin — just enough to lift PCB edges off floor,
+    # WROOM module sits in the gap between posts touching/near the floor)
     for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
         cx = ESP_POS_X + dx * (ESP_L / 2 - post_sz / 2)
         cy = ESP_POS_Y + dy * (ESP_W / 2 - post_sz / 2)
@@ -202,6 +215,15 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
             ESP_L * 0.4, rail_t
         ).extrude(guide_total)
         base = base.union(rail)
+    # EN reset button access hole through floor
+    # Board is upside down: USB end at -X, EN button is 6.1mm from USB end,
+    # 4.8mm from left edge. "Left" when USB faces you = +Y when board is in cradle.
+    en_x = ESP_POS_X - ESP_L / 2 + ESP_EN_BTN_FROM_USB
+    en_y = ESP_POS_Y + ESP_W / 2 - ESP_EN_BTN_FROM_EDGE  # +Y side
+    btn_hole = cq.Workplane("XY").workplane(offset=-0.01).center(en_x, en_y).circle(
+        ESP_EN_BTN_HOLE_D / 2
+    ).extrude(FLOOR_T + 0.02)
+    base = base.cut(btn_hole)
     return base
 
 
@@ -394,15 +416,6 @@ def make_lid() -> cq.Workplane:
                     VENT_W, VENT_LEN + 2
                 ).extrude(EXT_H_LID + 0.02)
             )
-    # Label
-    try:
-        lid = lid.union(
-            cq.Workplane("XY").workplane(offset=EXT_H_LID).center(0, 14).text(
-                "MundMaus v5.5", 7, 0.6, font="Liberation Sans:Bold"
-            )
-        )
-    except Exception:
-        pass
     return lid
 
 
