@@ -13,6 +13,11 @@
 ## In Progress
 - [ ] Gehäuse v5.5 Lid drucken — Grau PETG, Slot 4
 
+## Next
+- [ ] Gehäuse v5.6 — Cantilever-Clips statt Schrauben (Daumen-lösbar, selten geöffnet)
+- [ ] Gehäuse v5.6 — Joystick-PCB Niederhalter (Druckstege im Lid-Inneren, ~0.5mm Spiel)
+- [ ] Gehäuse v5.6 — Schraubbosses entfernen (durch Clips ersetzt)
+
 ## Done (2026-03-19)
 - [x] Solitaire: Key-Repeat-Bug behoben (e.repeat Guard)
 - [x] Solitaire: Navigierbare Action-Buttons (Hilfe/Neu) rechts vom Tableau
