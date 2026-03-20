@@ -338,7 +338,6 @@ def make_base() -> cq.Workplane:
         _add_screw_bosses,
         _add_esp_cradle,
         _add_joystick_pillars,
-        _add_pressure_sensor_mount,
         _cut_pressure_barb_port,
         _cut_usb_cable_notch,
         _add_mic_mount,
