@@ -1,8 +1,5 @@
 {
   "type": "process",
-  "name": "0.20mm Standard @BBL P2S",
-  "from": "system",
-  "instantiation": "true",
   "adaptive_layer_height": "0",
   "bottom_shell_layers": "5",
   "bottom_color_penetration_layers": "3",
@@ -17,7 +14,6 @@
   ],
   "brim_object_gap": "0.1",
   "brim_width": "5",
-  "compatible_printers_condition": "",
   "circle_compensation_manual_offset": "0",
   "default_acceleration": [
     "10000",
@@ -308,9 +304,12 @@
     "80%",
     "80%"
   ],
-  "setting_id": "GP155",
   "description": "Standard profile for 0.4mm nozzle, prioritizing speed.",
   "compatible_printers": [
     "Bambu Lab P2S 0.4 nozzle"
-  ]
+  ],
+  "from": "system",
+  "name": "0.20mm Standard @BBL P2S",
+  "setting_id": "",
+  "instantiation": "true"
 }

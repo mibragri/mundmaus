@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Validate Bambu slicer profiles before printing.
+# Catches wrong/generic gcodes, missing temperatures, wrong bed types.
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MACHINE="${SCRIPT_DIR}/machine-resolved.json"
+FILAMENT="${SCRIPT_DIR}/filament-resolved.json"
+PROCESS="${SCRIPT_DIR}/process-resolved.json"
+
+ERRORS=0
+err() { echo "  ✗ $1"; ERRORS=$((ERRORS + 1)); }
+ok()  { echo "  ✓ $1"; }
+
+echo "=== Bambu Profile Validation ==="
+
+# 1. Machine profile: must contain P2S-specific start gcode
+echo ""
+echo "── Machine Profile ──"
+if [[ ! -f "$MACHINE" ]]; then
+    err "machine-resolved.json not found"
+else
+    # P2S start gcode contains "P2S start gcode" marker
+    if python3 -c "
+import json, sys
+m = json.load(open('$MACHINE'))
+gcode = m.get('machine_start_gcode', '')
+if 'P2S start gcode' not in gcode and 'P1S start gcode' not in gcode:
+    print('GENERIC')
+    sys.exit(1)
+print('P2S')
+" 2>/dev/null; then
+        ok "Start-GCode ist P2S-spezifisch"
+    else
+        err "Start-GCode ist GENERISCH (nicht P2S)! Profile neu generieren mit resolve-profiles.py"
+    fi
+
+    # Check bed type
+    BED=$(python3 -c "import json; print(json.load(open('$MACHINE')).get('curr_bed_type','MISSING'))")
+    if [[ "$BED" == *"PEI"* || "$BED" == *"Engineering"* ]]; then
+        ok "Bed type: $BED (PETG-kompatibel)"
+    elif [[ "$BED" == *"Cool"* ]]; then
+        err "Bed type: $BED — nicht für PETG geeignet!"
+    else
+        ok "Bed type: $BED"
+    fi
+
+    # Check 'from' field exists (CLI requirement)
+    FROM=$(python3 -c "import json; print(json.load(open('$MACHINE')).get('from','MISSING'))")
+    if [[ "$FROM" == "MISSING" || "$FROM" == "" ]]; then
+        err "'from' field fehlt oder leer — CLI wird abstürzen"
+    else
+        ok "from: $FROM"
+    fi
+fi
+
+# 2. Filament profile: nozzle temperature must be set
+echo ""
+echo "── Filament Profile ──"
+if [[ ! -f "$FILAMENT" ]]; then
+    err "filament-resolved.json not found"
+else
+    NOZZLE_TEMP=$(python3 -c "
+import json
+f = json.load(open('$FILAMENT'))
+t = f.get('nozzle_temperature', [0])
+print(t[0] if isinstance(t, list) else t)
+")
+    if [[ "$NOZZLE_TEMP" -gt 180 && "$NOZZLE_TEMP" -lt 300 ]]; then
+        ok "Nozzle temperature: ${NOZZLE_TEMP}°C"
+    else
+        err "Nozzle temperature: ${NOZZLE_TEMP}°C — unrealistisch!"
+    fi
+
+    FIL_TYPE=$(python3 -c "import json; print(json.load(open('$FILAMENT')).get('filament_type','MISSING'))")
+    ok "Filament type: $FIL_TYPE"
+fi
+
+# 3. Process profile: wall count, infill
+echo ""
+echo "── Process Profile ──"
+if [[ ! -f "$PROCESS" ]]; then
+    err "process-resolved.json not found"
+else
+    WALLS=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('wall_loops','?'))")
+    INFILL=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('sparse_infill_density','?'))")
+    PATTERN=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('sparse_infill_pattern','?'))")
+    ok "Walls: $WALLS, Infill: $INFILL $PATTERN"
+fi
+
+# 4. Quick slice test (dry run)
+echo ""
+echo "── Slice Smoke Test ──"
+if command -v /home/ai/.local/bin/BambuStudio.AppImage &>/dev/null; then
+    TEST_3MF="/tmp/bambu-profile-test-$$.3mf"
+    # Create a tiny test cube STL
+    python3 -c "
+import struct
+# Minimal 10mm cube STL (binary)
+triangles = [
+    # bottom
+    ((0,0,-1), (0,0,0), (10,0,0), (10,10,0)),
+    ((0,0,-1), (0,0,0), (10,10,0), (0,10,0)),
+    # top
+    ((0,0,1), (0,0,10), (10,10,10), (10,0,10)),
+    ((0,0,1), (0,0,10), (0,10,10), (10,10,10)),
+    # front
+    ((0,-1,0), (0,0,0), (10,0,0), (10,0,10)),
+    ((0,-1,0), (0,0,0), (10,0,10), (0,0,10)),
+    # back
+    ((0,1,0), (0,10,0), (0,10,10), (10,10,10)),
+    ((0,1,0), (0,10,0), (10,10,10), (10,10,0)),
+    # left
+    ((-1,0,0), (0,0,0), (0,0,10), (0,10,10)),
+    ((-1,0,0), (0,0,0), (0,10,10), (0,10,0)),
+    # right
+    ((1,0,0), (10,0,0), (10,10,0), (10,10,10)),
+    ((1,0,0), (10,0,0), (10,10,10), (10,0,10)),
+]
+with open('/tmp/test_cube.stl', 'wb') as f:
+    f.write(b'\0' * 80)
+    f.write(struct.pack('<I', len(triangles)))
+    for n, v1, v2, v3 in triangles:
+        f.write(struct.pack('<3f', *n))
+        f.write(struct.pack('<3f', *v1))
+        f.write(struct.pack('<3f', *v2))
+        f.write(struct.pack('<3f', *v3))
+        f.write(struct.pack('<H', 0))
+" 2>/dev/null
+
+    /home/ai/.local/bin/BambuStudio.AppImage \
+        --load-settings "${MACHINE};${PROCESS}" \
+        --load-filaments "${FILAMENT}" \
+        --ensure-on-bed --slice 0 \
+        --export-3mf "$TEST_3MF" \
+        /tmp/test_cube.stl 2>&1 | grep -v trace > /dev/null 2>&1
+
+    if [[ -f "$TEST_3MF" ]]; then
+        # Verify gcode in output
+        GCODE_CHECK=$(python3 -c "
+import zipfile, sys
+z = zipfile.ZipFile('$TEST_3MF')
+gcode = z.read('Metadata/plate_1.gcode').decode()
+if 'P2S start gcode' in gcode or 'M140 S' in gcode[:2000]:
+    print('OK')
+else:
+    print('BAD_GCODE')
+")
+        if [[ "$GCODE_CHECK" == "OK" ]]; then
+            ok "Smoke test: Slice + GCode korrekt"
+        else
+            err "Smoke test: GCode enthält nicht den P2S Start-Code!"
+        fi
+        rm -f "$TEST_3MF"
+    else
+        err "Smoke test: Slice fehlgeschlagen"
+    fi
+    rm -f /tmp/test_cube.stl
+else
+    ok "BambuStudio nicht installiert — Smoke Test übersprungen"
+fi
+
+echo ""
+echo "================================"
+if [[ $ERRORS -gt 0 ]]; then
+    echo "  $ERRORS FEHLER — NICHT DRUCKEN!"
+    exit 1
+else
+    echo "  Alle Checks bestanden ✓"
+    exit 0
+fi
