@@ -4,7 +4,7 @@ v5.5 is a compact symmetric redesign. Key changes from v5.4c:
 - **Removed adapter bay** — enclosure shrinks from 168 to 136 mm
 - **New component order**: Mount(-X) → Joystick → Sensor → ESP32(+X)
 - **ESP32 USB faces -X** (center) for plug access; cable routes to -Y wall notch
-- 4 screw bosses (restored +X+Y, sensor moved to center)
+- 4 cantilever snap clips (replaced screws, daumen-lösbar)
 
 Component positions along X axis:
 - Mic mount collar: -X wall (internal, -58.1 inner edge)
@@ -29,8 +29,7 @@ Component positions along X axis:
 | USB cable notch wall | -Y |
 | Vent slots wall | -Y |
 | Pressure barb wall | +Y |
-| Screw bosses | 4 (all corners restored) |
-| Nearest -X screw boss clearance in Y | 1.50 mm |
+| Lid attachment | 4 cantilever snap clips (daumen-lösbar) |
 ## Changes vs v5.4c
 | Feature | v5.4c | v5.5 |
 |---|---|---|
@@ -41,7 +40,7 @@ Component positions along X axis:
 | ESP32 X position | 28.0 | 35.0 |
 | Joystick X position | -15.0 | -19.0 |
 | Sensor X position | 18.0 | 42.0 |
-| +X+Y screw boss | standard corner | restored (sensor moved to center) |
+| Lid attachment | M3 screws | snap clips (daumen-lösbar) |
 | Vent slot wall | -Y (fixed) | -Y |
 | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
 | Joystick Y position | upper edge (Y=8.0) | upper edge (Y=-2.0) |

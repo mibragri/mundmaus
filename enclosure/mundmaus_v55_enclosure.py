@@ -31,19 +31,19 @@ FLOOR_T, CEIL_T, INNER_R = 2.0, 2.0, 10.0  # INNER_R = CORNER_R - WALL
 BASE_INNER_H, LID_INNER_H = 28.0, 7.0
 CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 3.5, 2.0
 LIP_H, LIP_T, LIP_GAP = 4.0, 1.8, 0.15
-TOL, TOL_LOOSE = 0.2, 0.5
+TOL, TOL_LOOSE = 0.2, 0.2  # tighter guide rails — slight press-fit for ESP32
 
 # ── ESP32-WROOM-32 DevKitC V4 ──────────────────────────────────────
 ESP_L, ESP_W, ESP_H = 54.4, 28.0, 1.2  # Espressif DevKitC V4 spec (was 51.5)
 ESP_MODULE_H = 3.1                      # WROOM-32 metal shield height
-ESP_STANDOFF_H, ESP_GUIDE_H = 0.5, 3.0  # minimal standoff — module faces floor for cooling
+ESP_STANDOFF_H, ESP_GUIDE_H = 3.0, 3.0  # back to 3.0 — USB connector needs clearance below PCB
 ESP_POS_X, ESP_POS_Y = 35.0, -2.0      # right side; USB faces -X (center)
 ESP_USB_PROTRUSION = 2.4
 # ESP32 is mounted UPSIDE DOWN: WROOM module faces floor for cooling,
 # buttons (EN/BOOT) face floor, pin headers face up.
 # EN (reset) button position relative to USB end of PCB:
-ESP_EN_BTN_FROM_USB = 6.1   # mm from USB end along long axis
-ESP_EN_BTN_FROM_EDGE = 4.8  # mm from left edge (when USB faces you)
+ESP_EN_BTN_FROM_USB = 7.5   # mm from USB end along long axis
+ESP_EN_BTN_FROM_EDGE = 4.8  # mm from RIGHT edge (J2 side, when USB faces you)
 ESP_EN_BTN_HOLE_D = 3.0     # access hole diameter in floor
 
 # ── KY-023 Joystick ────────────────────────────────────────────────
@@ -74,9 +74,12 @@ USB_NOTCH_X = ESP_POS_X - ESP_L / 2  # USB faces -X (center), cable routes left
 # ── USB plug channel (cut into joystick platform base) ─────────────
 USB_PLUG_W, USB_PLUG_H, USB_PLUG_DEPTH = 12.0, 9.0, 15.0
 
-# ── M3 screw bosses ────────────────────────────────────────────────
-SCREW_D, SCREW_BOSS_D, SCREW_BOSS_H = 3.4, 7.0, 10.0
-SCREW_PILOT_D, SCREW_INSET = 2.5, 6.0
+# ── Cantilever snap clips (replace screws) ────────────────────────
+CLIP_W, CLIP_T, CLIP_H = 8.0, 1.5, 6.0  # clip arm: width, thickness, height
+CLIP_HOOK_D = 1.2    # hook depth (overhang into lid slot)
+CLIP_HOOK_H = 1.5    # hook height
+CLIP_INSET_X = 20.0  # distance from ±X walls
+CLIP_INSET_Y = 0.0   # centered on ±Y walls
 
 # ── 3/8"-16 UNC mic stand mount (-X wall) ──────────────────────────
 MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 14.29, 5.56
@@ -134,16 +137,14 @@ ESP_LEFT_EDGE_X = ESP_POS_X - ESP_L / 2
 ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
 ESP_TO_WALL_CLEARANCE = INNER_POS_X - ESP_RIGHT_EDGE_X
 
-# Screw positions — 4 bosses (restored +X+Y, sensor moved to center)
-_STD_X = CAV_X / 2 - SCREW_INSET
-_STD_Y = CAV_Y / 2 - SCREW_INSET
-SCREW_POSITIONS = [
-    (_STD_X, -_STD_Y),          # +X -Y
-    (_STD_X, _STD_Y),           # +X +Y (restored)
-    (-_STD_X, _STD_Y),          # -X +Y
-    (-_STD_X, -_STD_Y),         # -X -Y
+# Clip positions — 4 cantilever clips on inner walls
+# Two on ±Y walls (long sides), two on ±X walls (short sides)
+CLIP_POSITIONS = [
+    (CLIP_INSET_X, INNER_POS_Y, 0, -1),     # +Y wall, hook faces -Y
+    (CLIP_INSET_X, -INNER_POS_Y, 0, 1),     # -Y wall, hook faces +Y
+    (-CLIP_INSET_X, INNER_POS_Y, 0, -1),    # +Y wall left, hook faces -Y
+    (-CLIP_INSET_X, -INNER_POS_Y, 0, 1),    # -Y wall left, hook faces +Y
 ]
-NEAREST_BOSS_Y_CLEARANCE = _STD_Y - (MIC_COLLAR_D / 2 + SCREW_BOSS_D / 2)
 
 # ── Helper functions ───────────────────────────────────────────────
 
@@ -179,28 +180,33 @@ def rounded_cavity(length: float, width: float, height: float, radius: float) ->
 # ── Base features ──────────────────────────────────────────────────
 
 
-def _add_screw_bosses(base: cq.Workplane) -> cq.Workplane:
-    for px, py in SCREW_POSITIONS:
-        boss = cq.Workplane("XY").workplane(offset=FLOOR_T).center(px, py).circle(
-            SCREW_BOSS_D / 2
-        ).extrude(SCREW_BOSS_H)
-        pilot = cq.Workplane("XY").workplane(offset=FLOOR_T - 0.01).center(px, py).circle(
-            SCREW_PILOT_D / 2
-        ).extrude(SCREW_BOSS_H + 0.02)
-        base = base.union(boss).cut(pilot)
+def _add_snap_clips(base: cq.Workplane) -> cq.Workplane:
+    """Cantilever snap clips on inner walls — daumen-lösbar."""
+    clip_base_z = EXT_H_BASE - CLIP_H - 2.0  # clips near top of base wall
+    for cx, cy, dx, dy in CLIP_POSITIONS:
+        # Clip arm: vertical cantilever rising from wall
+        arm = cq.Workplane("XY").workplane(offset=clip_base_z).center(cx, cy).rect(
+            CLIP_W, CLIP_T
+        ).extrude(CLIP_H)
+        # Hook at top: small overhang that catches the lid
+        hook_z = clip_base_z + CLIP_H
+        hook = cq.Workplane("XY").workplane(offset=hook_z).center(
+            cx, cy + dy * CLIP_HOOK_D / 2
+        ).rect(CLIP_W, CLIP_T + CLIP_HOOK_D).extrude(CLIP_HOOK_H)
+        base = base.union(arm).union(hook)
     return base
 
 
 def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
     """ESP32 cradle — board mounted UPSIDE DOWN (WROOM module faces floor).
 
-    Minimal standoffs (0.5mm) keep module close to floor for cooling.
-    Guide rails hold PCB edges. EN reset button accessible through floor hole.
+    WROOM module (18×25.5×3.1mm) protrudes through a floor cutout for cooling.
+    PCB edges rest on standoffs. Guide rails hold PCB. EN button through floor.
     """
     post_sz, rail_t = 3.5, 1.5
+    # Standoff lifts PCB so module can protrude through floor
     guide_total = ESP_STANDOFF_H + ESP_H + ESP_GUIDE_H
-    # Corner posts (thin — just enough to lift PCB edges off floor,
-    # WROOM module sits in the gap between posts touching/near the floor)
+    # Corner posts
     for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
         cx = ESP_POS_X + dx * (ESP_L / 2 - post_sz / 2)
         cy = ESP_POS_Y + dy * (ESP_W / 2 - post_sz / 2)
@@ -215,11 +221,37 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
             ESP_L * 0.4, rail_t
         ).extrude(guide_total)
         base = base.union(rail)
+    # WROOM module pocket: hole in floor (16×18mm) with raised collar to guide module
+    # Standoff=3.0mm, module=3.1mm → module bottom is 0.1mm below floor inner surface
+    # Collar extends up from floor to meet the module and hold it aligned
+    wroom_hole_w = 16.0 + 0.5   # 16mm across + clearance
+    wroom_hole_l = 18.0 + 0.5   # 18mm along + clearance
+    collar_wall = 1.5            # collar wall thickness
+    collar_h = ESP_STANDOFF_H - (ESP_MODULE_H - FLOOR_T) + 1.0  # guide height above floor
+    # Shield center: at non-antenna end of WROOM module
+    antenna_end_x = ESP_POS_X + ESP_L / 2
+    shield_start_x = antenna_end_x - 25.5  # module start
+    wroom_x = shield_start_x + 18.0 / 2   # shield center
+    wroom_y = ESP_POS_Y
+    # Collar: raised ring around the hole
+    collar_outer_w = wroom_hole_w + 2 * collar_wall
+    collar_outer_l = wroom_hole_l + 2 * collar_wall
+    collar = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+        wroom_x, wroom_y
+    ).rect(collar_outer_l, collar_outer_w).extrude(collar_h)
+    collar_inner = cq.Workplane("XY").workplane(offset=FLOOR_T - 0.01).center(
+        wroom_x, wroom_y
+    ).rect(wroom_hole_l, wroom_hole_w).extrude(collar_h + 0.02)
+    base = base.union(collar).cut(collar_inner)
+    # Cut hole through floor
+    wroom_cut = cq.Workplane("XY").workplane(offset=-0.01).center(
+        wroom_x, wroom_y
+    ).rect(wroom_hole_l, wroom_hole_w).extrude(FLOOR_T + 0.02)
+    base = base.cut(wroom_cut)
     # EN reset button access hole through floor
-    # Board is upside down: USB end at -X, EN button is 6.1mm from USB end,
-    # 4.8mm from left edge. "Left" when USB faces you = +Y when board is in cradle.
+    # Board upside down: USB at -X, EN is 6.1mm from USB end, 4.8mm from left edge (+Y)
     en_x = ESP_POS_X - ESP_L / 2 + ESP_EN_BTN_FROM_USB
-    en_y = ESP_POS_Y + ESP_W / 2 - ESP_EN_BTN_FROM_EDGE  # +Y side
+    en_y = ESP_POS_Y - ESP_W / 2 + ESP_EN_BTN_FROM_EDGE  # -Y side (J2/EN side)
     btn_hole = cq.Workplane("XY").workplane(offset=-0.01).center(en_x, en_y).circle(
         ESP_EN_BTN_HOLE_D / 2
     ).extrude(FLOOR_T + 0.02)
@@ -357,13 +389,12 @@ def make_base() -> cq.Workplane:
     cavity = rounded_cavity(CAV_X, CAV_Y, BASE_INNER_H + 1.0, INNER_R).translate((0, 0, FLOOR_T))
     base = base.cut(cavity)
     for fn in [
-        _add_screw_bosses,
+        _add_snap_clips,
         _add_esp_cradle,
         _add_joystick_pillars,
         _cut_pressure_barb_port,
         _cut_usb_cable_notch,
         _add_mic_mount,
-        _cut_vent_slots,
     ]:
         base = fn(base)
     return base
@@ -395,27 +426,46 @@ def make_lid() -> cq.Workplane:
         lid = lid.cut(joy_chamfer)
     except Exception:
         pass
-    # Screw through-holes
-    for px, py in SCREW_POSITIONS:
-        lid = lid.cut(
-            cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(px, py).circle(
-                SCREW_D / 2
-            ).extrude(EXT_H_LID + LIP_H + 0.02)
-        )
+    # Snap clip slots — matching base cantilever hooks
+    for cx, cy, dx, dy in CLIP_POSITIONS:
+        # Slot in lip where hook catches: cut a notch in the lip inner wall
+        slot_z = -LIP_H  # bottom of lip
+        hook_slot = cq.Workplane("XY").workplane(offset=slot_z - 0.01).center(
+            cx, cy + dy * (LIP_T / 2)
+        ).rect(CLIP_W + 0.4, CLIP_T + CLIP_HOOK_D + 0.4).extrude(CLIP_HOOK_H + 0.5)
+        lid = lid.cut(hook_slot)
+    # Joystick PCB hold-down stubs — press PCB onto pillars when lid closes
+    # Two stubs on either side of the joystick opening, resting on PCB edge
+    joy_pcb_z = FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H  # top of PCB when on pillars
+    # Lid inner surface is at Z=EXT_H_BASE (when assembled), stub extends down
+    stub_gap = EXT_H_BASE - joy_pcb_z  # gap lid→PCB top
+    stub_h = stub_gap - 0.3  # 0.3mm clearance, slight preload when clipped
+    if stub_h > 1.0:
+        for dx_stub in [-1, 1]:
+            stub_x = JOY_POS_X + dx_stub * (JOY_OPENING / 2 + 3.0)
+            stub = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
+                stub_x, JOY_POS_Y
+            ).rect(4.0, 8.0).extrude(stub_h)
+            lid = lid.union(stub)
+    # ESP32 hold-down pad — presses board into cradle, keeps WROOM in pocket
+    # ESP32 PCB top (upside down: pin header side) is at FLOOR_T + STANDOFF + ESP_H
+    esp_pcb_top_z = FLOOR_T + ESP_STANDOFF_H + ESP_H
+    esp_holddown_gap = EXT_H_BASE - esp_pcb_top_z
+    esp_holddown_h = esp_holddown_gap - 0.3  # 0.3mm preload
+    if esp_holddown_h > 1.0:
+        # Two pads on either end of ESP32, avoiding pin headers in the middle
+        for dx_esp in [-1, 1]:
+            pad_x = ESP_POS_X + dx_esp * (ESP_L / 2 - 8.0)  # 8mm from each end
+            pad = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
+                pad_x, ESP_POS_Y
+            ).rect(6.0, 10.0).extrude(esp_holddown_h)
+            lid = lid.union(pad)
     # USB cable relief — notch in lid lip on -Y side matching base notch
     cable_relief = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
         USB_NOTCH_X, -LIP_H / 2
     ).rect(USB_NOTCH_W, LIP_H + 0.02).extrude(-(WALL + LIP_GAP + LIP_T + 0.02))
     lid = lid.cut(cable_relief)
-    # Lid vents
-    for side in [-1, 0, 1]:
-        for idx in range(3):
-            slot_x = side * 35.0 + (idx - 1) * (VENT_PITCH - 0.5)
-            lid = lid.cut(
-                cq.Workplane("XY").workplane(offset=-0.01).center(slot_x, 0).rect(
-                    VENT_W, VENT_LEN + 2
-                ).extrude(EXT_H_LID + 0.02)
-            )
+    # No lid vents — WROOM floor cutout provides ventilation
     return lid
 
 
@@ -531,7 +581,7 @@ def write_report(report_path: Path) -> None:
         - **Removed adapter bay** — enclosure shrinks from 168 to {EXT_X:.0f} mm
         - **New component order**: Mount(-X) → Joystick → Sensor → ESP32(+X)
         - **ESP32 USB faces -X** (center) for plug access; cable routes to -Y wall notch
-        - 4 screw bosses (restored +X+Y, sensor moved to center)
+        - 4 cantilever snap clips (replaced screws, daumen-lösbar)
 
         Component positions along X axis:
         - Mic mount collar: -X wall (internal, {MIC_COLLAR_INNER_X:.1f} inner edge)
@@ -556,8 +606,7 @@ def write_report(report_path: Path) -> None:
         | USB cable notch wall | -Y |
         | Vent slots wall | -Y |
         | Pressure barb wall | +Y |
-        | Screw bosses | 4 (all corners restored) |
-        | Nearest -X screw boss clearance in Y | {NEAREST_BOSS_Y_CLEARANCE:.2f} mm |
+        | Lid attachment | 4 cantilever snap clips (daumen-lösbar) |
         ## Changes vs v5.4c
         | Feature | v5.4c | v5.5 |
         |---|---|---|
@@ -568,7 +617,7 @@ def write_report(report_path: Path) -> None:
         | ESP32 X position | 28.0 | {ESP_POS_X:.1f} |
         | Joystick X position | -15.0 | {JOY_POS_X:.1f} |
         | Sensor X position | 18.0 | {PRES_POS_X:.1f} |
-        | +X+Y screw boss | standard corner | restored (sensor moved to center) |
+        | Lid attachment | M3 screws | snap clips (daumen-lösbar) |
         | Vent slot wall | -Y (fixed) | -Y |
         | Pressure sensor | +Y wall side-mount, external barb | +Y wall side-mount, external barb |
         | Joystick Y position | upper edge (Y=8.0) | upper edge (Y={JOY_POS_Y:.1f}) |
