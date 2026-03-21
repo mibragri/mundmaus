@@ -29,7 +29,7 @@ logging.getLogger("OCC").setLevel(logging.ERROR)
 CAV_X, CAV_Y, WALL = 132.0, 46.0, 2.0  # thinner walls (5 perimeters @ 0.4mm)
 FLOOR_T, CEIL_T, INNER_R = 2.0, 2.0, 10.0  # INNER_R = CORNER_R - WALL
 BASE_INNER_H, LID_INNER_H = 28.0, 7.0
-CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 3.5, 2.0
+CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 1.5, 2.0  # LID_TOP_R must be <= CEIL_T to avoid paper-thin walls when printed flipped
 LIP_H, LIP_T, LIP_GAP = 4.0, 1.8, 0.15
 TOL, TOL_LOOSE = 0.2, 0.2  # tighter guide rails — slight press-fit for ESP32
 
@@ -405,12 +405,17 @@ def make_lid() -> cq.Workplane:
     lip_r = max(0.5, INNER_R - LIP_GAP)
     lid = organic_box(EXT_X, EXT_Y, EXT_H_LID, CORNER_R, top_r=LID_TOP_R)
     lid = lid.cut(rounded_cavity(CAV_X, CAV_Y, LID_INNER_H + 0.01, INNER_R))
+    # Lip wall extends from -LIP_H up to LID_INNER_H so the inner wall
+    # is continuous from the ceiling to the lip bottom — no overhang when
+    # printed flipped (ceiling-down).  Both outer and inner shells extend
+    # upward; the lip pocket (hollow) only exists in the bottom LIP_H.
+    lip_total_h = LIP_H + LID_INNER_H
     lip_outer = cq.Workplane("XY").workplane(offset=-LIP_H).rect(
         lip_x, lip_y
-    ).extrude(LIP_H).edges("|Z").fillet(lip_r)
+    ).extrude(lip_total_h).edges("|Z").fillet(lip_r)
     lip_inner = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).rect(
         lip_x - 2 * LIP_T, lip_y - 2 * LIP_T
-    ).extrude(LIP_H + 0.02).edges("|Z").fillet(max(0.3, lip_r - LIP_T))
+    ).extrude(lip_total_h + 0.02).edges("|Z").fillet(max(0.3, lip_r - LIP_T))
     lid = lid.union(lip_outer.cut(lip_inner))
     # Joystick opening
     joy_cut = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
@@ -434,32 +439,7 @@ def make_lid() -> cq.Workplane:
             cx, cy + dy * (LIP_T / 2)
         ).rect(CLIP_W + 0.4, CLIP_T + CLIP_HOOK_D + 0.4).extrude(CLIP_HOOK_H + 0.5)
         lid = lid.cut(hook_slot)
-    # Joystick PCB hold-down stubs — press PCB onto pillars when lid closes
-    # Two stubs on either side of the joystick opening, resting on PCB edge
-    joy_pcb_z = FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H  # top of PCB when on pillars
-    # Lid inner surface is at Z=EXT_H_BASE (when assembled), stub extends down
-    stub_gap = EXT_H_BASE - joy_pcb_z  # gap lid→PCB top
-    stub_h = stub_gap - 0.3  # 0.3mm clearance, slight preload when clipped
-    if stub_h > 1.0:
-        for dx_stub in [-1, 1]:
-            stub_x = JOY_POS_X + dx_stub * (JOY_OPENING / 2 + 3.0)
-            stub = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
-                stub_x, JOY_POS_Y
-            ).rect(4.0, 8.0).extrude(stub_h)
-            lid = lid.union(stub)
-    # ESP32 hold-down pad — presses board into cradle, keeps WROOM in pocket
-    # ESP32 PCB top (upside down: pin header side) is at FLOOR_T + STANDOFF + ESP_H
-    esp_pcb_top_z = FLOOR_T + ESP_STANDOFF_H + ESP_H
-    esp_holddown_gap = EXT_H_BASE - esp_pcb_top_z
-    esp_holddown_h = esp_holddown_gap - 0.3  # 0.3mm preload
-    if esp_holddown_h > 1.0:
-        # Two pads on either end of ESP32, avoiding pin headers in the middle
-        for dx_esp in [-1, 1]:
-            pad_x = ESP_POS_X + dx_esp * (ESP_L / 2 - 8.0)  # 8mm from each end
-            pad = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
-                pad_x, ESP_POS_Y
-            ).rect(6.0, 10.0).extrude(esp_holddown_h)
-            lid = lid.union(pad)
+    # Hold-down stubs/pads removed — base standoffs + guide rails retain components
     # USB cable relief — notch in lid lip on -Y side matching base notch
     cable_relief = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
         USB_NOTCH_X, -LIP_H / 2

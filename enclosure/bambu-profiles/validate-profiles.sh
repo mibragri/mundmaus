@@ -88,7 +88,57 @@ else
     ok "Walls: $WALLS, Infill: $INFILL $PATTERN"
 fi
 
-# 4. Quick slice test (dry run)
+# 4. Retraction check (PETG-specific: direct drive = low retraction)
+echo ""
+echo "── Retraction Check ──"
+python3 -c "
+import json, sys
+m = json.load(open('$MACHINE'))
+f = json.load(open('$FILAMENT'))
+errors = []
+# Machine retraction (base)
+r_len = m.get('retraction_length', ['0'])[0]
+r_spd = m.get('retraction_speed', ['0'])[0]
+# Filament can override
+f_len = f.get('filament_retraction_length', ['nil'])[0]
+if f_len not in ('nil', ''):
+    r_len = f_len
+r_len = float(r_len)
+r_spd = float(r_spd)
+if r_len > 2.0:
+    print(f'ERROR retraction_length={r_len}mm >2.0mm — PETG clog risk on direct drive!')
+    errors.append(1)
+elif r_len > 1.0:
+    print(f'WARN retraction_length={r_len}mm — on the high side for direct drive PETG')
+else:
+    print(f'OK retraction={r_len}mm @ {r_spd}mm/s')
+sys.exit(1 if errors else 0)
+" 2>/dev/null
+RETRACT_RESULT=$?
+if [[ $RETRACT_RESULT -eq 0 ]]; then
+    RETRACT_MSG=$(python3 -c "
+import json
+m = json.load(open('$MACHINE'))
+f = json.load(open('$FILAMENT'))
+r = f.get('filament_retraction_length', ['nil'])[0]
+if r in ('nil', ''): r = m.get('retraction_length', ['?'])[0]
+s = m.get('retraction_speed', ['?'])[0]
+print(f'Retraction: {r}mm @ {s}mm/s')
+")
+    ok "$RETRACT_MSG"
+else
+    RETRACT_MSG=$(python3 -c "
+import json
+m = json.load(open('$MACHINE'))
+f = json.load(open('$FILAMENT'))
+r = f.get('filament_retraction_length', ['nil'])[0]
+if r in ('nil', ''): r = m.get('retraction_length', ['?'])[0]
+print(f'Retraction: {r}mm — zu hoch für PETG Direct Drive!')
+")
+    err "$RETRACT_MSG"
+fi
+
+# 5. Quick slice test (dry run)
 echo ""
 echo "── Slice Smoke Test ──"
 if command -v /home/ai/.local/bin/BambuStudio.AppImage &>/dev/null; then
