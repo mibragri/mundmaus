@@ -86,6 +86,14 @@ else
     INFILL=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('sparse_infill_density','?'))")
     PATTERN=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('sparse_infill_pattern','?'))")
     ok "Walls: $WALLS, Infill: $INFILL $PATTERN"
+
+    # Prime tower should be off for single-filament prints
+    PRIME=$(python3 -c "import json; print(json.load(open('$PROCESS')).get('enable_prime_tower',0))")
+    if [[ "$PRIME" == "1" ]]; then
+        err "Prime tower enabled — unnecessary for single-filament, wastes space between parts"
+    else
+        ok "Prime tower: off"
+    fi
 fi
 
 # 4. Retraction check (PETG-specific: direct drive = low retraction)
