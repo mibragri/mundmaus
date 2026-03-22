@@ -49,10 +49,10 @@ ESP_EN_BTN_HOLE_D = 3.0     # access hole diameter in floor
 # ── KY-023 Joystick ────────────────────────────────────────────────
 JOY_PCB_L, JOY_PCB_W, JOY_PCB_H = 34.0, 26.0, 1.6
 JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
-JOY_PLATFORM_H = 22.5
+JOY_PLATFORM_H = 21.5  # was 22.5 — 1mm shorter for less housing protrusion above lid
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
-JOY_OPENING = 17.0
+JOY_OPENING = 16.3  # was 17.0 — snug fit to center housing (0.15mm/side)
 JOY_POS_X, JOY_POS_Y = -19.0, -2.0  # left side, Y=-2 = centered on USB plug Y for equal clearance
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
@@ -182,7 +182,7 @@ def rounded_cavity(length: float, width: float, height: float, radius: float) ->
 
 def _add_snap_clips(base: cq.Workplane) -> cq.Workplane:
     """Cantilever snap clips on inner walls — daumen-lösbar."""
-    clip_base_z = EXT_H_BASE - CLIP_H - 2.0  # clips near top of base wall
+    clip_base_z = EXT_H_BASE - CLIP_H - 4.0  # clips lower for 2mm hook engagement into lip slot
     for cx, cy, dx, dy in CLIP_POSITIONS:
         # Clip arm: vertical cantilever rising from wall
         arm = cq.Workplane("XY").workplane(offset=clip_base_z).center(cx, cy).rect(
@@ -405,18 +405,28 @@ def make_lid() -> cq.Workplane:
     lip_r = max(0.5, INNER_R - LIP_GAP)
     lid = organic_box(EXT_X, EXT_Y, EXT_H_LID, CORNER_R, top_r=LID_TOP_R)
     lid = lid.cut(rounded_cavity(CAV_X, CAV_Y, LID_INNER_H + 0.01, INNER_R))
-    # Lip wall extends from -LIP_H up to LID_INNER_H so the inner wall
-    # is continuous from the ceiling to the lip bottom — no overhang when
-    # printed flipped (ceiling-down).  Both outer and inner shells extend
-    # upward; the lip pocket (hollow) only exists in the bottom LIP_H.
-    lip_total_h = LIP_H + LID_INNER_H
+    # Two-zone inner wall for overhang-free printing (flipped, ceiling-down):
+    # 1. LIP zone (Z=-LIP_H to Z=0): at lip_x dimensions, inserts into base
+    #    with LIP_GAP clearance. This is the functional retention lip.
+    # 2. SUPPORT zone (Z=0 to Z=LID_INNER_H): at CAV_X dimensions, flush with
+    #    cavity inner wall. Stays inside the lid body, never enters the base.
+    #    Provides continuous wall from ceiling to lip — no overhang at Z=9 in print.
+    # Lip (lower zone — inserts into base)
     lip_outer = cq.Workplane("XY").workplane(offset=-LIP_H).rect(
         lip_x, lip_y
-    ).extrude(lip_total_h).edges("|Z").fillet(lip_r)
+    ).extrude(LIP_H).edges("|Z").fillet(lip_r)
     lip_inner = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).rect(
         lip_x - 2 * LIP_T, lip_y - 2 * LIP_T
-    ).extrude(lip_total_h + 0.02).edges("|Z").fillet(max(0.3, lip_r - LIP_T))
+    ).extrude(LIP_H + 0.02).edges("|Z").fillet(max(0.3, lip_r - LIP_T))
     lid = lid.union(lip_outer.cut(lip_inner))
+    # Support wall (upper zone — flush with cavity, stays in lid)
+    support_outer = cq.Workplane("XY").rect(
+        CAV_X, CAV_Y
+    ).extrude(LID_INNER_H).edges("|Z").fillet(INNER_R)
+    support_inner = cq.Workplane("XY").workplane(offset=-0.01).rect(
+        CAV_X - 2 * LIP_T, CAV_Y - 2 * LIP_T
+    ).extrude(LID_INNER_H + 0.02).edges("|Z").fillet(max(0.3, INNER_R - LIP_T))
+    lid = lid.union(support_outer.cut(support_inner))
     # Joystick opening
     joy_cut = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
         JOY_POS_X, JOY_POS_Y
