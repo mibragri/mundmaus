@@ -60,20 +60,36 @@ echo "── Filament Profile ──"
 if [[ ! -f "$FILAMENT" ]]; then
     err "filament-resolved.json not found"
 else
-    NOZZLE_TEMP=$(python3 -c "
-import json
+    python3 -c "
+import json, sys
 f = json.load(open('$FILAMENT'))
-t = f.get('nozzle_temperature', [0])
-print(t[0] if isinstance(t, list) else t)
-")
-    if [[ "$NOZZLE_TEMP" -gt 180 && "$NOZZLE_TEMP" -lt 300 ]]; then
-        ok "Nozzle temperature: ${NOZZLE_TEMP}°C"
-    else
-        err "Nozzle temperature: ${NOZZLE_TEMP}°C — unrealistisch!"
+t = int(f.get('nozzle_temperature', ['0'])[0])
+ti = int(f.get('nozzle_temperature_initial_layer', ['0'])[0])
+tmin = int(f.get('nozzle_temperature_range_low', ['180'])[0])
+tmax = int(f.get('nozzle_temperature_range_high', ['300'])[0])
+bed = int(f.get('textured_plate_temp', ['0'])[0])
+bed_i = int(f.get('textured_plate_temp_initial_layer', ['0'])[0])
+fil_type = str(f.get('filament_type', '?'))
+ok = lambda m: print(f'  OK {m}')
+er = lambda m: print(f'  FAIL {m}')
+fail = False
+if t < tmin or t > tmax:
+    er(f'Nozzle {t}C outside range {tmin}-{tmax}C'); fail = True
+if 'PETG' in fil_type and t < 230:
+    er(f'Nozzle {t}C too low for PETG (recommend 230-250C)'); fail = True
+if 'PETG' in fil_type and ti < 230:
+    er(f'Nozzle initial {ti}C too low for PETG first layer'); fail = True
+if 'PETG' in fil_type and bed < 70:
+    er(f'Bed {bed}C too low for PETG on Textured PEI (recommend 70-80C)'); fail = True
+ok(f'Nozzle: {t}C (initial: {ti}C)')
+ok(f'Bed: {bed}C (initial: {bed_i}C)')
+ok(f'Filament: {fil_type}')
+sys.exit(1 if fail else 0)
+"
+    FILAMENT_CHECK=$?
+    if [[ $FILAMENT_CHECK -ne 0 ]]; then
+        ERRORS=$((ERRORS + 1))
     fi
-
-    FIL_TYPE=$(python3 -c "import json; print(json.load(open('$FILAMENT')).get('filament_type','MISSING'))")
-    ok "Filament type: $FIL_TYPE"
 fi
 
 # 3. Process profile: wall count, infill

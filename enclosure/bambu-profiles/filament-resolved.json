@@ -279,10 +279,10 @@
     "0"
   ],
   "hot_plate_temp": [
-    "70"
+    "75"
   ],
   "hot_plate_temp_initial_layer": [
-    "70"
+    "75"
   ],
   "hole_coef_1": [
     "0"
@@ -313,12 +313,12 @@
     "270"
   ],
   "nozzle_temperature": [
-    "220",
-    "220"
+    "235",
+    "235"
   ],
   "nozzle_temperature_initial_layer": [
-    "220",
-    "220"
+    "240",
+    "240"
   ],
   "no_slow_down_for_cooling_on_outwalls": [
     "0"
@@ -361,10 +361,10 @@
     "70"
   ],
   "textured_plate_temp": [
-    "70"
+    "75"
   ],
   "textured_plate_temp_initial_layer": [
-    "70"
+    "75"
   ],
   "volumetric_speed_coefficients": [
     "0 0 0 0 0 0"
