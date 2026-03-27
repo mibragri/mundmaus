@@ -49,10 +49,13 @@ ESP_EN_BTN_HOLE_D = 3.0     # access hole diameter in floor
 # ── KY-023 Joystick ────────────────────────────────────────────────
 JOY_PCB_L, JOY_PCB_W, JOY_PCB_H = 34.0, 26.0, 1.6
 JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
-JOY_PLATFORM_H = 21.5  # was 22.5 — 1mm shorter for less housing protrusion above lid
+JOY_PLATFORM_H = 21.0  # was 21.5 — 0.5mm lower per user feedback
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
 JOY_OPENING = 16.3  # was 17.0 — snug fit to center housing (0.15mm/side)
+JOY_LID_HOLE_D = 14.0   # circular lid opening — rotation circle + 1mm clearance/side
+JOY_LID_HOLE_OFFSET_X = 1.1   # calculated from measured housing center X=-17.9 vs JOY_POS=-19
+JOY_LID_HOLE_OFFSET_Y = -0.8   # +0.3 was too far +Y, user says 1.1mm more toward -Y: 0.3 - 1.1 = -0.8
 JOY_POS_X, JOY_POS_Y = -19.0, -2.0  # left side, Y=-2 = centered on USB plug Y for equal clearance
 JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
 JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
@@ -61,7 +64,7 @@ JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
 
 # ── Pressure Sensor (MPS20N0040D-S + HX710B) ───────────────────────
 PRES_L, PRES_W, PRES_H = 20.0, 15.0, 5.0
-PRES_POS_X, PRES_POS_Z = 42.0, 20.0  # right of ESP32, +Y wall shelf
+PRES_POS_X, PRES_POS_Z = 42.0, 18.0  # right of ESP32, +Y wall shelf (was 20, lowered to clear lip)
 PRES_SENSOR_WALL_GAP = 0.3
 PRES_HOLDER_T, PRES_HOLDER_DEPTH = 2.0, 7.0
 PRES_BARB_HOLE_D, PRES_BARB_CHAMFER_D = 3.0, 5.0
@@ -74,17 +77,19 @@ USB_NOTCH_X = ESP_POS_X - ESP_L / 2  # USB faces -X (center), cable routes left
 # ── USB plug channel (cut into joystick platform base) ─────────────
 USB_PLUG_W, USB_PLUG_H, USB_PLUG_DEPTH = 12.0, 9.0, 15.0
 
-# ── Cantilever snap clips (replace screws) ────────────────────────
-CLIP_W, CLIP_T, CLIP_H = 8.0, 1.5, 6.0  # clip arm: width, thickness, height
-CLIP_HOOK_D = 1.2    # hook depth (overhang into lid slot)
-CLIP_HOOK_H = 1.5    # hook height
-CLIP_INSET_X = 20.0  # distance from ±X walls
-CLIP_INSET_Y = 0.0   # centered on ±Y walls
+# ── Detent ridge retention (Tupperware-style click) ──────────────
+RIDGE_H = 0.5        # ridge height (protrusion from lip surface) — was 0.3, too weak
+RIDGE_W = 0.8        # ridge width (along Z axis of lip)
+RIDGE_Z = 2.0        # ridge position: mm from lip bottom edge
+RIDGE_LEN = 10.0     # each ridge pad length (along wall)
+GROOVE_D = 0.55      # groove depth (into cavity wall) — was 0.35
+GROOVE_W = 1.0       # groove width (along Z) — slightly wider than ridge for tolerance
 
 # ── 3/8"-16 UNC mic stand mount (-X wall) ──────────────────────────
 MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 14.29, 5.56
 MIC_NUT_TOL, MIC_NUT_POCKET_D, MIC_COLLAR_D = 0.205, 7.9, 24.0
 MIC_POS_Y = 0.0
+# MIC_POS_Z is derived below (collar sits on floor, top clears lip)
 
 # ── Ventilation (-Y wall) ──────────────────────────────────────────
 VENT_N, VENT_W, VENT_LEN, VENT_PITCH = 6, 1.6, 14.0, 6.0
@@ -97,7 +102,8 @@ OUTER_POS_Y = EXT_Y / 2    # +25
 INNER_POS_X = CAV_X / 2    # +65
 INNER_POS_Y = EXT_Y / 2 - WALL  # +22
 
-MIC_POS_Z = EXT_H_BASE / 2
+# Collar sits on floor: center = FLOOR_T + radius, top must clear lip (EXT_H_BASE - LIP_H)
+MIC_POS_Z = FLOOR_T + MIC_COLLAR_D / 2 - 0.5  # 13.5mm, collar top = 25.5mm (0.5mm below lip at 26mm)
 MIC_NUT_SW_TOL = MIC_NUT_SW + 2 * MIC_NUT_TOL
 MIC_WALL_OUTER_X = -OUTER_POS_X
 MIC_WALL_INNER_X = MIC_WALL_OUTER_X + WALL
@@ -130,6 +136,28 @@ PRES_TO_JOY_PLATFORM_CLEARANCE_X = PRES_HOLDER_MIN_X - JOY_PLATFORM_MAX_X
 BARB_TO_JOYSTICK_OFFSET_X = PRES_POS_X - JOY_POS_X
 BARB_TO_LID_RIM_CLEARANCE_Z = EXT_H_BASE - PRES_HOLDER_MAX_Z
 
+# Lip insertion zone: Z = EXT_H_BASE - LIP_H to EXT_H_BASE
+# ALL internal features must have their top BELOW this zone
+LIP_ZONE_BOTTOM = EXT_H_BASE - LIP_H
+MIC_COLLAR_TOP_Z = MIC_POS_Z + MIC_COLLAR_D / 2
+MIC_TO_LIP_CLEARANCE = LIP_ZONE_BOTTOM - MIC_COLLAR_TOP_Z
+
+# Guard: all internal features must clear the lip insertion zone
+_LIP_CLEARANCE_CHECKS = {
+    "Mic collar top": (MIC_COLLAR_TOP_Z, LIP_ZONE_BOTTOM),
+    "Sensor holder top": (PRES_HOLDER_MAX_Z, LIP_ZONE_BOTTOM),
+    "Joystick PCB top": (FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H, LIP_ZONE_BOTTOM),
+}
+for _name, (_top, _limit) in _LIP_CLEARANCE_CHECKS.items():
+    if _top > _limit:
+        raise ValueError(
+            f"COLLISION: {_name} at Z={_top:.1f}mm extends into lip zone "
+            f"(Z={_limit:.1f}mm). Reduce height or move component down."
+        )
+    elif _top > _limit - 0.5:
+        import warnings
+        warnings.warn(f"{_name} at Z={_top:.1f}mm is only {_limit - _top:.1f}mm below lip zone")
+
 # Clearances (new layout: Collar → Joy → Sensor → ESP32)
 COLLAR_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - MIC_COLLAR_INNER_X
 JOY_TO_PRES_CLEARANCE = PRES_HOLDER_MIN_X - JOY_PLATFORM_MAX_X
@@ -137,14 +165,7 @@ ESP_LEFT_EDGE_X = ESP_POS_X - ESP_L / 2
 ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
 ESP_TO_WALL_CLEARANCE = INNER_POS_X - ESP_RIGHT_EDGE_X
 
-# Clip positions — 4 cantilever clips on inner walls
-# Two on ±Y walls (long sides), two on ±X walls (short sides)
-CLIP_POSITIONS = [
-    (CLIP_INSET_X, INNER_POS_Y, 0, -1),     # +Y wall, hook faces -Y
-    (CLIP_INSET_X, -INNER_POS_Y, 0, 1),     # -Y wall, hook faces +Y
-    (-CLIP_INSET_X, INNER_POS_Y, 0, -1),    # +Y wall left, hook faces -Y
-    (-CLIP_INSET_X, -INNER_POS_Y, 0, 1),    # -Y wall left, hook faces +Y
-]
+# Detent ridge runs continuously around the lip — no discrete positions needed
 
 # ── Helper functions ───────────────────────────────────────────────
 
@@ -180,20 +201,55 @@ def rounded_cavity(length: float, width: float, height: float, radius: float) ->
 # ── Base features ──────────────────────────────────────────────────
 
 
-def _add_snap_clips(base: cq.Workplane) -> cq.Workplane:
-    """Cantilever snap clips on inner walls — daumen-lösbar."""
-    clip_base_z = EXT_H_BASE - CLIP_H - 4.0  # clips lower for 2mm hook engagement into lip slot
-    for cx, cy, dx, dy in CLIP_POSITIONS:
-        # Clip arm: vertical cantilever rising from wall
-        arm = cq.Workplane("XY").workplane(offset=clip_base_z).center(cx, cy).rect(
-            CLIP_W, CLIP_T
-        ).extrude(CLIP_H)
-        # Hook at top: small overhang that catches the lid
-        hook_z = clip_base_z + CLIP_H
-        hook = cq.Workplane("XY").workplane(offset=hook_z).center(
-            cx, cy + dy * CLIP_HOOK_D / 2
-        ).rect(CLIP_W, CLIP_T + CLIP_HOOK_D).extrude(CLIP_HOOK_H)
-        base = base.union(arm).union(hook)
+def _add_detent_groove(base: cq.Workplane) -> cq.Workplane:
+    """Detent grooves at discrete points in cavity wall — stronger hold than continuous.
+
+    6 groove pads: 2 centered on each long wall (±Y), 1 centered on each short wall (±X).
+    Plus 1 groove near the joystick hole for lid retention at that critical point.
+    Discrete pads allow the wall to flex locally, giving a better click.
+    """
+    groove_z = EXT_H_BASE - LIP_H + RIDGE_Z
+    # Groove pad positions: (center_x, center_y, length_along_x, length_along_y)
+    # Long walls (±Y): 2 pads each, spaced apart
+    # Short walls (±X): 1 pad each, centered
+    inner_x = CAV_X / 2  # 66
+    inner_y = CAV_Y / 2  # 23
+    groove_pads = [
+        # +Y wall: 2 pads
+        (20, inner_y, RIDGE_LEN, GROOVE_D),
+        (-20, inner_y, RIDGE_LEN, GROOVE_D),
+        # -Y wall: 2 pads
+        (20, -inner_y, RIDGE_LEN, GROOVE_D),
+        (-20, -inner_y, RIDGE_LEN, GROOVE_D),
+        # +X wall: 1 pad centered
+        (inner_x, 0, GROOVE_D, RIDGE_LEN),
+        # -X wall: 1 pad centered
+        (-inner_x, 0, GROOVE_D, RIDGE_LEN),
+        # Joystick area: extra pad on +Y wall near joystick
+        (JOY_POS_X, inner_y, RIDGE_LEN, GROOVE_D),
+    ]
+    for cx, cy, half_lx, half_ly in groove_pads:
+        # Cut groove pad into the wall (outward from cavity surface)
+        # Determine wall direction: which wall is this pad on?
+        if abs(cy) > abs(cx) * (inner_y / inner_x):  # on ±Y wall
+            # Groove extends in +/- Y direction (into the wall)
+            sign_y = 1 if cy > 0 else -1
+            pad = (cq.Workplane("XY")
+                   .workplane(offset=groove_z - GROOVE_W / 2)
+                   .center(cx, cy)
+                   .rect(half_lx, GROOVE_D * 2)
+                   .extrude(GROOVE_W))
+            # Shift outward into wall
+            pad = pad.translate((0, sign_y * GROOVE_D / 2, 0))
+        else:  # on ±X wall
+            sign_x = 1 if cx > 0 else -1
+            pad = (cq.Workplane("XY")
+                   .workplane(offset=groove_z - GROOVE_W / 2)
+                   .center(cx, cy)
+                   .rect(GROOVE_D * 2, half_ly)
+                   .extrude(GROOVE_W))
+            pad = pad.translate((sign_x * GROOVE_D / 2, 0, 0))
+        base = base.cut(pad)
     return base
 
 
@@ -389,7 +445,7 @@ def make_base() -> cq.Workplane:
     cavity = rounded_cavity(CAV_X, CAV_Y, BASE_INNER_H + 1.0, INNER_R).translate((0, 0, FLOOR_T))
     base = base.cut(cavity)
     for fn in [
-        _add_snap_clips,
+        _add_detent_groove,
         _add_esp_cradle,
         _add_joystick_pillars,
         _cut_pressure_barb_port,
@@ -427,28 +483,54 @@ def make_lid() -> cq.Workplane:
         CAV_X - 2 * LIP_T, CAV_Y - 2 * LIP_T
     ).extrude(LID_INNER_H + 0.02).edges("|Z").fillet(max(0.3, INNER_R - LIP_T))
     lid = lid.union(support_outer.cut(support_inner))
-    # Joystick opening
-    joy_cut = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).center(
-        JOY_POS_X, JOY_POS_Y
-    ).rect(JOY_OPENING, JOY_OPENING).extrude(EXT_H_LID + LIP_H + 0.02)
+    # Joystick opening — circular, only rotation circle of stick
+    # Offset compensates for observed housing position vs lid hole
+    joy_hole_x = JOY_POS_X + JOY_LID_HOLE_OFFSET_X
+    joy_hole_y = JOY_POS_Y + JOY_LID_HOLE_OFFSET_Y
+    joy_cut = (cq.Workplane("XY").workplane(offset=-LIP_H - 0.01)
+               .center(joy_hole_x, joy_hole_y)
+               .circle(JOY_LID_HOLE_D / 2)
+               .extrude(EXT_H_LID + LIP_H + 0.02))
     lid = lid.cut(joy_cut)
     try:
-        joy_chamfer = cq.Workplane("XY").workplane(offset=EXT_H_LID - 0.01).center(
-            JOY_POS_X, JOY_POS_Y
-        ).rect(JOY_OPENING, JOY_OPENING).workplane(offset=-1.0).rect(
-            JOY_OPENING - 2.0, JOY_OPENING - 2.0
-        ).loft()
-        lid = lid.cut(joy_chamfer)
+        # Chamfer on exterior edge — 2mm wide bevel for clean look
+        joy_chamfer_outer = (cq.Workplane("XY").workplane(offset=EXT_H_LID - 0.01)
+                             .center(joy_hole_x, joy_hole_y)
+                             .circle(JOY_LID_HOLE_D / 2 + 2.0)
+                             .workplane(offset=-2.0)
+                             .circle(JOY_LID_HOLE_D / 2)
+                             .loft())
+        lid = lid.cut(joy_chamfer_outer)
     except Exception:
         pass
-    # Snap clip slots — matching base cantilever hooks
-    for cx, cy, dx, dy in CLIP_POSITIONS:
-        # Slot in lip where hook catches: cut a notch in the lip inner wall
-        slot_z = -LIP_H  # bottom of lip
-        hook_slot = cq.Workplane("XY").workplane(offset=slot_z - 0.01).center(
-            cx, cy + dy * (LIP_T / 2)
-        ).rect(CLIP_W + 0.4, CLIP_T + CLIP_HOOK_D + 0.4).extrude(CLIP_HOOK_H + 0.5)
-        lid = lid.cut(hook_slot)
+    # Detent ridges: discrete pads on lip outer surface at 7 points.
+    # Matches groove positions in base. Stronger hold than continuous ridge.
+    ridge_z = -LIP_H + RIDGE_Z  # Z position in lid coords
+    lip_half_x = lip_x / 2  # outer lip half-width
+    lip_half_y = lip_y / 2  # outer lip half-height
+    # Ridge pad positions matching groove pads: (cx, cy, is_y_wall)
+    ridge_positions = [
+        (20, lip_half_y, True), (-20, lip_half_y, True),       # +Y wall
+        (20, -lip_half_y, True), (-20, -lip_half_y, True),     # -Y wall
+        (lip_half_x, 0, False), (-lip_half_x, 0, False),       # ±X walls
+        (JOY_POS_X, lip_half_y, True),                         # joystick area
+    ]
+    for cx, cy, is_y_wall in ridge_positions:
+        if is_y_wall:
+            sign_y = 1 if cy > 0 else -1
+            pad = (cq.Workplane("XY")
+                   .workplane(offset=ridge_z - RIDGE_W / 2)
+                   .center(cx, cy + sign_y * RIDGE_H / 2)
+                   .rect(RIDGE_LEN, RIDGE_H)
+                   .extrude(RIDGE_W))
+        else:
+            sign_x = 1 if cx > 0 else -1
+            pad = (cq.Workplane("XY")
+                   .workplane(offset=ridge_z - RIDGE_W / 2)
+                   .center(cx + sign_x * RIDGE_H / 2, cy)
+                   .rect(RIDGE_H, RIDGE_LEN)
+                   .extrude(RIDGE_W))
+        lid = lid.union(pad)
     # Hold-down stubs/pads removed — base standoffs + guide rails retain components
     # USB cable relief — notch in lid lip on -Y side matching base notch
     cable_relief = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(

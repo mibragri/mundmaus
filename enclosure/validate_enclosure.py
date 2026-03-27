@@ -250,27 +250,43 @@ else:
 # USB cable notch position
 ok(f"USB cable notch at X={USB_NOTCH_X:.1f} on -Y wall (aligned with USB port)")
 
-# Screw boss conflicts
-print("\n── 4. Screw Boss Clearances ──")
-for i, (bx, by) in enumerate(SCREW_POSITIONS):
-    label = f"Boss {i+1} ({bx:+.0f},{by:+.0f})"
-    boss_r = SCREW_BOSS_D / 2
+# Detent ridge/groove checks
+print("\n── 4. Detent Ridge Retention ──")
+_groove_z = EXT_H_BASE - LIP_H + RIDGE_Z
+ok(f"Ridge on lip at Z={-LIP_H + RIDGE_Z:.1f}mm (lid coords), groove at Z={_groove_z:.1f}mm (base coords)")
+ok(f"Ridge: {RIDGE_H}mm high, {RIDGE_W}mm wide — groove: {GROOVE_D}mm deep, {GROOVE_W}mm wide")
+if RIDGE_H > LIP_GAP:
+    _interference = RIDGE_H - LIP_GAP
+    ok(f"Ridge interference: {_interference:.2f}mm (ridge {RIDGE_H}mm > gap {LIP_GAP}mm) — provides click ✓")
+else:
+    warn(f"Ridge {RIDGE_H}mm <= gap {LIP_GAP}mm — no interference, won't click!")
+if GROOVE_D < RIDGE_H:
+    warn(f"Groove {GROOVE_D}mm shallower than ridge {RIDGE_H}mm — ridge won't fully seat")
+else:
+    ok(f"Groove depth {GROOVE_D}mm >= ridge {RIDGE_H}mm — full engagement ✓")
+# Check groove doesn't cut through wall
+_remaining_wall = WALL - GROOVE_D
+if _remaining_wall < 1.0:
+    err(f"Groove leaves only {_remaining_wall:.1f}mm wall — too thin!")
+else:
+    ok(f"Wall after groove: {_remaining_wall:.1f}mm remaining ({_remaining_wall/0.42:.0f} perimeters) ✓")
 
-    # Check vs joystick pillars
-    _boss_pillar_conflict = False
-    for _px, _py in _pillar_positions:
-        dist = ((bx - _px)**2 + (by - _py)**2)**0.5
-        if dist < boss_r + _pillar_base_r:
-            warn(f"{label} overlaps pillar at ({_px:.0f},{_py:.0f}) — will merge")
-            _boss_pillar_conflict = True
-            break
-    if not _boss_pillar_conflict:
-        ok(f"{label} clear of joystick pillars ✓")
-
-    # Check vs mic collar
-    collar_dist = ((bx - (-INNER_POS_X + MIC_NUT_POCKET_D / 2))**2 + (by - MIC_POS_Y)**2)**0.5
-    if collar_dist < MIC_COLLAR_D / 2 + boss_r:
-        warn(f"{label} close to mic collar (distance {collar_dist:.1f}mm)")
+# Guard: groove must cut INTO the wall (outward from cavity), not into the cavity
+# Load the enclosure module and verify the groove geometry direction
+import importlib, sys
+_enc = sys.modules.get("mundmaus_v55_enclosure")
+if _enc and hasattr(_enc, '_add_detent_groove'):
+    import inspect
+    _src = inspect.getsource(_enc._add_detent_groove)
+    # The outer rect must be LARGER than CAV_X/CAV_Y (cuts into wall)
+    # If outer rect uses CAV_X without adding GROOVE_D, it cuts into cavity (WRONG)
+    if ("CAV_X + 2 * GROOVE_D" in _src and "CAV_Y + 2 * GROOVE_D" in _src) or \
+       ("sign_y * GROOVE_D" in _src and "sign_x * GROOVE_D" in _src):
+        ok(f"Groove direction: cuts into wall (outward from cavity) ✓")
+    elif "CAV_X," in _src and "CAV_X + " not in _src and "sign_" not in _src:
+        err(f"GROOVE BUG: groove cuts INTO cavity, not into wall!")
+    else:
+        warn(f"Groove direction: could not verify from source — check manually")
 
 # ── 5. Printability (Bambu Lab P1S/P2S, 0.4mm nozzle) ───────────
 
@@ -315,13 +331,12 @@ else:
 platform_overhang = JOY_PLATFORM_H  # vertical wall, no overhang
 ok(f"Joystick platform: {JOY_PLATFORM_H}mm vertical wall — no overhang, no support needed ✓")
 
-# Screw boss printability
-boss_wall = (SCREW_BOSS_D - SCREW_PILOT_D) / 2
-boss_lines = boss_wall / LINE_W
-if boss_lines < 2:
-    warn(f"Screw boss wall {boss_wall:.1f}mm = {boss_lines:.1f} lines — thin")
+# Ridge printability
+ridge_layers = RIDGE_H / LAYER_H
+if ridge_layers < 1.5:
+    warn(f"Ridge {RIDGE_H}mm = {ridge_layers:.1f} layers — may not resolve cleanly at {LAYER_H}mm layer height")
 else:
-    ok(f"Screw boss wall: {boss_wall:.1f}mm = {boss_lines:.1f} lines ✓")
+    ok(f"Ridge: {RIDGE_H}mm = {ridge_layers:.1f} layers ✓")
 
 # Lid orientation check
 ok(f"Lid prints upside-down (ceiling-down), no support needed")
@@ -341,7 +356,7 @@ ok(f"Material: PETG (impact resistant, temp stable)")
 ok(f"Layer height: 0.20mm (standard quality)")
 ok(f"Wall count: 5 (= {5*LINE_W:.2f}mm, matches {WALL}mm wall)")
 ok(f"Top/bottom layers: 5 (= {5*LAYER_H:.2f}mm, for {FLOOR_T}mm floor)")
-ok(f"Infill: 20-25% gyroid (good for screw boss strength)")
+ok(f"Infill: 20-25% gyroid (good for structural strength)")
 ok(f"Nozzle temp: 240°C, Bed: 70°C (PETG on textured PEI)")
 ok(f"Cooling: 40-60% (PETG, enclosed P1S/P2S chamber)")
 ok(f"Arachne wall generator: enabled (default)")

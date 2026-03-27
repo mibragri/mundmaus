@@ -35,7 +35,9 @@ def mm(x, y):
 
 
 def rect(d, x1, y1, x2, y2, **kw):
-    d.rectangle([*mm(x1, y1), *mm(x2, y2)], **kw)
+    px1, py1 = mm(x1, y1)
+    px2, py2 = mm(x2, y2)
+    d.rectangle([min(px1, px2), min(py1, py2), max(px1, px2), max(py1, py2)], **kw)
 
 
 def circ(d, x, y, r, **kw):
@@ -156,9 +158,11 @@ rect(d, PRES_POS_X - PRES_L/2, pres_y + PRES_W/2,
      PRES_POS_X + PRES_L/2, pres_y - PRES_W/2, fill="#3a2a00", outline="#ffaa00", width=2)
 d.text(mm(PRES_POS_X - 8, pres_y), "Sensor", fill="#ffcc44")
 
-# Screw bosses
-for sx, sy in SCREW_POSITIONS:
-    circ(d, sx, sy, SCREW_BOSS_D/2, outline="#555", width=1)
+# Detent ridge (continuous around lip — shown as thin inner rectangle)
+_lip_half_x = (CAV_X - 2 * LIP_GAP) / 2
+_lip_half_y = (CAV_Y - 2 * LIP_GAP) / 2
+rect(d, -_lip_half_x, -_lip_half_y, _lip_half_x, _lip_half_y,
+     fill=None, outline="#ff6622", width=1)
 
 # Clearance annotations
 for p in pillars:

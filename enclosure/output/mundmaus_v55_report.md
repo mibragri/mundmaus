@@ -22,8 +22,8 @@ Component positions along X axis:
 | Remaining +Y wall behind PCB relief | 2.00 mm |
 | Front joystick posts to +Y wall | 14.50 mm |
 | Sensor barb X offset from joystick | 61.00 mm |
-| Sensor holder top to lid rim | 2.50 mm |
-| Mount center on -X wall | Y=0.00 mm, Z=15.00 mm |
+| Sensor holder top to lid rim | 4.50 mm |
+| Mount center on -X wall | Y=0.00 mm, Z=13.50 mm |
 | Mount collar edge margin on 50 mm wall | 13.00 mm each side |
 | USB cable notch X | 7.80 mm |
 | USB cable notch wall | -Y |
@@ -48,7 +48,7 @@ Component positions along X axis:
 ## External Dimensions
 - Base footprint: 136.0 x 50.0 mm
 - Closed enclosure height: 39.0 mm
-- Joystick protrusion above lid: 4.1 mm
+- Joystick protrusion above lid: 2.6 mm
 ## Print Notes
 - Material: PETG preferred, PLA acceptable for quick fit checks
 - Base orientation: floor-down, no support intended
