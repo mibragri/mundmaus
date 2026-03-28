@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MundMaus Memory</title>
+<style>
+  /* ═══════════════════════════════════════════════════════════
+     MundMaus Memory v1.0
+     Barrierefreies Memory-Spiel für Tetraplegiker
+     Steuerung: Joystick (4 Richtungen) + Pusten
+     Protokoll: WebSocket auf ws://${hostname}:81
+     ═══════════════════════════════════════════════════════════ */
+
+  :root {
+    /* Farbenblindheit-sichere Palette */
+    --bg: #1a1a2e;
+    --bg-light: #16213e;
+    --card-back: #0f3460;
+    --card-back-pattern: #1a4a7a;
+    --text: #e8e8e8;
+    --text-dim: #888;
+    --cursor-color: #00d4ff;       /* Cyan – sicher bei Protanopie/Deuteranopie */
+    --selected-color: #e040fb;     /* Magenta – max. Kontrast zu Cyan */
+    --match-color: #76ff03;        /* Helles Grün für Treffer */
+    --match-glow: rgba(118, 255, 3, 0.4);
+    --error-color: #ff5252;
+    --header-bg: rgba(15, 52, 96, 0.6);
+
+    /* Kartensymbole: 8 Paare mit einzigartigen Formen + Farben */
+    --pair0: #ff6b6b; /* Rot */
+    --pair1: #ffd93d; /* Gelb */
+    --pair2: #6bcb77; /* Grün */
+    --pair3: #4d96ff; /* Blau */
+    --pair4: #ff922b; /* Orange */
+    --pair5: #cc5de8; /* Lila */
+    --pair6: #20c997; /* Teal */
+    --pair7: #ff6b9d; /* Pink */
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── Header ─────────────────────────────────── */
+  #header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1vh 2vw;
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+    height: 7vh;
+    position: relative;
+    z-index: 10;
+  }
+
+  #header h1 {
+    font-size: 2.8vh;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  #header h1 span {
+    color: var(--cursor-color);
+  }
+
+  .stat-bar {
+    display: flex;
+    gap: 2vw;
+    align-items: center;
+    font-size: 2.2vh;
+  }
+
+  .stat-bar .stat {
+    display: flex;
+    align-items: center;
+    gap: 0.5vw;
+  }
+
+  .stat-bar .stat .label {
+    color: var(--text-dim);
+  }
+
+  .stat-bar .stat .value {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    min-width: 2ch;
+  }
+
+  /* ── WS Status ──────────────────────────────── */
+  #ws-status {
+    position: fixed;
+    top: 1.5vh;
+    right: 1.5vw;
+    width: 1.2vh;
+    height: 1.2vh;
+    border-radius: 50%;
+    background: #666;
+    z-index: 100;
+    transition: background 0.3s;
+  }
+  #ws-status.connected { background: #76ff03; box-shadow: 0 0 6px #76ff03; }
+
+  /* ── Spielfeld ──────────────────────────────── */
+  #board {
+    display: grid;
+    gap: 1.2vmin;
+    padding: 2vmin;
+    justify-content: center;
+    align-content: center;
+    height: 86vh;
+  }
+
+  /* Grid-Konfigurationen */
+  #board.grid-4x3 { grid-template-columns: repeat(4, 1fr); max-width: 60vw; margin: 0 auto; }
+  #board.grid-4x4 { grid-template-columns: repeat(4, 1fr); max-width: 60vw; margin: 0 auto; }
+  #board.grid-6x4 { grid-template-columns: repeat(6, 1fr); max-width: 80vw; margin: 0 auto; }
+  #board.grid-6x6 { grid-template-columns: repeat(6, 1fr); max-width: 85vw; margin: 0 auto; }
+
+  /* ── Karte ──────────────────────────────────── */
+  .card {
+    aspect-ratio: 3 / 4;
+    perspective: 800px;
+    cursor: default;
+    position: relative;
+  }
+
+  .card-inner {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    transform-style: preserve-3d;
+    transition: transform 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 1.2vmin;
+  }
+
+  .card.flipped .card-inner {
+    transform: rotateY(180deg);
+  }
+
+  .card-face {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    backface-visibility: hidden;
+    border-radius: 1.2vmin;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 0.3vmin solid transparent;
+  }
+
+  /* ── Kartenrückseite ────────────────────────── */
+  .card-back {
+    background: var(--card-back);
+    background-image:
+      repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 8px,
+        var(--card-back-pattern) 8px,
+        var(--card-back-pattern) 9px
+      );
+    border-color: rgba(255,255,255,0.1);
+  }
+
+  .card-back::after {
+    content: '🧠';
+    font-size: 4vmin;
+    opacity: 0.4;
+  }
+
+  /* ── Kartenvorderseite ──────────────────────── */
+  .card-front {
+    background: #fff;
+    transform: rotateY(180deg);
+    border-color: rgba(0,0,0,0.1);
+  }
+
+  .card-front .symbol {
+    font-size: 6vmin;
+    line-height: 1;
+  }
+
+  .card-front .symbol-label {
+    position: absolute;
+    bottom: 0.8vmin;
+    font-size: 1.6vmin;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Cursor (aktive Karte) ──────────────────── */
+  .card.cursor .card-inner {
+    box-shadow:
+      0 0 0 0.4vmin var(--cursor-color),
+      0 0 15px rgba(0, 212, 255, 0.4),
+      0 0 30px rgba(0, 212, 255, 0.15);
+    border-radius: 1.2vmin;
+  }
+
+  .card.cursor .card-back {
+    border-color: var(--cursor-color);
+  }
+
+  /* Cursor-Badge */
+  .card.cursor::before {
+    content: '▼';
+    position: absolute;
+    top: -2.5vmin;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 2vmin;
+    color: var(--cursor-color);
+    filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+    animation: cursor-bob 1s ease-in-out infinite;
+    z-index: 5;
+  }
+
+  @keyframes cursor-bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50% { transform: translateX(-50%) translateY(3px); }
+  }
+
+  /* ── Aufgedeckte erste Karte (selektiert) ───── */
+  .card.selected .card-inner {
+    box-shadow:
+      0 0 0 0.4vmin var(--selected-color),
+      0 0 20px rgba(224, 64, 251, 0.5);
+  }
+
+  .card.selected::after {
+    content: '✦';
+    position: absolute;
+    top: -2.5vmin;
+    right: -1vmin;
+    font-size: 2.2vmin;
+    color: var(--selected-color);
+    filter: drop-shadow(0 0 4px rgba(224, 64, 251, 0.6));
+    animation: pulse-star 1.2s ease-in-out infinite;
+    z-index: 5;
+  }
+
+  @keyframes pulse-star {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.7; }
+  }
+
+  /* ── Gefundenes Paar ────────────────────────── */
+  .card.matched .card-inner {
+    box-shadow: 0 0 0 0.3vmin var(--match-color), 0 0 12px var(--match-glow);
+  }
+
+  .card.matched .card-front {
+    background: #f0fff0;
+  }
+
+  .card.matched::after {
+    content: '✓';
+    position: absolute;
+    top: 0.5vmin;
+    right: 0.8vmin;
+    font-size: 2.2vmin;
+    color: var(--match-color);
+    font-weight: 900;
+    z-index: 5;
+  }
+
+  /* ── Kein-Treffer-Schüttel ──────────────────── */
+  .card.wrong .card-inner {
+    animation: shake 0.5s ease-in-out;
+    box-shadow: 0 0 0 0.3vmin var(--error-color), 0 0 15px rgba(255, 82, 82, 0.4);
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: rotateY(180deg) translateX(0); }
+    20% { transform: rotateY(180deg) translateX(-5px); }
+    40% { transform: rotateY(180deg) translateX(5px); }
+    60% { transform: rotateY(180deg) translateX(-3px); }
+    80% { transform: rotateY(180deg) translateX(3px); }
+  }
+
+  /* ── Footer / Hilfe ─────────────────────────── */
+  #footer {
+    height: 7vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 3vw;
+    font-size: 1.8vh;
+    color: var(--text-dim);
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+  }
+
+  #footer kbd {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 0.2em 0.5em;
+    font-family: inherit;
+    font-size: 0.9em;
+  }
+
+  /* ── Schwierigkeitsmenü ─────────────────────── */
+  #difficulty-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3vh;
+    z-index: 200;
+  }
+
+  #difficulty-menu.hidden { display: none; }
+
+  #difficulty-menu h2 {
+    font-size: 4vh;
+    margin-bottom: 2vh;
+  }
+
+  .diff-option {
+    width: 40vw;
+    max-width: 400px;
+    padding: 2.5vh 3vw;
+    border-radius: 1.5vmin;
+    background: var(--bg-light);
+    border: 0.3vmin solid rgba(255,255,255,0.1);
+    text-align: center;
+    cursor: default;
+    transition: all 0.2s;
+  }
+
+  .diff-option.cursor {
+    border-color: var(--cursor-color);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(0, 212, 255, 0.3);
+    transform: scale(1.05);
+  }
+
+  .diff-option .diff-title {
+    font-size: 2.8vh;
+    font-weight: 700;
+    margin-bottom: 0.5vh;
+  }
+
+  .diff-option .diff-desc {
+    font-size: 1.8vh;
+    color: var(--text-dim);
+  }
+
+  /* ── Gewonnen-Overlay ───────────────────────── */
+  #win-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+
+  #win-screen.hidden { display: none; }
+
+  #win-screen h2 {
+    font-size: 6vh;
+    margin-bottom: 2vh;
+    background: linear-gradient(135deg, var(--cursor-color), var(--selected-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  #win-screen .win-stats {
+    font-size: 2.8vh;
+    margin-bottom: 4vh;
+    text-align: center;
+    line-height: 1.8;
+  }
+
+  #win-screen .win-stars {
+    font-size: 5vh;
+    margin-bottom: 3vh;
+    letter-spacing: 1vw;
+  }
+
+  .win-btn {
+    padding: 2vh 4vw;
+    border-radius: 1.5vmin;
+    background: var(--card-back);
+    border: 0.3vmin solid rgba(255,255,255,0.1);
+    color: var(--text);
+    font-size: 2.5vh;
+    font-weight: 600;
+    cursor: default;
+    transition: all 0.2s;
+  }
+
+  .win-btn.cursor {
+    border-color: var(--cursor-color);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(0, 212, 255, 0.3);
+  }
+
+  /* ── Kiosk-Modus ────────────────────────────── */
+  body.kiosk #footer { display: none; }
+  body.kiosk { cursor: none; }
+
+  /* ── Idle-Screen ────────────────────────────── */
+  #idle-screen {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 300;
+    transition: opacity 0.5s;
+  }
+
+  #idle-screen.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #idle-screen h2 {
+    font-size: 4vh;
+    margin-bottom: 2vh;
+  }
+
+  #idle-screen p {
+    font-size: 2.5vh;
+    color: var(--text-dim);
+    animation: idle-pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes idle-pulse {
+    0%, 100% { opacity: 0.5; }
+    50% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<!-- WS Status -->
+<div id="ws-status" title="ESP32 nicht verbunden"></div>
+
+<!-- Header -->
+<div id="header">
+  <h1>Mund<span>Maus</span> Memory</h1>
+  <div class="stat-bar">
+    <div class="stat"><span class="label">Züge:</span> <span class="value" id="moves">0</span></div>
+    <div class="stat"><span class="label">Paare:</span> <span class="value" id="pairs">0</span>/<span class="value" id="total-pairs">0</span></div>
+    <div class="stat"><span class="label">Zeit:</span> <span class="value" id="timer">0:00</span></div>
+  </div>
+</div>
+
+<!-- Spielfeld -->
+<div id="board"></div>
+
+<!-- Footer (Hilfe) -->
+<div id="footer">
+  <span><kbd>←↑→↓</kbd> Navigieren</span>
+  <span><kbd>Leertaste</kbd> Aufdecken</span>
+  <span><kbd>N</kbd> Neues Spiel</span>
+  <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>F</kbd> Vollbild</span>
+</div>
+
+<!-- Schwierigkeitsmenü -->
+<div id="difficulty-menu" class="hidden">
+  <h2>🧠 Schwierigkeit wählen</h2>
+  <div class="diff-option" data-level="0">
+    <div class="diff-title">Leicht</div>
+    <div class="diff-desc">4 × 3 — 6 Paare</div>
+  </div>
+  <div class="diff-option" data-level="1">
+    <div class="diff-title">Mittel</div>
+    <div class="diff-desc">4 × 4 — 8 Paare</div>
+  </div>
+  <div class="diff-option" data-level="2">
+    <div class="diff-title">Schwer</div>
+    <div class="diff-desc">6 × 4 — 12 Paare</div>
+  </div>
+  <div class="diff-option" data-level="3">
+    <div class="diff-title">Experte</div>
+    <div class="diff-desc">6 × 6 — 18 Paare</div>
+  </div>
+</div>
+
+<!-- Gewonnen -->
+<div id="win-screen" class="hidden">
+  <h2>🎉 Geschafft!</h2>
+  <div class="win-stars" id="win-stars"></div>
+  <div class="win-stats" id="win-stats"></div>
+  <div class="win-btn cursor" id="btn-new-game">Neues Spiel</div>
+  <div class="win-btn" id="btn-same" style="margin-top: 1.5vh;">Nochmal (gleiche Stufe)</div>
+</div>
+
+<!-- Idle Screen -->
+<div id="idle-screen" class="hidden">
+  <h2>🧠 MundMaus Memory</h2>
+  <p>Pusten zum Starten</p>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   MundMaus Memory v1.0
+   ═══════════════════════════════════════════════════════════ */
+
+// ── Symbole: Form + Farbe + Text-Label (3-fach kodiert, farbenblindheit-sicher) ──
+const SYMBOLS = [
+  { emoji: '★',  label: 'Stern',    color: '#ff6b6b' },
+  { emoji: '♦',  label: 'Diamant',  color: '#ffd93d' },
+  { emoji: '●',  label: 'Kreis',    color: '#6bcb77' },
+  { emoji: '▲',  label: 'Dreieck',  color: '#4d96ff' },
+  { emoji: '■',  label: 'Quadrat',  color: '#ff922b' },
+  { emoji: '♥',  label: 'Herz',     color: '#cc5de8' },
+  { emoji: '⬟',  label: 'Pentagon', color: '#20c997' },
+  { emoji: '✦',  label: 'Funkel',   color: '#ff6b9d' },
+  { emoji: '◆',  label: 'Raute',    color: '#74c0fc' },
+  { emoji: '▼',  label: 'Pfeil',    color: '#ffa94d' },
+  { emoji: '⬣',  label: 'Hexagon',  color: '#da77f2' },
+  { emoji: '⊕',  label: 'Ziel',     color: '#63e6be' },
+  { emoji: '◈',  label: 'Juwel',    color: '#e599f7' },
+  { emoji: '⬢',  label: 'Wabe',     color: '#fcc419' },
+  { emoji: '☆',  label: 'Hohlstern',color: '#ff8787' },
+  { emoji: '◐',  label: 'Halbmond', color: '#91a7ff' },
+  { emoji: '♣',  label: 'Kreuz',    color: '#69db7c' },
+  { emoji: '♠',  label: 'Pik',      color: '#b197fc' },
+];
+
+const LEVELS = [
+  { cols: 4, rows: 3, pairs: 6,  grid: 'grid-4x3', name: 'Leicht' },
+  { cols: 4, rows: 4, pairs: 8,  grid: 'grid-4x4', name: 'Mittel' },
+  { cols: 6, rows: 4, pairs: 12, grid: 'grid-6x4', name: 'Schwer' },
+  { cols: 6, rows: 6, pairs: 18, grid: 'grid-6x6', name: 'Experte' },
+];
+
+// ── Audio ────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+
+function beep(freq, dur, type = 'square') {
+  ensureAudio();
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = type;
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + dur / 1000);
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start();
+  osc.stop(audioCtx.currentTime + dur / 1000);
+}
+
+function sndNav()     { beep(600, 60); }
+function sndFlip()    { beep(800, 100); beep(1000, 80); }
+function sndMatch()   { beep(1000, 100); setTimeout(() => beep(1200, 100), 120); setTimeout(() => beep(1400, 150), 250); }
+function sndNoMatch() { beep(200, 250, 'sawtooth'); }
+function sndWin() {
+  const notes = [523, 659, 784, 1047];
+  notes.forEach((f, i) => setTimeout(() => beep(f, 200, 'sine'), i * 180));
+}
+function sndMenuNav() { beep(500, 50); }
+
+// ── State ────────────────────────────────────────────────
+let state = {
+  phase: 'menu', // menu | playing | checking | win
+  level: 1,
+  cards: [],
+  cols: 4,
+  rows: 4,
+  cursor: 0,
+  first: null,    // index der ersten aufgedeckten Karte
+  second: null,
+  moves: 0,
+  matched: 0,
+  totalPairs: 0,
+  timerStart: null,
+  timerInterval: null,
+  menuCursor: 1,
+  winCursor: 0,
+  kiosk: false,
+  idleTimeout: null,
+};
+
+// ── DOM ──────────────────────────────────────────────────
+const $board = document.getElementById('board');
+const $moves = document.getElementById('moves');
+const $pairs = document.getElementById('pairs');
+const $totalPairs = document.getElementById('total-pairs');
+const $timer = document.getElementById('timer');
+const $diffMenu = document.getElementById('difficulty-menu');
+const $winScreen = document.getElementById('win-screen');
+const $winStars = document.getElementById('win-stars');
+const $winStats = document.getElementById('win-stats');
+const $idleScreen = document.getElementById('idle-screen');
+const $wsStatus = document.getElementById('ws-status');
+
+// ── Shuffle ──────────────────────────────────────────────
+function shuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// ── Board erstellen ──────────────────────────────────────
+function createBoard(levelIdx) {
+  const level = LEVELS[levelIdx];
+  state.level = levelIdx;
+  state.cols = level.cols;
+  state.rows = level.rows;
+  state.totalPairs = level.pairs;
+  state.matched = 0;
+  state.moves = 0;
+  state.first = null;
+  state.second = null;
+  state.cursor = 0;
+  state.phase = 'playing';
+
+  // Symbole auswählen und Paare erstellen
+  const chosen = shuffle([...SYMBOLS]).slice(0, level.pairs);
+  const deck = shuffle([...chosen, ...chosen].map((s, i) => ({
+    id: i,
+    symbol: s,
+    flipped: false,
+    matched: false,
+  })));
+  state.cards = deck;
+
+  // Grid
+  $board.className = level.grid;
+  $board.innerHTML = '';
+  deck.forEach((card, idx) => {
+    const el = document.createElement('div');
+    el.className = 'card';
+    el.dataset.idx = idx;
+    el.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-back"></div>
+        <div class="card-face card-front">
+          <div class="symbol" style="color:${card.symbol.color}">${card.symbol.emoji}</div>
+          <div class="symbol-label" style="color:${card.symbol.color}">${card.symbol.label}</div>
+        </div>
+      </div>
+    `;
+    $board.appendChild(el);
+  });
+
+  // UI
+  $moves.textContent = '0';
+  $pairs.textContent = '0';
+  $totalPairs.textContent = level.pairs;
+  $timer.textContent = '0:00';
+
+  // Timer
+  if (state.timerInterval) clearInterval(state.timerInterval);
+  state.timerStart = Date.now();
+  state.timerInterval = setInterval(updateTimer, 1000);
+
+  updateCursor();
+}
+
+function updateTimer() {
+  if (state.phase === 'win') return;
+  const elapsed = Math.floor((Date.now() - state.timerStart) / 1000);
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  $timer.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function getElapsed() {
+  return Math.floor((Date.now() - state.timerStart) / 1000);
+}
+
+// ── Rendering ────────────────────────────────────────────
+function updateCursor() {
+  const cards = $board.querySelectorAll('.card');
+  cards.forEach((el, i) => {
+    el.classList.toggle('cursor', i === state.cursor && state.phase === 'playing');
+    el.classList.toggle('flipped', state.cards[i].flipped || state.cards[i].matched);
+    el.classList.toggle('matched', state.cards[i].matched);
+    el.classList.toggle('selected', state.first === i && state.second === null);
+  });
+}
+
+// ── Navigation ───────────────────────────────────────────
+function navigate(dir) {
+  resetIdle();
+  if (state.phase === 'menu') return navigateMenu(dir);
+  if (state.phase === 'win') return navigateWin(dir);
+  if (state.phase !== 'playing') return;
+
+  const { cursor, cols, rows } = state;
+  const total = cols * rows;
+  let next = cursor;
+
+  const row = Math.floor(cursor / cols);
+  const col = cursor % cols;
+
+  switch (dir) {
+    case 'left':  next = col > 0 ? cursor - 1 : cursor; break;
+    case 'right': next = col < cols - 1 ? cursor + 1 : cursor; break;
+    case 'up':    next = row > 0 ? cursor - cols : cursor; break;
+    case 'down':  next = row < rows - 1 ? cursor + cols : cursor; break;
+  }
+
+  if (next !== cursor) {
+    state.cursor = next;
+    sndNav();
+    updateCursor();
+  }
+}
+
+function navigateMenu(dir) {
+  const opts = $diffMenu.querySelectorAll('.diff-option');
+  if (dir === 'up' && state.menuCursor > 0) {
+    state.menuCursor--;
+    sndMenuNav();
+  } else if (dir === 'down' && state.menuCursor < opts.length - 1) {
+    state.menuCursor++;
+    sndMenuNav();
+  }
+  opts.forEach((el, i) => el.classList.toggle('cursor', i === state.menuCursor));
+}
+
+function navigateWin(dir) {
+  if (dir === 'up' || dir === 'down') {
+    state.winCursor = state.winCursor === 0 ? 1 : 0;
+    sndMenuNav();
+    document.getElementById('btn-new-game').classList.toggle('cursor', state.winCursor === 0);
+    document.getElementById('btn-same').classList.toggle('cursor', state.winCursor === 1);
+  }
+}
+
+// ── Aktion (Pusten) ──────────────────────────────────────
+function action() {
+  resetIdle();
+  ensureAudio();
+
+  if (state.phase === 'menu') {
+    $diffMenu.classList.add('hidden');
+    createBoard(state.menuCursor);
+    sndFlip();
+    return;
+  }
+
+  if (state.phase === 'win') {
+    if (state.winCursor === 0) {
+      showMenu();
+    } else {
+      createBoard(state.level);
+    }
+    sndFlip();
+    return;
+  }
+
+  if (state.phase !== 'playing') return;
+
+  const idx = state.cursor;
+  const card = state.cards[idx];
+
+  // Bereits aufgedeckt oder matched → ignorieren
+  if (card.flipped || card.matched) return;
+
+  // Karte aufdecken
+  card.flipped = true;
+  sndFlip();
+
+  if (state.first === null) {
+    // Erste Karte
+    state.first = idx;
+    updateCursor();
+  } else {
+    // Zweite Karte
+    state.second = idx;
+    state.moves++;
+    $moves.textContent = state.moves;
+    state.phase = 'checking';
+    updateCursor();
+
+    const firstCard = state.cards[state.first];
+    const secondCard = state.cards[state.second];
+
+    if (firstCard.symbol.label === secondCard.symbol.label) {
+      // Treffer!
+      setTimeout(() => {
+        firstCard.matched = true;
+        secondCard.matched = true;
+        state.matched++;
+        $pairs.textContent = state.matched;
+        sndMatch();
+
+        state.first = null;
+        state.second = null;
+        state.phase = 'playing';
+        updateCursor();
+
+        // Gewonnen?
+        if (state.matched === state.totalPairs) {
+          winGame();
+        }
+      }, 400);
+    } else {
+      // Kein Treffer
+      const cards = $board.querySelectorAll('.card');
+      setTimeout(() => {
+        cards[state.first].classList.add('wrong');
+        cards[state.second].classList.add('wrong');
+        sndNoMatch();
+      }, 400);
+
+      setTimeout(() => {
+        firstCard.flipped = false;
+        secondCard.flipped = false;
+        cards[state.first].classList.remove('wrong');
+        cards[state.second].classList.remove('wrong');
+        state.first = null;
+        state.second = null;
+        state.phase = 'playing';
+        updateCursor();
+      }, 1200);
+    }
+  }
+}
+
+// ── Gewonnen ─────────────────────────────────────────────
+function winGame() {
+  state.phase = 'win';
+  if (state.timerInterval) clearInterval(state.timerInterval);
+
+  const elapsed = getElapsed();
+  const m = Math.floor(elapsed / 60);
+  const s = elapsed % 60;
+  const level = LEVELS[state.level];
+
+  // Sterne: basierend auf Züge vs optimale Züge
+  const optimal = level.pairs; // Minimum = Anzahl Paare
+  const ratio = state.moves / optimal;
+  let stars = 3;
+  if (ratio > 2) stars = 2;
+  if (ratio > 3) stars = 1;
+
+  $winStars.textContent = '⭐'.repeat(stars) + '☆'.repeat(3 - stars);
+  $winStats.innerHTML = `
+    <div>${level.name} — ${level.pairs} Paare</div>
+    <div>${state.moves} Züge · ${m}:${s.toString().padStart(2, '0')}</div>
+  `;
+
+  state.winCursor = 0;
+  document.getElementById('btn-new-game').classList.add('cursor');
+  document.getElementById('btn-same').classList.remove('cursor');
+
+  $winScreen.classList.remove('hidden');
+  sndWin();
+}
+
+// ── Menü ─────────────────────────────────────────────────
+function showMenu() {
+  state.phase = 'menu';
+  state.menuCursor = state.level || 1;
+  if (state.timerInterval) clearInterval(state.timerInterval);
+
+  $winScreen.classList.add('hidden');
+  $diffMenu.classList.remove('hidden');
+
+  const opts = $diffMenu.querySelectorAll('.diff-option');
+  opts.forEach((el, i) => el.classList.toggle('cursor', i === state.menuCursor));
+}
+
+// ── Idle ─────────────────────────────────────────────────
+function resetIdle() {
+  $idleScreen.classList.add('hidden');
+  if (state.idleTimeout) clearTimeout(state.idleTimeout);
+  if (state.kiosk) {
+    state.idleTimeout = setTimeout(() => {
+      $idleScreen.classList.remove('hidden');
+    }, 120000); // 2 Minuten
+  }
+}
+
+// ── Kiosk ────────────────────────────────────────────────
+function toggleKiosk() {
+  state.kiosk = !state.kiosk;
+  document.body.classList.toggle('kiosk', state.kiosk);
+  resetIdle();
+}
+
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen();
+  }
+}
+
+// ── Tastatur ─────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  switch (e.key) {
+    case 'ArrowLeft':  navigate('left'); break;
+    case 'ArrowRight': navigate('right'); break;
+    case 'ArrowUp':    navigate('up'); break;
+    case 'ArrowDown':  navigate('down'); break;
+    case ' ':
+    case 'Enter':
+      e.preventDefault();
+      action();
+      break;
+    case 'n': case 'N': showMenu(); break;
+    case 'k': case 'K': toggleKiosk(); break;
+    case 'f': case 'F': toggleFullscreen(); break;
+  }
+});
+
+// ── WebSocket (MundMaus ESP32) ───────────────────────────
+let ws = null;
+let wsReconnectTimer = null;
+let wsBackoff = 3000; // start at 3s, doubles on failure, cap 30s
+const WS_BACKOFF_INIT = 3000;
+const WS_BACKOFF_MAX = 30000;
+
+function wsConnect() {
+  const host = location.hostname || '192.168.4.1';
+  const url = `ws://${host}:81`;
+
+  try {
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      $wsStatus.className = 'connected';
+      $wsStatus.title = 'ESP32 verbunden';
+      wsBackoff = WS_BACKOFF_INIT; // reset on success
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        resetIdle();
+
+        if (msg.type === 'nav') {
+          navigate(msg.dir);
+        } else if (msg.type === 'action') {
+          if (msg.kind === 'puff' || msg.kind === 'press') {
+            action();
+          } else if (msg.kind === 'new_game') {
+            showMenu();
+          } else if (msg.kind === 'kiosk') {
+            toggleKiosk();
+          }
+        }
+      } catch (err) {
+        console.warn('[WS] Parse-Fehler:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      $wsStatus.className = '';
+      $wsStatus.title = 'ESP32 nicht verbunden';
+      ws = null;
+      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+      wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+    };
+
+    ws.onerror = () => {
+      ws?.close();
+    };
+  } catch (e) {
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+    wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────
+showMenu();
+wsConnect();
+</script>
+</body>
+</html>
