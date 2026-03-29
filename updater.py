@@ -291,11 +291,11 @@ def _download_file(fname, dest):
     _, _, host, path = url.split('/', 3)
     path = '/' + path
 
+    addr = socket.getaddrinfo(host, 443)[0][-1]
+    raw_sock = socket.socket()
+    raw_sock.settimeout(10)
+    sock = raw_sock
     try:
-        addr = socket.getaddrinfo(host, 443)[0][-1]
-        raw_sock = socket.socket()
-        raw_sock.settimeout(10)
-        sock = raw_sock
         raw_sock.connect(addr)
         sock = ssl.wrap_socket(raw_sock, server_hostname=host)
         sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'.encode())

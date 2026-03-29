@@ -170,7 +170,7 @@ def _mark_boot_ok():
             with open(UPDATE_STATE_FILE, 'w') as f:
                 _json.dump({'status': 'ok'}, f)
             print("  Recovery-Warnung zurueckgesetzt")
-    except OSError:
+    except (OSError, ValueError):
         pass
 
 
