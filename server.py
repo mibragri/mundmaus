@@ -252,8 +252,11 @@ class MundMausServer:
             else:
                 self._send_json(client, {'available': [], 'offline': True})
         elif 'POST /api/updates/check' in fl:
-            self._send_json(client, {'ok': True})
-            self._recheck_updates = True
+            if self._updating:
+                self._send_json(client, {'ok': False, 'error': 'Update laeuft bereits'})
+            else:
+                self._send_json(client, {'ok': True})
+                self._recheck_updates = True
         elif 'POST /api/update/start' in fl:
             if self._updating:
                 self._send_json(client, {'ok': False, 'error': 'Update laeuft bereits'})
@@ -343,9 +346,10 @@ try{{const r=await fetch('/api/wifi',{{method:'POST',headers:{{'Content-Type':'a
 body:JSON.stringify({{ssid:s,password:p}})}}),d=await r.json();
 document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.getElementById('st').textContent=''+e}}}}
 </script></body></html>"""
+        html_bytes = html.encode('utf-8')
         client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
-        client.send(f'Content-Length: {len(html)}\r\nConnection: close\r\n\r\n'.encode())
-        client.send(html.encode())
+        client.send(f'Content-Length: {len(html_bytes)}\r\nConnection: close\r\n\r\n'.encode())
+        client.send(html_bytes)
 
     # --- WebSocket ---
 

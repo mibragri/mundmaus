@@ -178,13 +178,14 @@ def _mark_boot_ok():
         pass
 
 
-async def update_check(server, wifi):
-    """Check for updates in background after boot. Non-blocking."""
+async def update_check(server, wifi, initial=False):
+    """Check for updates in background. Non-blocking."""
     if wifi.mode != 'station':
         server._update_info = {'available': [], 'offline': True}
         server.ws_send_all({'type': 'update_status', 'available': [], 'offline': True})
         return
-    await asyncio.sleep_ms(2000)  # Let server settle
+    if initial:
+        await asyncio.sleep_ms(2000)  # Let server settle on first boot
     from updater import check_manifest
     def on_result(result):
         server._update_info = result
@@ -249,7 +250,7 @@ async def async_main():
     _mark_boot_ok()
 
     # Check for OTA updates in background
-    asyncio.create_task(update_check(server, wifi))
+    asyncio.create_task(update_check(server, wifi, initial=True))
 
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
