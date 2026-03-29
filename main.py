@@ -100,6 +100,18 @@ async def server_loop(server, wifi):
 
         server.check_reboot()
 
+        if server._updating:
+            from updater import run_update
+            available = server._update_info.get('available', [])
+            def on_progress(f, cur, tot):
+                server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
+            ok, msg = run_update(available, progress_cb=on_progress)
+            server.ws_send_all({'type': 'update_complete',
+                                'firmware_updated': any(u.get('firmware') for u in available),
+                                'message': msg, 'ok': ok})
+            server._updating = False
+            server._update_info = None
+
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
             gc.collect()
@@ -132,6 +144,22 @@ def _mark_boot_ok():
             print("  Update: Boot OK, Status gesetzt")
     except OSError:
         pass
+
+
+async def update_check(server, wifi):
+    """Check for updates in background after boot. Non-blocking."""
+    if wifi.mode != 'station':
+        server._update_info = {'available': [], 'offline': True}
+        server.ws_send_all({'type': 'update_status', 'available': [], 'offline': True})
+        return
+    await asyncio.sleep_ms(2000)  # Let server settle
+    from updater import check_manifest
+    def on_result(result):
+        server._update_info = result
+        msg = {'type': 'update_status'}
+        msg.update(result)
+        server.ws_send_all(msg)
+    check_manifest(notify_cb=on_result)
 
 
 async def async_main():
@@ -187,6 +215,9 @@ async def async_main():
 
     # Mark boot successful (rollback protection)
     _mark_boot_ok()
+
+    # Check for OTA updates in background
+    asyncio.create_task(update_check(server, wifi))
 
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")

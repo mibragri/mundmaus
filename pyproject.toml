@@ -34,3 +34,4 @@ ignore = [
 # Boot/main have imports that depend on hardware
 "boot.py" = ["E402", "F401", "I001"]  # imports interleaved with calls (MicroPython boot pattern)
 "main.py" = ["E402"]
+"server.py" = ["E501"]  # embedded HTML/JS portal template has long lines

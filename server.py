@@ -63,6 +63,16 @@ def _send_404(client, path):
     client.send(body.encode())
 
 def _generate_portal(wifi, wifi_ip):
+    recovery = False
+    try:
+        with open('update_state.json') as _f:
+            _us = json.load(_f)
+            recovery = _us.get('recovery', False)
+    except:
+        pass
+
+    recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">Update fehlgeschlagen &mdash; alte Version wiederhergestellt</div>' if recovery else ''
+
     games = []
     try:
         for entry in os.listdir(WWW_DIR):
@@ -121,6 +131,18 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <h1>MundMaus</h1>
 <p class="sub">Assistive Gaming Controller v{VERSION}</p>
 <div class="gs">{btns}</div>
+{recovery_banner}
+<div class="wf" id="upd" style="display:none">
+<h2>Updates</h2>
+<div id="upd-info"></div>
+<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">Jetzt aktualisieren</button>
+<div id="upd-progress" style="display:none">
+<div style="background:#333;border-radius:4px;height:24px;margin:8px 0">
+<div id="upd-bar" style="background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s"></div>
+</div>
+<div id="upd-file" style="font-size:.85em;color:#aaa"></div>
+</div>
+</div>
 <div class="wf">
 <h2><span class="wd"></span> {mode_label}: {ssid} &mdash; {wifi_ip}</h2>
 <button class="wsc" onclick="sc()">Netzwerke suchen</button>
@@ -150,6 +172,12 @@ document.getElementById('wm').textContent=d.message||'OK'}}
 catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
 async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
 document.getElementById('wm').textContent='Neustart...'}}}}
+const ws=new WebSocket('ws://'+location.hostname+':81');
+ws.onmessage=function(e){{const d=JSON.parse(e.data);
+if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.textContent='Offline \u2014 keine Update-Pruefung'}}else if(d.available&&d.available.length>0){{info.textContent=d.available.length+' Update(s) verfuegbar';btn.style.display='block'}}else{{info.textContent='Aktuell'}}}}
+else if(d.type==='update_progress'){{document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}}
+else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none'}}}};
+async function startUpdate(){{document.getElementById('upd-info').textContent='Starte Update...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
 </script>
 </body></html>"""
 
@@ -217,6 +245,19 @@ class MundMausServer:
                 'ip': self.wifi.ip, 'mode': self.wifi.mode,
                 'mem_free': gc.mem_free()
             })
+        elif 'GET /api/updates' in fl:
+            if self._update_info:
+                self._send_json(client, self._update_info)
+            else:
+                self._send_json(client, {'available': [], 'offline': True})
+        elif 'POST /api/update/start' in fl:
+            if self._updating:
+                self._send_json(client, {'ok': False, 'error': 'Update laeuft bereits'})
+            elif not self._update_info or not self._update_info.get('available'):
+                self._send_json(client, {'ok': False, 'error': 'Keine Updates'})
+            else:
+                self._updating = True
+                self._send_json(client, {'ok': True})
         elif f'GET /{WWW_DIR}/' in fl:
             path = fl.split(' ')[1].lstrip('/')
             if '..' not in path and _file_exists(path):
