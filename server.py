@@ -52,7 +52,7 @@ def _serve_file(client, filepath):
         with open(filepath, 'rb') as f:
             while True:
                 n = f.readinto(buf)
-                if n == 0: break
+                if not n: break
                 client.send(buf[:n])
     except OSError:
         _send_404(client, filepath)
