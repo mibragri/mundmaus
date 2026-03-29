@@ -82,19 +82,12 @@
     font-size: 2vh;
   }
 
-  .stat-bar .stat {
-    display: flex;
-    align-items: center;
-    gap: 0.5vw;
-  }
-
-  .stat-bar .stat .label {
-    color: var(--text-dim);
-  }
-
-  .stat-bar .stat .value {
+  .stat { display: flex; align-items: center; gap: 0.5vw; }
+  .stat .label { color: var(--text-dim); }
+  .stat .value {
     font-weight: 700;
     color: var(--cursor-color);
+    font-variant-numeric: tabular-nums;
     font-variant-numeric: tabular-nums;
     min-width: 2ch;
   }
