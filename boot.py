@@ -142,6 +142,11 @@ s.textContent=r.ok?n+' OK! Seite neu laden nach Upload aller Dateien.':'Fehler: 
             if 'POST /upload/' in fl:
                 fname = fl.split('/upload/')[1].split(' ')[0]
                 fname = fname.replace('%20', ' ')
+                # Path traversal protection: only allow bare filenames
+                if '/' in fname or '\\' in fname:
+                    fname = fname.split('/')[-1].split('\\')[-1]
+                if fname.startswith('.'):
+                    fname = '_' + fname
                 # Read past headers
                 while b'\r\n\r\n' not in req.encode():
                     req += cl.recv(256).decode('utf-8', 'ignore')

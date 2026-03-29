@@ -74,7 +74,7 @@ def check_manifest(notify_cb=None):
     return result
 
 
-def run_update(available, progress_cb=None):
+def run_update(available, progress_cb=None, error_cb=None):
     """Download and install updates. Returns (success, message).
     progress_cb(file, current, total) called per file.
     """
@@ -102,6 +102,8 @@ def run_update(available, progress_cb=None):
         if not ok:
             errors.append(fname)
             _safe_remove(fname + '.new')
+            if error_cb:
+                error_cb(fname, "Download fehlgeschlagen")
 
     # Firmware (all-or-nothing)
     fw_ok = True
@@ -114,6 +116,8 @@ def run_update(available, progress_cb=None):
         if not ok:
             fw_ok = False
             errors.append(fname)
+            if error_cb:
+                error_cb(fname, "Download fehlgeschlagen")
             break
 
     if not fw_ok:
@@ -145,10 +149,20 @@ def run_update(available, progress_cb=None):
                 os.rename(fname, fname + '.bak')
 
         # Step b: rename all .new → final
-        for upd in firmware:
-            fname = upd['file']
-            os.rename(fname + '.new', fname)
-            local[fname] = upd['to_ver']
+        try:
+            for upd in firmware:
+                fname = upd['file']
+                os.rename(fname + '.new', fname)
+                local[fname] = upd['to_ver']
+        except Exception as e:
+            print(f"  Install-Fehler: {e}, Rollback...")
+            for upd in firmware:
+                fname = upd['file']
+                if _file_exists(fname + '.bak'):
+                    _safe_remove(fname)
+                    os.rename(fname + '.bak', fname)
+            _safe_remove(UPDATE_STATE_FILE)
+            return False, f"Install fehlgeschlagen: {e}, Rollback durchgefuehrt"
 
         # Step c: set pending state
         with open(UPDATE_STATE_FILE, 'w') as f:
@@ -216,12 +230,19 @@ def _http_get(url, timeout=5):
         # Read header
         header = b''
         while b'\r\n\r\n' not in header:
+            if len(header) > 4096:
+                print(f"  Header zu gross ({host})")
+                return None
             chunk = sock.read(256)
             if not chunk:
                 return None
             header += chunk
 
         header_end = header.index(b'\r\n\r\n') + 4
+        status_line = header.split(b'\r\n')[0]
+        if b'200' not in status_line:
+            print(f"  HTTP {status_line} ({host})")
+            return None
         body = header[header_end:]
 
         # Read rest
@@ -265,6 +286,9 @@ def _download_file(fname, dest):
         # Skip header
         header = b''
         while b'\r\n\r\n' not in header:
+            if len(header) > 4096:
+                print(f"  Header zu gross ({host})")
+                return False
             chunk = sock.read(256)
             if not chunk:
                 return False

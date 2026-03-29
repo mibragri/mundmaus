@@ -78,6 +78,23 @@ async def sensor_loop(joystick, puff, server):
         await asyncio.sleep_ms(SENSOR_POLL_MS)
 
 
+async def _run_update_async(server):
+    """Run update in background, yielding to event loop between files."""
+    from updater import run_update
+    available = server._update_info.get('available', [])
+    def on_progress(f, cur, tot):
+        server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
+    def on_error(f, err):
+        server.ws_send_all({'type': 'update_error', 'file': f, 'error': err})
+    ok, msg = run_update(available, progress_cb=on_progress, error_cb=on_error)
+    server.ws_send_all({'type': 'update_complete',
+                        'firmware_updated': any(u.get('firmware') for u in available),
+                        'message': msg, 'ok': ok})
+    server._updating = False
+    server._update_info = None
+    server._update_task_running = False
+
+
 async def server_loop(server, wifi):
     loop_count = 0
     while True:
@@ -100,17 +117,9 @@ async def server_loop(server, wifi):
 
         server.check_reboot()
 
-        if server._updating:
-            from updater import run_update
-            available = server._update_info.get('available', [])
-            def on_progress(f, cur, tot):
-                server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
-            ok, msg = run_update(available, progress_cb=on_progress)
-            server.ws_send_all({'type': 'update_complete',
-                                'firmware_updated': any(u.get('firmware') for u in available),
-                                'message': msg, 'ok': ok})
-            server._updating = False
-            server._update_info = None
+        if server._updating and not getattr(server, '_update_task_running', False):
+            server._update_task_running = True
+            asyncio.create_task(_run_update_async(server))
 
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
