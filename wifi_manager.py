@@ -6,7 +6,7 @@ import time
 
 import network
 
-from config import AP_IP, AP_PASS, AP_SSID, WIFI_CONFIG_FILE
+from config import AP_PASS, AP_SSID, WIFI_CONFIG_FILE
 
 
 class WiFiManager:
@@ -86,40 +86,40 @@ class WiFiManager:
         self.sta.active(False)
         self.ap.active(True)
         self.ap.config(essid=AP_SSID, password=AP_PASS,
-                       authmode=3, max_clients=3)
-        self.ip = AP_IP
+                       authmode=network.AUTH_WPA_WPA2_PSK)
+        while not self.ap.active():
+            time.sleep_ms(100)
+        self.ip = self.ap.ifconfig()[0]
         self.mode = 'ap'
-        print(f"  Hotspot: {AP_SSID} ({AP_IP})")
         return self.ip
 
-    def scan_networks(self, limit=15):
+    def scan_networks(self):
         try:
             was_active = self.sta.active()
             self.sta.active(True)
-            raw = self.sta.scan()
+            time.sleep_ms(100)
+            results = self.sta.scan()
             if not was_active and self.mode == 'ap':
                 self.sta.active(False)
             seen = set()
-            results = []
-            for ssid_b, *_, rssi, _ in sorted(raw, key=lambda x: x[3], reverse=True):
-                ssid = ssid_b.decode('utf-8', 'ignore').strip()
-                if ssid and ssid not in seen:
-                    seen.add(ssid)
-                    results.append(ssid)
-                if len(results) >= limit:
-                    break
-            return results
+            ssids = []
+            for r in sorted(results, key=lambda x: x[3], reverse=True):
+                name = r[0].decode('utf-8', 'ignore').strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    ssids.append(name)
+            return ssids[:15]
         except Exception as e:
-            print(f"  Scan-Fehler: {e}")
+            print(f"  Scan Fehler: {e}")
             return []
 
     def get_status(self):
         return {
-            'mode': self.mode,
-            'ssid': self.ssid or AP_SSID,
-            'ip': self.ip,
+            'mode': self.mode or 'disconnected',
+            'ssid': self.ssid or '',
+            'ip': self.ip or '',
             'ap_ssid': AP_SSID,
-            'connected': self.sta.isconnected() if self.mode == 'station' else False,
+            'connected': self.sta.isconnected() if self.mode == 'station' else False
         }
 
     def startup(self):
