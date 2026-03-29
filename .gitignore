@@ -23,3 +23,6 @@ enclosure/bambu-profiles/result.json
 
 # Temp files
 *.tmp
+
+# Downloaded firmware binary (re-downloaded on demand)
+tools/.micropython-firmware.bin
