@@ -80,19 +80,25 @@ async def sensor_loop(joystick, puff, server):
 
 async def _run_update_async(server):
     """Run update in background, yielding to event loop between files."""
-    from updater import run_update
-    available = server._update_info.get('available', [])
-    def on_progress(f, cur, tot):
-        server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
-    def on_error(f, err):
-        server.ws_send_all({'type': 'update_error', 'file': f, 'error': err})
-    ok, msg = run_update(available, progress_cb=on_progress, error_cb=on_error)
-    server.ws_send_all({'type': 'update_complete',
-                        'firmware_updated': any(u.get('firmware') for u in available),
-                        'message': msg, 'ok': ok})
-    server._updating = False
-    server._update_info = None
-    server._update_task_running = False
+    try:
+        from updater import run_update
+        available = server._update_info.get('available', [])
+        def on_progress(f, cur, tot):
+            server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
+        def on_error(f, err):
+            server.ws_send_all({'type': 'update_error', 'file': f, 'error': err})
+        ok, msg = run_update(available, progress_cb=on_progress, error_cb=on_error)
+        server.ws_send_all({'type': 'update_complete',
+                            'firmware_updated': any(u.get('firmware') for u in available),
+                            'message': msg, 'ok': ok})
+    except Exception as e:
+        print(f"  Update-Fehler: {e}")
+        server.ws_send_all({'type': 'update_complete', 'ok': False,
+                            'message': f'Update-Fehler: {e}', 'firmware_updated': False})
+    finally:
+        server._updating = False
+        server._update_info = None
+        server._update_task_running = False
 
 
 async def server_loop(server, wifi):
@@ -142,7 +148,7 @@ async def display_loop(tft, ip, mode, joystick, puff, server):
 # ============================================================
 
 def _mark_boot_ok():
-    """If update was pending, mark boot as successful."""
+    """If update was pending, mark boot as successful and clean up .bak files."""
     import json as _json
     try:
         with open(UPDATE_STATE_FILE) as f:
@@ -150,6 +156,13 @@ def _mark_boot_ok():
         if state.get('status') == 'pending':
             with open(UPDATE_STATE_FILE, 'w') as f:
                 _json.dump({'status': 'ok'}, f)
+            # Clean up .bak files from successful update
+            for entry in os.listdir('/'):
+                if entry.endswith('.bak'):
+                    try:
+                        os.remove(entry)
+                    except:
+                        pass
             print("  Update: Boot OK, Status gesetzt")
     except OSError:
         pass

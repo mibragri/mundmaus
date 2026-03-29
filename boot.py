@@ -59,39 +59,6 @@ def _rollback():
     return count
 
 
-state = _read_state()
-
-if state.get('status') == 'pending':
-    attempts = state.get('attempts', 0)
-
-    if attempts >= _MAX_ATTEMPTS:
-        # Too many failed boots — rollback
-        print(f"  Update fehlgeschlagen ({attempts} Versuche)")
-
-        # Check if .bak files exist
-        has_bak = any(e.endswith('.bak') for e in os.listdir('/'))
-
-        if has_bak:
-            n = _rollback()
-            _write_state({'status': 'ok', 'recovery': True})
-            print(f"  {n} Dateien wiederhergestellt")
-            # main.py (restored) will run normally after boot.py
-        else:
-            print("  Keine .bak Dateien — Recovery-AP")
-            _write_state({'status': 'ok', 'recovery': True})
-            _recovery_ap()
-            # _recovery_ap() blocks forever — main.py won't run
-    else:
-        # Increment attempt counter and let main.py try
-        state['attempts'] = attempts + 1
-        _write_state(state)
-        print(f"  Update-Versuch {attempts + 1}/{_MAX_ATTEMPTS}")
-
-
-# ============================================================
-# RECOVERY AP (last resort)
-# ============================================================
-
 def _recovery_ap():
     """Minimal AP with file upload page. Blocks forever."""
     import network
@@ -174,3 +141,36 @@ s.textContent=r.ok?n+' OK! Seite neu laden nach Upload aller Dateien.':'Fehler: 
                 cl.close()
             except:
                 pass
+
+
+# ============================================================
+# BOOT LOGIC
+# ============================================================
+
+state = _read_state()
+
+if state.get('status') == 'pending':
+    attempts = state.get('attempts', 0)
+
+    if attempts >= _MAX_ATTEMPTS:
+        # Too many failed boots — rollback
+        print(f"  Update fehlgeschlagen ({attempts} Versuche)")
+
+        # Check if .bak files exist
+        has_bak = any(e.endswith('.bak') for e in os.listdir('/'))
+
+        if has_bak:
+            n = _rollback()
+            _write_state({'status': 'ok', 'recovery': True})
+            print(f"  {n} Dateien wiederhergestellt")
+            # main.py (restored) will run normally after boot.py
+        else:
+            print("  Keine .bak Dateien — Recovery-AP")
+            _write_state({'status': 'ok', 'recovery': True})
+            _recovery_ap()
+            # _recovery_ap() blocks forever — main.py won't run
+    else:
+        # Increment attempt counter and let main.py try
+        state['attempts'] = attempts + 1
+        _write_state(state)
+        print(f"  Update-Versuch {attempts + 1}/{_MAX_ATTEMPTS}")
