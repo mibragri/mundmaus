@@ -16,10 +16,11 @@ echo -e "\n${YELLOW}--- Syntax check (mpy-cross) ---${NC}"
 FAIL=0
 for f in "$PROJECT_DIR"/*.py; do
     fname="$(basename "$f")"
-    if mpy-cross "$f" -o /dev/null 2>/dev/null; then
+    if mpy-cross "$f" -o /dev/null 2>&1; then
         echo -e "  ${GREEN}OK${NC}  $fname"
     else
         echo -e "  ${RED}FAIL${NC}  $fname"
+        mpy-cross "$f" -o /dev/null  # Re-run to show error
         FAIL=1
     fi
 done
@@ -55,10 +56,16 @@ done
 # --- Reboot and monitor serial ---
 echo -e "\n${YELLOW}--- Rebooting + monitoring serial ---${NC}"
 SERIAL_LOG=$(mktemp)
-trap 'rm -f '"$SERIAL_LOG" EXIT
+trap "rm -f '$SERIAL_LOG'" EXIT
 
 mpremote connect "$PORT" exec "import machine; machine.reset()" 2>/dev/null || true
 sleep 1
+
+# Wait for port to reappear after reset
+for _i in $(seq 1 5); do
+    [[ -e "$PORT" ]] && break
+    sleep 1
+done
 
 timeout "$BOOT_TIMEOUT" bash -c "
     stty -F '$PORT' 115200 raw -echo 2>/dev/null && cat '$PORT'

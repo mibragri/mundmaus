@@ -14,13 +14,13 @@ echo -e "${YELLOW}=== MundMaus OTA Deploy ===${NC}"
 
 # --- Pre-flight ---
 if [[ ! -f "$MANIFEST" ]]; then
-    echo -e "${RED}ERROR: manifest.json not found. Run tools/update-manifest.py first.${NC}"
+    echo -e "${RED}ERROR: manifest.json not found. Run tools/update_manifest.py first.${NC}"
     exit 1
 fi
 
-python3 -c "
-import json, sys
-m = json.load(open('$MANIFEST'))
+MANIFEST="$MANIFEST" python3 -c "
+import json, os, sys
+m = json.load(open(os.environ['MANIFEST']))
 assert 'files' in m, 'No files in manifest'
 assert len(m['files']) > 0, 'Empty manifest'
 print(f\"  Manifest OK: {len(m['files'])} files\")
@@ -28,11 +28,11 @@ for name, info in m['files'].items():
     print(f\"    {name}: v{info['version']}\")
 "
 
-python3 -c "
-import json, sys
+MANIFEST="$MANIFEST" PROJECT_DIR="$PROJECT_DIR" python3 -c "
+import json, os, sys
 from pathlib import Path
-m = json.load(open('$MANIFEST'))
-project = Path('$PROJECT_DIR')
+m = json.load(open(os.environ['MANIFEST']))
+project = Path(os.environ['PROJECT_DIR'])
 missing = []
 for name in m['files']:
     src = name.replace('www/', 'games/') if name.startswith('www/') else name
@@ -66,9 +66,9 @@ ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
 
 rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
 
-python3 -c "
-import json
-m = json.load(open('$MANIFEST'))
+MANIFEST="$MANIFEST" python3 -c "
+import json, os
+m = json.load(open(os.environ['MANIFEST']))
 for name in m['files']:
     if not name.startswith('www/'):
         print(name)
@@ -77,9 +77,9 @@ for name in m['files']:
 done
 
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/www"
-python3 -c "
-import json
-m = json.load(open('$MANIFEST'))
+MANIFEST="$MANIFEST" python3 -c "
+import json, os
+m = json.load(open(os.environ['MANIFEST']))
 for name in m['files']:
     if name.startswith('www/'):
         print(name)
@@ -90,7 +90,11 @@ done
 
 # --- Verify ---
 echo -e "\n${YELLOW}--- Verifying ---${NC}"
-ssh "$REMOTE_HOST" "cat $REMOTE_DIR/manifest.json | python3 -c 'import json,sys; m=json.load(sys.stdin); print(f\"Remote manifest: {len(m[\\\"files\\\"])} files\")'"
+if curl -sf "https://mundmaus.de/ota/manifest.json" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(f"  Remote manifest: {len(m[\"files\"])} files")'; then
+    echo -e "  ${GREEN}Verify OK${NC}"
+else
+    echo -e "  ${YELLOW}WARNING: Could not verify HTTPS endpoint${NC}"
+fi
 
 echo -e "\n${GREEN}=== OTA Deploy complete ===${NC}"
 echo "  URL: https://mundmaus.de/ota/manifest.json"

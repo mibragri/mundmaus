@@ -56,6 +56,10 @@ for f in "$PROJECT_DIR"/games/*.html; do
 done
 
 echo -e "\n${YELLOW}--- Creating versions.json ---${NC}"
+if [[ ! -f "$PROJECT_DIR/manifest.json" ]]; then
+    echo -e "${RED}ERROR: manifest.json not found. Run tools/update_manifest.py first.${NC}"
+    exit 1
+fi
 python3 -c "
 import json
 m = json.load(open('$PROJECT_DIR/manifest.json'))
