@@ -58,9 +58,10 @@ def _serve_file(client, filepath):
         _send_404(client, filepath)
 
 def _send_404(client, path):
-    body = f'<html><body><h1>404</h1><p>{path}</p></body></html>'
-    client.send(b'HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n')
-    client.send(body.encode())
+    body = f'<html><body><h1>404</h1><p>{path}</p></body></html>'.encode()
+    client.send(b'HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\n')
+    client.send(f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n'.encode())
+    client.send(body)
 
 def _generate_portal(wifi, wifi_ip):
     recovery = False
@@ -305,8 +306,9 @@ class MundMausServer:
             self._send_json(client, {'ok': False, 'error': str(e)}, 500)
 
     def _send_json(self, client, data, status=200):
+        _reasons = {200: 'OK', 400: 'Bad Request', 500: 'Internal Server Error'}
         body = json.dumps(data).encode()
-        client.send(f'HTTP/1.1 {status} OK\r\n'.encode())
+        client.send(f'HTTP/1.1 {status} {_reasons.get(status, "OK")}\r\n'.encode())
         client.send(b'Content-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n')
         client.send(f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n'.encode())
         client.send(body)
@@ -436,7 +438,15 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
         for i, c in enumerate(self.ws_clients):
             try:
                 data = c.recv(512)
-                if data and len(data) > 2:
+                if not data:
+                    # Connection closed
+                    dead.append(i)
+                    continue
+                if len(data) > 2:
+                    # Check for close frame (opcode 0x8)
+                    if (data[0] & 0x0f) == 0x8:
+                        dead.append(i)
+                        continue
                     payload = self._ws_decode(data)
                     if payload:
                         try: messages.append(json.loads(payload))

@@ -81,6 +81,8 @@ async def sensor_loop(joystick, puff, server):
 async def _run_update_async(server):
     """Run update in background, yielding to event loop between files."""
     try:
+        if not server._update_info:
+            return
         from updater import run_update
         available = server._update_info.get('available', [])
         def on_progress(f, cur, tot):
@@ -158,9 +160,8 @@ def _mark_boot_ok():
     try:
         with open(UPDATE_STATE_FILE) as f:
             state = _json.load(f)
+        needs_write = False
         if state.get('status') == 'pending':
-            with open(UPDATE_STATE_FILE, 'w') as f:
-                _json.dump({'status': 'ok'}, f)
             # Clean up .bak files from successful update
             for entry in os.listdir('/'):
                 if entry.endswith('.bak'):
@@ -169,11 +170,13 @@ def _mark_boot_ok():
                     except:
                         pass
             print("  Update: Boot OK, Status gesetzt")
-        # Also clear recovery flag if present
+            needs_write = True
         if state.get('recovery'):
+            print("  Recovery-Warnung zurueckgesetzt")
+            needs_write = True
+        if needs_write:
             with open(UPDATE_STATE_FILE, 'w') as f:
                 _json.dump({'status': 'ok'}, f)
-            print("  Recovery-Warnung zurueckgesetzt")
     except (OSError, ValueError):
         pass
 

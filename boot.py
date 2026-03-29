@@ -105,35 +105,36 @@ s.textContent=r.ok?n+' OK! Seite neu laden nach Upload aller Dateien.':'Fehler: 
         try:
             cl, _ = srv.accept()
             cl.settimeout(10)
-            req = cl.recv(256).decode('utf-8', 'ignore')
-            fl = req.split('\r\n')[0] if req else ''
+            req = cl.recv(256)
+            fl = req.split(b'\r\n')[0].decode('utf-8', 'ignore') if req else ''
 
             if 'POST /upload/' in fl:
                 fname = fl.split('/upload/')[1].split(' ')[0]
                 fname = fname.replace('%20', ' ')
-                # Path traversal protection: only allow bare filenames
                 if '/' in fname or '\\' in fname:
                     fname = fname.split('/')[-1].split('\\')[-1]
                 if fname.startswith('.'):
                     fname = '_' + fname
-                # Read past headers
-                while b'\r\n\r\n' not in req.encode():
-                    req += cl.recv(256).decode('utf-8', 'ignore')
-                # Read body (file content)
-                cl_match = [line for line in req.split('\r\n') if 'Content-Length:' in line]
+                # Read past headers (as bytes)
+                while b'\r\n\r\n' not in req:
+                    req += cl.recv(256)
+                # Extract Content-Length from headers
+                header_part = req[:req.index(b'\r\n\r\n')].decode('utf-8', 'ignore')
+                cl_match = [line for line in header_part.split('\r\n') if 'Content-Length:' in line]
                 cl_len = int(cl_match[0].split(':')[1].strip()) if cl_match else 0
-                body_start = req.index('\r\n\r\n') + 4
-                body = req[body_start:].encode()
+                # Extract body as raw bytes
+                body_start = req.index(b'\r\n\r\n') + 4
+                body = req[body_start:]
                 while len(body) < cl_len:
                     body += cl.recv(2048)
-                # Determine destination
                 dest = f'www/{fname}' if fname.endswith('.html') and not fname.endswith('.py') else fname
                 with open(dest, 'wb') as f:
                     f.write(body)
                 cl.send(b'HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nOK')
                 print(f"  Upload: {dest} ({len(body)} bytes)")
             else:
-                cl.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n')
+                cl.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n')
+                cl.send(f'Content-Length: {len(_upload_page)}\r\nConnection: close\r\n\r\n'.encode())
                 cl.send(_upload_page)
 
             cl.close()
