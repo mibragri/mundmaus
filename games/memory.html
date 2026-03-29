@@ -19,23 +19,23 @@
     --card-back: #0f3460;
     --card-back-pattern: #1a4a7a;
     --text: #e8e8e8;
-    --text-dim: #888;
-    --cursor-color: #00d4ff;       /* Cyan – sicher bei Protanopie/Deuteranopie */
+    --text-dim: #aaa;
+    --cursor-color: #FFD700;       /* Gold – hoher Kontrast auf dunklem Hintergrund */
     --selected-color: #e040fb;     /* Magenta – max. Kontrast zu Cyan */
-    --match-color: #76ff03;        /* Helles Grün für Treffer */
-    --match-glow: rgba(118, 255, 3, 0.4);
+    --match-color: #2e8b00;        /* Dunkles Grün für Treffer (AA on white) */
+    --match-glow: rgba(46, 139, 0, 0.4);
     --error-color: #ff5252;
     --header-bg: rgba(15, 52, 96, 0.6);
 
-    /* Kartensymbole: 8 Paare mit einzigartigen Formen + Farben */
-    --pair0: #ff6b6b; /* Rot */
-    --pair1: #ffd93d; /* Gelb */
-    --pair2: #6bcb77; /* Grün */
-    --pair3: #4d96ff; /* Blau */
-    --pair4: #ff922b; /* Orange */
-    --pair5: #cc5de8; /* Lila */
-    --pair6: #20c997; /* Teal */
-    --pair7: #ff6b9d; /* Pink */
+    /* Kartensymbole: 8 Paare mit einzigartigen Formen + Farben (WCAG AA on white) */
+    --pair0: #c03030; /* Rot */
+    --pair1: #8a7000; /* Gelb */
+    --pair2: #2d7a3a; /* Grün */
+    --pair3: #2060c0; /* Blau */
+    --pair4: #a85800; /* Orange */
+    --pair5: #8b30a8; /* Lila */
+    --pair6: #0a7a58; /* Teal */
+    --pair7: #b03060; /* Pink */
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -56,16 +56,17 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 1vh 2vw;
+    padding: 0.8vh 2vw;
     background: var(--header-bg);
     backdrop-filter: blur(10px);
-    height: 7vh;
+    height: 6vh;
     position: relative;
     z-index: 10;
+    flex-shrink: 0;
   }
 
   #header h1 {
-    font-size: 2.8vh;
+    font-size: 2.6vh;
     font-weight: 700;
     letter-spacing: 0.05em;
   }
@@ -78,7 +79,7 @@
     display: flex;
     gap: 2vw;
     align-items: center;
-    font-size: 2.2vh;
+    font-size: 2vh;
   }
 
   .stat-bar .stat {
@@ -93,6 +94,7 @@
 
   .stat-bar .stat .value {
     font-weight: 700;
+    color: var(--cursor-color);
     font-variant-numeric: tabular-nums;
     min-width: 2ch;
   }
@@ -100,32 +102,72 @@
   /* ── WS Status ──────────────────────────────── */
   #ws-status {
     position: fixed;
-    top: 1.5vh;
-    right: 1.5vw;
-    width: 1.2vh;
-    height: 1.2vh;
+    top: 1vh;
+    right: 1vw;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: #666;
-    z-index: 100;
+    z-index: 200;
     transition: background 0.3s;
   }
   #ws-status.connected { background: #76ff03; box-shadow: 0 0 6px #76ff03; }
+
+  /* ── Game Area (board + buttons) ─────────────── */
+  #game-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 89vh;
+    padding: 2vmin;
+    gap: 2vmin;
+  }
 
   /* ── Spielfeld ──────────────────────────────── */
   #board {
     display: grid;
     gap: 1.2vmin;
-    padding: 2vmin;
     justify-content: center;
-    align-content: center;
-    height: 86vh;
+    align-content: start;
   }
 
   /* Grid-Konfigurationen */
-  #board.grid-4x3 { grid-template-columns: repeat(4, 1fr); max-width: 60vw; margin: 0 auto; }
-  #board.grid-4x4 { grid-template-columns: repeat(4, 1fr); max-width: 60vw; margin: 0 auto; }
-  #board.grid-6x4 { grid-template-columns: repeat(6, 1fr); max-width: 80vw; margin: 0 auto; }
-  #board.grid-6x6 { grid-template-columns: repeat(6, 1fr); max-width: 85vw; margin: 0 auto; }
+  #board.grid-4x3 { grid-template-columns: repeat(4, 17vmin); }
+  #board.grid-4x4 { grid-template-columns: repeat(4, 15vmin); }
+  #board.grid-6x4 { grid-template-columns: repeat(6, 12vmin); }
+  #board.grid-6x6 { grid-template-columns: repeat(6, 10vmin); }
+
+  /* ── Action Button Column (right of board) ──── */
+  #action-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vmin;
+    padding-top: 0.5vmin;
+  }
+
+  .action-btn {
+    width: 10vmin;
+    padding: 1.5vmin 1vmin;
+    border-radius: 1.2vmin;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.12);
+    color: var(--text-dim);
+    font-size: 2.2vmin;
+    font-weight: 700;
+    cursor: default;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .action-btn.cursor {
+    background: rgba(255, 215, 0, 0.25);
+    border: 2px solid #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    color: #fff;
+  }
 
   /* ── Karte ──────────────────────────────────── */
   .card {
@@ -204,15 +246,25 @@
 
   /* ── Cursor (aktive Karte) ──────────────────── */
   .card.cursor .card-inner {
-    box-shadow:
-      0 0 0 0.4vmin var(--cursor-color),
-      0 0 15px rgba(0, 212, 255, 0.4),
-      0 0 30px rgba(0, 212, 255, 0.15);
+    border: 3px solid #FFD700;
+    background: rgba(255, 215, 0, 0.25);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
     border-radius: 1.2vmin;
   }
 
   .card.cursor .card-back {
-    border-color: var(--cursor-color);
+    border-color: #FFD700;
+  }
+
+  /* Cursor on flipped white cards: gold border + background */
+  .card.cursor.flipped .card-inner {
+    border: 3px solid #FFD700;
+    background: rgba(255, 215, 0, 0.25);
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  }
+
+  .card.cursor.flipped .card-front {
+    background: rgba(255, 248, 220, 0.95);
   }
 
   /* Cursor-Badge */
@@ -224,7 +276,7 @@
     transform: translateX(-50%);
     font-size: 2vmin;
     color: var(--cursor-color);
-    filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
     animation: cursor-bob 1s ease-in-out infinite;
     z-index: 5;
   }
@@ -294,22 +346,23 @@
 
   /* ── Footer / Hilfe ─────────────────────────── */
   #footer {
-    height: 7vh;
+    height: 5vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 3vw;
-    font-size: 1.8vh;
+    gap: 2vw;
+    font-size: 1.5vh;
     color: var(--text-dim);
     background: var(--header-bg);
     backdrop-filter: blur(10px);
+    flex-shrink: 0;
   }
 
   #footer kbd {
     background: rgba(255,255,255,0.1);
     border: 1px solid rgba(255,255,255,0.2);
     border-radius: 4px;
-    padding: 0.2em 0.5em;
+    padding: 0.15em 0.4em;
     font-family: inherit;
     font-size: 0.9em;
   }
@@ -349,7 +402,7 @@
 
   .diff-option.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(0, 212, 255, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 215, 0, 0.3);
     transform: scale(1.05);
   }
 
@@ -415,7 +468,7 @@
 
   .win-btn.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(0, 212, 255, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 215, 0, 0.3);
   }
 
   /* ── Kiosk-Modus ────────────────────────────── */
@@ -472,8 +525,13 @@
   </div>
 </div>
 
-<!-- Spielfeld -->
-<div id="board"></div>
+<!-- Spielfeld + Buttons -->
+<div id="game-area">
+  <div id="board"></div>
+  <div id="action-col">
+    <div class="action-btn" id="btn-new">↻ Neu</div>
+  </div>
+</div>
 
 <!-- Footer (Hilfe) -->
 <div id="footer">
@@ -481,7 +539,6 @@
   <span><kbd>Leertaste</kbd> Aufdecken</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
-  <span><kbd>F</kbd> Vollbild</span>
 </div>
 
 <!-- Schwierigkeitsmenü -->
@@ -527,24 +584,24 @@
 
 // ── Symbole: Form + Farbe + Text-Label (3-fach kodiert, farbenblindheit-sicher) ──
 const SYMBOLS = [
-  { emoji: '★',  label: 'Stern',    color: '#ff6b6b' },
-  { emoji: '♦',  label: 'Diamant',  color: '#ffd93d' },
-  { emoji: '●',  label: 'Kreis',    color: '#6bcb77' },
-  { emoji: '▲',  label: 'Dreieck',  color: '#4d96ff' },
-  { emoji: '■',  label: 'Quadrat',  color: '#ff922b' },
-  { emoji: '♥',  label: 'Herz',     color: '#cc5de8' },
-  { emoji: '⬟',  label: 'Pentagon', color: '#20c997' },
-  { emoji: '✦',  label: 'Funkel',   color: '#ff6b9d' },
-  { emoji: '◆',  label: 'Raute',    color: '#74c0fc' },
-  { emoji: '▼',  label: 'Pfeil',    color: '#ffa94d' },
-  { emoji: '⬣',  label: 'Hexagon',  color: '#da77f2' },
-  { emoji: '⊕',  label: 'Ziel',     color: '#63e6be' },
-  { emoji: '◈',  label: 'Juwel',    color: '#e599f7' },
-  { emoji: '⬢',  label: 'Wabe',     color: '#fcc419' },
-  { emoji: '☆',  label: 'Hohlstern',color: '#ff8787' },
-  { emoji: '◐',  label: 'Halbmond', color: '#91a7ff' },
-  { emoji: '♣',  label: 'Kreuz',    color: '#69db7c' },
-  { emoji: '♠',  label: 'Pik',      color: '#b197fc' },
+  { emoji: '★',  label: 'Stern',    color: '#c03030' },
+  { emoji: '♦',  label: 'Diamant',  color: '#8a7000' },
+  { emoji: '●',  label: 'Kreis',    color: '#2d7a3a' },
+  { emoji: '▲',  label: 'Dreieck',  color: '#2060c0' },
+  { emoji: '■',  label: 'Quadrat',  color: '#a85800' },
+  { emoji: '♥',  label: 'Herz',     color: '#8b30a8' },
+  { emoji: '⬟',  label: 'Pentagon', color: '#0a7a58' },
+  { emoji: '✦',  label: 'Funkel',   color: '#b03060' },
+  { emoji: '◆',  label: 'Raute',    color: '#1a5fa0' },
+  { emoji: '▼',  label: 'Pfeil',    color: '#9a5500' },
+  { emoji: '⬣',  label: 'Hexagon',  color: '#7a2898' },
+  { emoji: '⊕',  label: 'Ziel',     color: '#0a7058' },
+  { emoji: '◈',  label: 'Juwel',    color: '#882898' },
+  { emoji: '⬢',  label: 'Wabe',     color: '#8a6800' },
+  { emoji: '☆',  label: 'Hohlstern',color: '#b03030' },
+  { emoji: '◐',  label: 'Halbmond', color: '#3050a0' },
+  { emoji: '♣',  label: 'Kreuz',    color: '#1a6830' },
+  { emoji: '♠',  label: 'Pik',      color: '#5a30a0' },
 ];
 
 const LEVELS = [
@@ -595,6 +652,7 @@ let state = {
   cols: 4,
   rows: 4,
   cursor: 0,
+  inBtnCol: false, // true when cursor is in the right button column
   first: null,    // index der ersten aufgedeckten Karte
   second: null,
   moves: 0,
@@ -620,6 +678,7 @@ const $winStars = document.getElementById('win-stars');
 const $winStats = document.getElementById('win-stats');
 const $idleScreen = document.getElementById('idle-screen');
 const $wsStatus = document.getElementById('ws-status');
+const $btnNew = document.getElementById('btn-new');
 
 // ── Shuffle ──────────────────────────────────────────────
 function shuffle(arr) {
@@ -642,6 +701,7 @@ function createBoard(levelIdx) {
   state.first = null;
   state.second = null;
   state.cursor = 0;
+  state.inBtnCol = false;
   state.phase = 'playing';
 
   // Symbole auswählen und Paare erstellen
@@ -703,11 +763,13 @@ function getElapsed() {
 function updateCursor() {
   const cards = $board.querySelectorAll('.card');
   cards.forEach((el, i) => {
-    el.classList.toggle('cursor', i === state.cursor && state.phase === 'playing');
+    el.classList.toggle('cursor', i === state.cursor && state.phase === 'playing' && !state.inBtnCol);
     el.classList.toggle('flipped', state.cards[i].flipped || state.cards[i].matched);
     el.classList.toggle('matched', state.cards[i].matched);
     el.classList.toggle('selected', state.first === i && state.second === null);
   });
+  // Button highlight
+  $btnNew.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol);
 }
 
 // ── Navigation ───────────────────────────────────────────
@@ -717,8 +779,21 @@ function navigate(dir) {
   if (state.phase === 'win') return navigateWin(dir);
   if (state.phase !== 'playing') return;
 
+  if (state.inBtnCol) {
+    // In button column
+    if (dir === 'left') {
+      state.inBtnCol = false;
+      // Move cursor to rightmost column of current row
+      const row = Math.floor(state.cursor / state.cols);
+      state.cursor = row * state.cols + (state.cols - 1);
+      sndNav();
+      updateCursor();
+    }
+    // Only one button, up/down/right do nothing
+    return;
+  }
+
   const { cursor, cols, rows } = state;
-  const total = cols * rows;
   let next = cursor;
 
   const row = Math.floor(cursor / cols);
@@ -726,7 +801,10 @@ function navigate(dir) {
 
   switch (dir) {
     case 'left':  next = col > 0 ? cursor - 1 : cursor; break;
-    case 'right': next = col < cols - 1 ? cursor + 1 : cursor; break;
+    case 'right':
+      if (col < cols - 1) { next = cursor + 1; }
+      else { state.inBtnCol = true; sndNav(); updateCursor(); return; }
+      break;
     case 'up':    next = row > 0 ? cursor - cols : cursor; break;
     case 'down':  next = row < rows - 1 ? cursor + cols : cursor; break;
   }
@@ -782,6 +860,13 @@ function action() {
   }
 
   if (state.phase !== 'playing') return;
+
+  // Button column action
+  if (state.inBtnCol) {
+    showMenu();
+    sndFlip();
+    return;
+  }
 
   const idx = state.cursor;
   const card = state.cards[idx];
@@ -909,15 +994,12 @@ function resetIdle() {
 function toggleKiosk() {
   state.kiosk = !state.kiosk;
   document.body.classList.toggle('kiosk', state.kiosk);
-  resetIdle();
-}
-
-function toggleFullscreen() {
-  if (!document.fullscreenElement) {
+  if (state.kiosk) {
     document.documentElement.requestFullscreen().catch(() => {});
   } else {
-    document.exitFullscreen();
+    if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
   }
+  resetIdle();
 }
 
 // ── Tastatur ─────────────────────────────────────────────
@@ -934,7 +1016,6 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'n': case 'N': showMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;
-    case 'f': case 'F': toggleFullscreen(); break;
   }
 });
 

@@ -16,18 +16,18 @@
     --bg: #1a1a2e;
     --bg-light: #16213e;
     --text: #e8e8e8;
-    --text-dim: #888;
+    --text-dim: #aaa;
     --header-bg: rgba(15, 52, 96, 0.6);
 
-    /* Brett: Farbenblindheit-sicher – Blau/Beige statt Schwarz/Weiß */
-    --sq-light: #e8d5b5;
-    --sq-dark: #4a7c9b;
-    --sq-light-text: #6b5a42;
-    --sq-dark-text: #a3cfe0;
+    /* Brett: Erdig/natürlich – Goldbraun/Salbeigrün */
+    --sq-light: #c8b07a;
+    --sq-dark: #6b8a5e;
+    --sq-light-text: #5a4a2a;
+    --sq-dark-text: #d8e8d0;
 
-    /* Cursor: Cyan */
-    --cursor-color: #00d4ff;
-    --cursor-glow: rgba(0, 212, 255, 0.4);
+    /* Cursor: Gold */
+    --cursor-color: #FFD700;
+    --cursor-glow: rgba(255, 215, 0, 0.4);
 
     /* Selektion: Magenta */
     --selected-color: #e040fb;
@@ -38,16 +38,16 @@
     --capture-color: rgba(255, 82, 82, 0.7);
 
     /* Letzter Zug: halbtransparent gelb */
-    --last-move: rgba(255, 235, 59, 0.3);
+    --last-move: rgba(255, 235, 59, 0.35);
 
     /* Schach-Warnung */
     --check-color: rgba(255, 0, 0, 0.35);
 
     /* Piece colors */
-    --piece-white: #fff;
-    --piece-white-stroke: #333;
-    --piece-black: #222;
-    --piece-black-stroke: #000;
+    --piece-white: #ffffff;
+    --piece-white-stroke: #333333;
+    --piece-black: #1a1a1a;
+    --piece-black-stroke: #000000;
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -91,8 +91,9 @@
     align-items: center;
     font-size: 2vh;
   }
+  .stat { display: flex; align-items: center; gap: 0.5vw; }
   .stat .label { color: var(--text-dim); }
-  .stat .value { font-weight: 700; }
+  .stat .value { font-weight: 700; color: var(--cursor-color); font-variant-numeric: tabular-nums; }
 
   #status-text {
     font-size: 2vh;
@@ -106,13 +107,13 @@
   /* ── WS Status ──────────────────────────────── */
   #ws-status {
     position: fixed;
-    top: 1.2vh;
-    right: 1.2vw;
-    width: 1.1vh;
-    height: 1.1vh;
+    top: 1vh;
+    right: 1vw;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     background: #666;
-    z-index: 100;
+    z-index: 200;
     transition: background 0.3s;
   }
   #ws-status.connected { background: #76ff03; box-shadow: 0 0 6px #76ff03; }
@@ -138,8 +139,8 @@
   .rank-labels {
     display: flex;
     flex-direction: column;
-    height: 80vmin;
-    max-height: 80vh;
+    height: 72vmin;
+    max-height: 72vh;
   }
   .rank-labels div {
     flex: 1;
@@ -155,8 +156,8 @@
   /* File labels (a-h) */
   .file-labels {
     display: flex;
-    width: 80vmin;
-    max-width: 80vh;
+    width: 72vmin;
+    max-width: 72vh;
     margin-left: 3.8vmin;
   }
   .file-labels div {
@@ -179,10 +180,10 @@
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     grid-template-rows: repeat(8, 1fr);
-    width: 80vmin;
-    height: 80vmin;
-    max-width: 80vh;
-    max-height: 80vh;
+    width: 72vmin;
+    height: 72vmin;
+    max-width: 72vh;
+    max-height: 72vh;
     border: 0.4vmin solid rgba(255,255,255,0.15);
     border-radius: 0.6vmin;
     overflow: hidden;
@@ -216,16 +217,18 @@
 
   /* ── Cursor ─────────────────────────────────── */
   .sq.cursor {
-    outline: 0.45vmin solid var(--cursor-color);
-    outline-offset: -0.45vmin;
+    background: rgba(255, 215, 0, 0.25) !important;
+    outline: 2px solid #FFD700;
+    outline-offset: -2px;
     box-shadow: inset 0 0 12px var(--cursor-glow), 0 0 12px var(--cursor-glow);
     z-index: 2;
   }
 
   /* ── Selektiert ─────────────────────────────── */
   .sq.selected {
-    outline: 0.45vmin solid var(--selected-color);
-    outline-offset: -0.45vmin;
+    background: rgba(224, 64, 251, 0.3) !important;
+    outline: 2px solid var(--selected-color);
+    outline-offset: -2px;
     box-shadow: inset 0 0 15px var(--selected-glow);
     z-index: 2;
   }
@@ -261,6 +264,35 @@
     transition: transform 0.15s;
     line-height: 1;
   }
+  /* White pieces: bold dark outline for visibility on all squares */
+  .piece.white-piece {
+    color: var(--piece-white);
+    text-shadow:
+      -2px -2px 0 var(--piece-white-stroke),
+       2px -2px 0 var(--piece-white-stroke),
+      -2px  2px 0 var(--piece-white-stroke),
+       2px  2px 0 var(--piece-white-stroke),
+       0   -2px 0 var(--piece-white-stroke),
+       0    2px 0 var(--piece-white-stroke),
+      -2px  0   0 var(--piece-white-stroke),
+       2px  0   0 var(--piece-white-stroke),
+       0    0   3px #333,
+       0    0   6px #333;
+  }
+  /* Black pieces: near-black with dark stroke */
+  .piece.black-piece {
+    color: var(--piece-black);
+    text-shadow:
+      -1px -1px 0 var(--piece-black-stroke),
+       1px -1px 0 var(--piece-black-stroke),
+      -1px  1px 0 var(--piece-black-stroke),
+       1px  1px 0 var(--piece-black-stroke),
+       0   -1px 0 var(--piece-black-stroke),
+       0    1px 0 var(--piece-black-stroke),
+      -1px  0   0 var(--piece-black-stroke),
+       1px  0   0 var(--piece-black-stroke),
+       0    0   4px rgba(0,0,0,0.6);
+  }
   .sq.cursor .piece { transform: scale(1.08); }
 
   /* ── Captured Pieces ────────────────────────── */
@@ -280,8 +312,8 @@
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 3vw;
-    font-size: 1.6vh;
+    gap: 2vw;
+    font-size: 1.5vh;
     color: var(--text-dim);
     background: var(--header-bg);
     backdrop-filter: blur(10px);
@@ -440,7 +472,7 @@
     width: 0.8vh;
     height: 0.8vh;
     border-radius: 50%;
-    background: var(--cursor-color);
+    background: #FFD700;
     animation: dot-pulse 1.2s ease-in-out infinite;
     margin: 0 0.15vw;
   }
@@ -451,22 +483,22 @@
     50% { opacity: 1; transform: scale(1.2); }
   }
 
-  /* ── Action Button Row ──────────────────────── */
-  #action-row {
+  /* ── Action Button Column (right of board) ──── */
+  #action-col {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
     gap: 1.5vmin;
-    margin-top: 1vmin;
-    margin-left: 3.8vmin;
-    width: 80vmin;
-    max-width: 80vh;
+    padding-top: 0.5vmin;
+    margin-left: 1.5vmin;
   }
 
   .action-btn {
-    padding: 0.8vmin 2.5vmin;
+    width: 10vmin;
+    max-width: 10vh;
+    padding: 1.5vmin 1vmin;
     border-radius: 0.8vmin;
-    background: rgba(255,255,255,0.05);
-    border: 0.3vmin solid rgba(255,255,255,0.15);
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.12);
     color: var(--text);
     font-size: 2.2vmin;
     font-weight: 600;
@@ -474,13 +506,15 @@
     transition: all 0.15s;
     display: flex;
     align-items: center;
-    gap: 0.5vmin;
+    justify-content: center;
+    text-align: center;
   }
 
   .action-btn.cursor {
-    outline: 0.45vmin solid var(--cursor-color);
-    outline-offset: -0.45vmin;
-    box-shadow: inset 0 0 12px var(--cursor-glow), 0 0 12px var(--cursor-glow);
+    background: rgba(255, 215, 0, 0.25);
+    border: 2px solid #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    color: #fff;
   }
 
   .action-btn.disabled {
@@ -530,9 +564,10 @@
       <div id="board"></div>
       <div class="captured-row" id="captured-white"></div>
       <div class="file-labels" id="file-labels"></div>
-      <div id="action-row">
-        <div class="action-btn disabled" id="btn-undo" data-btn="0">↩ Zurück</div>
-      </div>
+    </div>
+    <div id="action-col">
+      <div class="action-btn disabled" id="btn-undo" data-btn="0">↩ Zurück</div>
+      <div class="action-btn" id="btn-new" data-btn="1">↻ Neu</div>
     </div>
   </div>
 </div>
@@ -540,9 +575,8 @@
 <div id="footer">
   <span><kbd>←↑→↓</kbd> Navigieren</span>
   <span><kbd>Leertaste</kbd> Auswählen/Ziehen</span>
-  <span><kbd>Esc</kbd> Abwählen</span>
-  <span><kbd>U</kbd> Rückgängig</span>
   <span><kbd>N</kbd> Neues Spiel</span>
+  <span><kbd>U</kbd> Rückgängig</span>
   <span><kbd>K</kbd> Kiosk</span>
 </div>
 
@@ -585,9 +619,9 @@
 const W = 'w', B = 'b';
 const KING = 'k', QUEEN = 'q', ROOK = 'r', BISHOP = 'b', KNIGHT = 'n', PAWN = 'p';
 
-// Unicode Schachfiguren
+// Unicode Schachfiguren – alle ausgefüllt (filled), Farbe via CSS
 const PIECE_CHAR = {
-  wk: '♔', wq: '♕', wr: '♖', wb: '♗', wn: '♘', wp: '♙',
+  wk: '♚', wq: '♛', wr: '♜', wb: '♝', wn: '♞', wp: '♟',
   bk: '♚', bq: '♛', br: '♜', bb: '♝', bn: '♞', bp: '♟',
 };
 
@@ -1119,7 +1153,8 @@ function aiMove() {
 // ── UI State ─────────────────────────────────────────────
 let ui = {
   phase: 'menu', // menu | playing | promoting | gameover
-  cursor: [6, 4], // [row, col] – start near white king; row 8 = button row
+  cursor: [6, 4], // [row, col] on the 8x8 grid
+  inBtnCol: false, // true when cursor is in the right button column
   selected: null, // [row, col] of selected piece
   legalForSelected: [],
   lastMove: null, // {fr,fc,tr,tc}
@@ -1129,7 +1164,7 @@ let ui = {
   goCursor: 0,
   kiosk: false,
   idleTimeout: null,
-  btnCursor: 0, // index within button row (row 8)
+  btnCursor: 0, // index within button column
 };
 
 // ── DOM Refs ─────────────────────────────────────────────
@@ -1148,6 +1183,8 @@ const $capturedW = document.getElementById('captured-white');
 const $capturedB = document.getElementById('captured-black');
 const $idleScreen = document.getElementById('idle-screen');
 const $btnUndo = document.getElementById('btn-undo');
+const $btnNew = document.getElementById('btn-new');
+const $actionBtns = document.querySelectorAll('#action-col .action-btn');
 
 // ── Build Board DOM ──────────────────────────────────────
 function buildBoardDOM() {
@@ -1202,8 +1239,8 @@ function renderBoard() {
     if (inCheck && kingPos && r === kingPos[0] && c === kingPos[1])
       sq.classList.add('in-check');
 
-    // Cursor
-    if (ui.phase === 'playing' && r === ui.cursor[0] && c === ui.cursor[1])
+    // Cursor (only when not in button column)
+    if (ui.phase === 'playing' && !ui.inBtnCol && r === ui.cursor[0] && c === ui.cursor[1])
       sq.classList.add('cursor');
 
     // Selected
@@ -1218,7 +1255,8 @@ function renderBoard() {
 
     // Piece
     if (piece) {
-      sq.innerHTML = `<span class="piece">${PIECE_CHAR[piece.color + piece.type]}</span>`;
+      const pieceClass = piece.color === W ? 'piece white-piece' : 'piece black-piece';
+      sq.innerHTML = `<span class="${pieceClass}">${PIECE_CHAR[piece.color + piece.type]}</span>`;
     } else {
       sq.innerHTML = '';
     }
@@ -1233,10 +1271,12 @@ function renderBoard() {
   $capturedB.innerHTML = sortCap(game.capturedB).map(t => `<span>${PIECE_CHAR['b'+t]}</span>`).join('');
   $capturedW.innerHTML = sortCap(game.capturedW).map(t => `<span>${PIECE_CHAR['w'+t]}</span>`).join('');
 
-  // Update undo button state
+  // Update button column state
   const canUndo = game.turn === W && game.history.length > 0;
   $btnUndo.classList.toggle('disabled', !canUndo);
-  $btnUndo.classList.toggle('cursor', ui.phase === 'playing' && ui.cursor[0] === 8 && ui.btnCursor === 0);
+  $actionBtns.forEach((btn, i) => {
+    btn.classList.toggle('cursor', ui.phase === 'playing' && ui.inBtnCol && ui.btnCursor === i);
+  });
 }
 
 function updateStatus() {
@@ -1279,28 +1319,39 @@ function navigate(dir) {
   if (ui.phase !== 'playing' || game.turn !== W) return;
 
   let [r, c] = ui.cursor;
-  if (r === 8) {
-    // On button row
+  let changed = false;
+
+  if (ui.inBtnCol) {
+    // In button column on the right
+    const btnCount = $actionBtns.length;
     switch (dir) {
-      case 'up': r = 7; c = Math.min(7, Math.max(0, c)); break;
-      // left/right would cycle buttons if more than one; only one for now
-      case 'left': break;
-      case 'right': break;
-      case 'down': break; // already at bottom
+      case 'left':
+        ui.inBtnCol = false;
+        c = 7; // return to rightmost board column
+        changed = true;
+        break;
+      case 'up':
+        if (ui.btnCursor > 0) { ui.btnCursor--; changed = true; }
+        break;
+      case 'down':
+        if (ui.btnCursor < btnCount - 1) { ui.btnCursor++; changed = true; }
+        break;
+      // right: stay in button col
     }
   } else {
     // On board
     switch (dir) {
-      case 'left':  c = Math.max(0, c - 1); break;
-      case 'right': c = Math.min(7, c + 1); break;
-      case 'up':    r = Math.max(0, r - 1); break;
-      case 'down':
-        if (r === 7) { r = 8; ui.btnCursor = 0; }
-        else r = Math.min(7, r + 1);
+      case 'left':  if (c > 0) { c--; changed = true; } break;
+      case 'right':
+        if (c < 7) { c++; changed = true; }
+        else { ui.inBtnCol = true; ui.btnCursor = 0; changed = true; }
         break;
+      case 'up':    if (r > 0) { r--; changed = true; } break;
+      case 'down':  if (r < 7) { r++; changed = true; } break;
     }
   }
-  if (r !== ui.cursor[0] || c !== ui.cursor[1]) {
+
+  if (changed) {
     ui.cursor = [r, c];
     sndNav();
     renderBoard();
@@ -1361,9 +1412,10 @@ function action() {
 
   const [r, c] = ui.cursor;
 
-  // Button row action
-  if (r === 8) {
+  // Button column action
+  if (ui.inBtnCol) {
     if (ui.btnCursor === 0) undo();
+    else if (ui.btnCursor === 1) showDiffMenu();
     return;
   }
 
@@ -1497,6 +1549,7 @@ function startGame() {
   buildBoardDOM();
   ui.phase = 'playing';
   ui.cursor = [6, 4];
+  ui.inBtnCol = false;
   ui.btnCursor = 0;
   ui.selected = null;
   ui.legalForSelected = [];
@@ -1523,6 +1576,11 @@ function undo() {
 function toggleKiosk() {
   ui.kiosk = !ui.kiosk;
   document.body.classList.toggle('kiosk', ui.kiosk);
+  if (ui.kiosk) {
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    if (document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+  }
   resetIdle();
 }
 
@@ -1532,11 +1590,6 @@ function resetIdle() {
   if (ui.kiosk) {
     ui.idleTimeout = setTimeout(() => $idleScreen.classList.remove('hidden'), 120000);
   }
-}
-
-function toggleFullscreen() {
-  if (!document.fullscreenElement) document.documentElement.requestFullscreen().catch(()=>{});
-  else document.exitFullscreen();
 }
 
 // ── Keyboard ─────────────────────────────────────────────
@@ -1552,7 +1605,6 @@ document.addEventListener('keydown', e => {
     case 'u': case 'U': undo(); break;
     case 'n': case 'N': showDiffMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;
-    case 'f': case 'F': toggleFullscreen(); break;
   }
 });
 

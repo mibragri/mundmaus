@@ -41,9 +41,14 @@ Persistenter Agent fuer MundMaus. Versteht Hardware-Constraints, MicroPython-Arc
 - Solitaire-Testserver: `systemctl --user status mundmaus-solitaire` (Port 9993)
 
 ## Endnutzer & Bedienung
-- **Papa** ist der Endnutzer -- Tetraplegie, kann nur Gesichtsmuskulatur nutzen
+- **Endnutzer** -- Tetraplegie, kann nur Gesichtsmuskulatur nutzen
 - UX muss extrem simpel und zuverlaessig sein
 - Kein Loeten, nur Breadboard + DuPont-Jumper
+- **Betreuer/Pfleger** -- wechselnde Pflegekraefte, KEINE Schulung moeglich
+  - Muessen Spiele per Tastatur/Maus bedienen koennen (Fallback)
+  - Footer in jedem Spiel zeigt Keyboard-Shortcuts (Pfeiltasten, Leertaste, N, K)
+  - Grosse beschriftete Buttons (Neu, Zurueck) rechts neben dem Spielfeld
+  - Kiosk-Mode (K) vereinfacht Ansicht fuer den Endnutzer
 - **Mundsteuerung**: Joystick mit Mundstueck, Lippen/Zunge fuer Navigation
 - **Drucksensor**: Pusten/Saugen ins Mundstueck -> Silikonschlauch geht seitlich ab nach links (+X) -> laeuft AUSSEN am Gehaeuse -> wird von aussen auf Sensor-Barb gesteckt
 - **Schlauch-Constraint**: Darf nicht stark gebogen sein (zieht am Joystick, beeintraechtigt Navigation)

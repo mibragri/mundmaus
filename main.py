@@ -460,27 +460,82 @@ def _generate_portal(wifi_ip):
     if not btns:
         btns = '<p style="color:#78909c">Noch keine Spiele. Lade HTML in <code>www/</code></p>'
 
+    wm = wifi_mgr_ref
+    mode = wm.mode if wm else '?'
+    ssid = (wm.ssid or AP_SSID) if wm else '?'
+    connected = wm.sta.isconnected() if wm and mode == 'station' else False
+    mode_label = 'WLAN' if mode == 'station' else 'Hotspot'
+    dot_color = '#4caf50' if connected else '#f0a030' if mode == 'ap' else '#d42a2a'
+
     return f"""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MundMaus</title><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:system-ui,sans-serif;background:#0a1628;color:#e0e0e0;
-min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2em}}
-h1{{font-size:clamp(2em,5vw,3.5em);color:#00d4ff;margin-bottom:.2em}}
-.sub{{color:#78909c;margin-bottom:2em}}
+min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2em}}
+h1{{font-size:clamp(2em,5vw,3.5em);color:#FFD700;margin-bottom:.2em}}
+.sub{{color:#78909c;margin-bottom:1.5em}}
 .gs{{display:flex;flex-wrap:wrap;gap:1.5em;justify-content:center;max-width:800px}}
 .g{{display:flex;align-items:center;justify-content:center;width:220px;height:120px;
-background:linear-gradient(135deg,#1a3a5c,#0d2240);border:2px solid #00d4ff44;border-radius:16px;
-color:#00d4ff;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}}
-.g:hover{{border-color:#00d4ff;transform:scale(1.05);box-shadow:0 0 20px #00d4ff33}}
-.i{{margin-top:2em;color:#546e7a;font-size:.85em;text-align:center}}
+background:linear-gradient(135deg,#1a3a5c,#0d2240);border:2px solid rgba(255,215,0,.3);border-radius:16px;
+color:#FFD700;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}}
+.g:hover{{border-color:#FFD700;transform:scale(1.05);box-shadow:0 0 20px rgba(255,215,0,.3)}}
+.wf{{background:rgba(255,255,255,.04);border:1px solid #333;border-radius:12px;padding:1.2em;
+margin-top:2em;max-width:500px;width:100%}}
+.wf h2{{font-size:1.1em;color:#FFD700;margin-bottom:.8em;display:flex;align-items:center;gap:.5em}}
+.wd{{width:10px;height:10px;border-radius:50%;background:{dot_color};flex-shrink:0}}
+.wf label{{font-size:.85em;color:#aaa;display:block;margin-bottom:.3em}}
+.wf select,.wf input{{width:100%;padding:8px;margin-bottom:.8em;background:#1a2a3a;
+border:1px solid #444;border-radius:6px;color:#fff;font-size:15px}}
+.wf select:focus,.wf input:focus{{border-color:#FFD700;outline:none}}
+.wf button{{padding:10px 16px;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}}
+.wb{{background:#FFD700;color:#000;width:100%}}
+.wb:hover{{background:#ffe44d}}
+.wsc{{background:#333;color:#ccc;margin-bottom:.8em;width:100%}}
+.wsc:hover{{background:#444}}
+.wm{{font-size:.85em;color:#FFD700;margin-top:.5em;min-height:1.2em}}
+.rb{{background:#8b0000;color:#fff;padding:8px 20px;border:none;border-radius:6px;
+font-size:.9em;cursor:pointer;margin-top:1.5em}}
+.rb:hover{{background:#a00}}
+.i{{margin-top:1.5em;color:#546e7a;font-size:.85em;text-align:center}}
 code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 </style></head><body>
-<h1>🎮 MundMaus</h1>
+<h1>MundMaus</h1>
 <p class="sub">Assistive Gaming Controller v{VERSION}</p>
 <div class="gs">{btns}</div>
-<div class="i">📶 {wifi_ip} &nbsp;|&nbsp; {BOARD} &nbsp;|&nbsp; v{VERSION} &nbsp;|&nbsp; RAM: {gc.mem_free()//1024}KB frei</div>
+<div class="wf">
+<h2><span class="wd"></span> {mode_label}: {ssid} &mdash; {wifi_ip}</h2>
+<button class="wsc" onclick="sc()">Netzwerke suchen</button>
+<label>SSID</label>
+<select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
+<input id="si" placeholder="WLAN Name (SSID)">
+<label>Passwort</label>
+<input id="pw" type="password" placeholder="Passwort">
+<button class="wb" onclick="sv()">Verbinden</button>
+<div class="wm" id="wm"></div>
+</div>
+<button class="rb" onclick="rb()">Neustart</button>
+<div class="i">{wifi_ip} &nbsp;|&nbsp; {BOARD} &nbsp;|&nbsp; v{VERSION} &nbsp;|&nbsp; RAM: {gc.mem_free()//1024}KB frei</div>
+<script>
+async function sc(){{try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
+s.innerHTML='<option>-- waehlen --</option>';
+d.networks.forEach(n=>{{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)}});
+s.style.display='block';document.getElementById('wm').textContent=d.networks.length+' Netzwerke'}}
+catch(e){{document.getElementById('wm').textContent='Scan fehlgeschlagen'}}}}
+async function sv(){{const s=document.getElementById('si').value,p=document.getElementById('pw').value;
+if(!s)return(document.getElementById('wm').textContent='SSID eingeben!');
+document.getElementById('wm').textContent='Speichere...';
+try{{const r=await fetch('/api/wifi',{{method:'POST',headers:{{'Content-Type':'application/json'}},
+body:JSON.stringify({{ssid:s,password:p}})}}),d=await r.json();
+document.getElementById('wm').textContent=d.message||'OK'}}catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
+async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
+document.getElementById('wm').textContent='Neustart...'}}}}
+</script>
 </body></html>"""
+
+
+# Global reference so _generate_portal can read WiFi state
+wifi_mgr_ref = None
 
 
 # ============================================================
@@ -593,18 +648,19 @@ class MundMausServer:
         html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MundMaus Setup</title><style>
-body{{font-family:sans-serif;background:#1e5631;color:#fff;display:flex;align-items:center;
+body{{font-family:sans-serif;background:#0a1628;color:#fff;display:flex;align-items:center;
 justify-content:center;min-height:100vh;text-align:center}}
-.b{{background:rgba(0,0,0,.4);padding:2em;border-radius:12px;max-width:400px}}
-h1{{color:#00d4ff}}input,select{{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:none;font-size:16px}}
-button{{width:100%;padding:12px;margin-top:12px;background:#00d4ff;color:#000;border:none;
+.b{{background:rgba(255,255,255,.04);padding:2em;border-radius:12px;max-width:400px;border:1px solid #333}}
+h1{{color:#FFD700}}input,select{{width:100%;padding:10px;margin:8px 0;border-radius:6px;border:1px solid #444;
+font-size:16px;background:#1a2a3a;color:#fff}}
+button{{width:100%;padding:12px;margin-top:12px;background:#FFD700;color:#000;border:none;
 border-radius:6px;font-size:18px;font-weight:bold;cursor:pointer}}
 .s{{margin-top:15px;font-size:14px;color:#aaa}}
-#sb{{background:#444;color:#fff;font-size:14px;padding:8px}}
+#sb{{background:#333;color:#ccc;font-size:14px;padding:8px}}
 </style></head><body><div class="b">
-<h1>🎮 MundMaus</h1>
+<h1>MundMaus</h1>
 <p>{BOARD} &mdash; v{VERSION}</p>
-<button id="sb" onclick="sc()">🔍 Netzwerke suchen</button>
+<button id="sb" onclick="sc()">Netzwerke suchen</button>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
 <input id="si" placeholder="WLAN Name (SSID)">
 <input id="pw" type="password" placeholder="Passwort">
@@ -613,10 +669,10 @@ border-radius:6px;font-size:18px;font-weight:bold;cursor:pointer}}
 <script>
 async function sc(){{document.getElementById('sb').textContent='...';
 try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
-s.innerHTML='<option>-- wählen --</option>';
+s.innerHTML='<option>-- waehlen --</option>';
 d.networks.forEach(n=>{{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)}});
 s.style.display='block'}}catch(e){{document.getElementById('st').textContent='Fehler'}}
-document.getElementById('sb').textContent='🔍 Suchen'}}
+document.getElementById('sb').textContent='Suchen'}}
 async function sv(){{const s=document.getElementById('si').value,p=document.getElementById('pw').value;
 if(!s)return alert('SSID!');document.getElementById('st').textContent='Speichere...';
 try{{const r=await fetch('/api/wifi',{{method:'POST',headers:{{'Content-Type':'application/json'}},
@@ -899,7 +955,9 @@ async def async_main():
 
     # WiFi
     print("\n[Netzwerk]")
+    global wifi_mgr_ref
     wifi = WiFiManager()
+    wifi_mgr_ref = wifi
     ip, mode = wifi.startup()
 
     print(f"\n  {'='*38}")

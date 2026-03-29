@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MundMaus — Mundgesteuerte Spielkonsole</title>
+  <meta name="description" content="MundMaus ist eine Open-Source Spielkonsole für Menschen mit Tetraplegie. Mundsteuerung per Joystick und Drucksensor, Spiele im Browser.">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+</head>
+<body>
+
+<a href="#main" class="skip-link">Zum Inhalt springen</a>
+
+<!-- Header -->
+<header class="site-header" id="header">
+  <div class="header-inner">
+    <a href="#" class="header-brand">Mund<span>Maus</span></a>
+    <nav>
+      <ul class="header-nav">
+        <li><a href="#about">Was ist MundMaus?</a></li>
+        <li><a href="#how">Wie funktioniert's?</a></li>
+        <li><a href="#games">Spiele</a></li>
+        <li><a href="#hardware">Hardware</a></li>
+        <li><a href="#opensource">Open Source</a></li>
+      </ul>
+    </nav>
+  </div>
+</header>
+
+<!-- Hero -->
+<section class="hero" id="main">
+  <div class="hero-grid"></div>
+  <div class="hero-pulse"></div>
+  <div class="hero-pulse"></div>
+  <div class="hero-pulse"></div>
+  <div class="container hero-content">
+    <p class="hero-kicker">Open-Source Assistive Technology</p>
+    <h1>Mund<span class="highlight">Maus</span></h1>
+    <p class="hero-subtitle">
+      Eine mundgesteuerte Spielkonsole für Menschen mit Tetraplegie.
+      Joystick, Drucksensor und Browser-Spiele &mdash; alles was es braucht
+      ist ein Pusten.
+    </p>
+    <div class="hero-actions">
+      <a href="#about" class="btn btn-primary">Mehr erfahren</a>
+      <a href="#opensource" class="btn btn-outline">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+        GitHub
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Wave: Hero → About -->
+<svg class="wave-divider" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="var(--warm)">
+  <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z"/>
+</svg>
+
+<!-- Was ist MundMaus? -->
+<section class="section section-warm" id="about">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Was ist MundMaus?</h2>
+      <p class="section-lead">
+        Ein kompaktes Gerät, das Mundbewegungen in Computereingaben übersetzt
+        &mdash; entwickelt für Menschen, die nur ihre Gesichtsmuskulatur nutzen können.
+      </p>
+    </div>
+    <div class="features-grid reveal-stagger">
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F579;</div>
+        <h3>Mundsteuerung</h3>
+        <p>Ein Joystick mit Mundstück. Lippen und Zunge steuern die Navigation &mdash; intuitiv und präzise.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F4A8;</div>
+        <h3>Pusten zum Klicken</h3>
+        <p>Ein Drucksensor erkennt Pusten über einen Silikonschlauch. Leichtes Pusten genügt als Mausklick.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F3AE;</div>
+        <h3>Browser-Spiele</h3>
+        <p>Solitaire, Schach, Memory &mdash; optimiert für Mundsteuerung mit grossen, gut sichtbaren Elementen.</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">&#x1F4E1;</div>
+        <h3>Kabellos</h3>
+        <p>Das Gerät verbindet sich per WLAN. Spiele laufen im Browser auf Tablet, Laptop oder Fernseher.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave: About → How -->
+<svg class="wave-divider" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="var(--navy)">
+  <path d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,30 1440,40 L1440,80 L0,80 Z"/>
+</svg>
+
+<!-- Wie funktioniert's? -->
+<section class="section section-dark" id="how">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Wie funktioniert's?</h2>
+      <p class="section-lead">Drei einfache Schritte &mdash; mehr braucht es nicht.</p>
+    </div>
+    <div class="steps reveal-stagger">
+      <div class="step">
+        <span class="step-icon">&#x1F579;</span>
+        <span class="step-number">1</span>
+        <h3>Bewegen</h3>
+        <p>Den Joystick mit Lippen und Zunge in die gewünschte Richtung lenken. Hoch, runter, links, rechts.</p>
+      </div>
+      <div class="step">
+        <span class="step-icon">&#x1F4A8;</span>
+        <span class="step-number">2</span>
+        <h3>Pusten</h3>
+        <p>Leicht ins Mundstück pusten. Der Drucksensor erkennt den Luftstoss und löst einen Klick aus.</p>
+      </div>
+      <div class="step">
+        <span class="step-icon">&#x1F3B2;</span>
+        <span class="step-number">3</span>
+        <h3>Spielen</h3>
+        <p>Die Spiele laufen im Browser. Einfach die MundMaus-Adresse aufrufen und losspielen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave: How → Games -->
+<svg class="wave-divider" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="var(--warm-mid)">
+  <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z"/>
+</svg>
+
+<!-- Spiele -->
+<section class="section section-mid" id="games">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Spiele</h2>
+      <p class="section-lead">Klassiker, optimiert für Mundsteuerung. Grosse Elemente, klare Farben, barrierefreies Design.</p>
+    </div>
+    <div class="games-grid reveal-stagger">
+      <div class="game-card">
+        <img class="game-card-img" src="img/solitaire.jpg" alt="Solitaire Screenshot" loading="lazy">
+        <div class="game-card-body">
+          <h3>Solitaire</h3>
+          <p>Klondike Solitaire mit Undo, Auto-Solve und Punktesystem. Der Klassiker für zwischendurch.</p>
+        </div>
+      </div>
+      <div class="game-card">
+        <img class="game-card-img" src="img/chess.jpg" alt="Schach Screenshot" loading="lazy">
+        <div class="game-card-body">
+          <h3>Schach</h3>
+          <p>Gegen den Computer in vier Schwierigkeitsstufen. Mit Zugvorschlägen und Rückgängig-Button.</p>
+        </div>
+      </div>
+      <div class="game-card">
+        <img class="game-card-img" src="img/memory.jpg" alt="Memory Screenshot" loading="lazy">
+        <div class="game-card-body">
+          <h3>Memory</h3>
+          <p>Paare finden mit Symbolen, Farben und Text &mdash; dreifach kodiert für Farbenblinde.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave: Games → Hardware -->
+<svg class="wave-divider" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="var(--navy)">
+  <path d="M0,40 C360,0 720,80 1080,40 C1260,20 1380,30 1440,40 L1440,80 L0,80 Z"/>
+</svg>
+
+<!-- Hardware -->
+<section class="section section-dark" id="hardware">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Hardware</h2>
+      <p class="section-lead">Einfache, günstige Bauteile. Kein Löten nötig &mdash; nur Steckverbindungen.</p>
+    </div>
+    <div class="specs-grid reveal-stagger">
+      <div class="spec-item">
+        <div class="spec-icon">&#x1F4BB;</div>
+        <div>
+          <h3>ESP32-WROOM-32</h3>
+          <p>Mikrocontroller mit WLAN. Hostet Webserver und Spiele direkt auf dem Chip.</p>
+        </div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-icon">&#x1F579;</div>
+        <div>
+          <h3>KY-023 Joystick</h3>
+          <p>Analoger 2-Achsen-Joystick mit Taster. Wird mit Mundstück bedient.</p>
+        </div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-icon">&#x1F4A8;</div>
+        <div>
+          <h3>MPS20N0040D-S Drucksensor</h3>
+          <p>Erkennt Pusten über Silikonschlauch. Empfindlich genug für leichtes Blasen.</p>
+        </div>
+      </div>
+      <div class="spec-item">
+        <div class="spec-icon">&#x1F4E6;</div>
+        <div>
+          <h3>3D-gedrucktes Gehäuse</h3>
+          <p>PETG-Gehäuse, entworfen in CadQuery. Alle STL-Dateien im Repository.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Wave: Hardware → Open Source -->
+<svg class="wave-divider" viewBox="0 0 1440 80" preserveAspectRatio="none" fill="var(--warm)">
+  <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z"/>
+</svg>
+
+<!-- Open Source -->
+<section class="section section-warm" id="opensource">
+  <div class="container">
+    <div class="section-header reveal">
+      <h2>Open Source</h2>
+    </div>
+    <div class="oss-banner reveal">
+      <span class="oss-badge">&#x1F6A7; In Arbeit</span>
+      <h3>Bald auf GitHub</h3>
+      <p>
+        Firmware, Spiele, Gehäuse-Dateien und Bauanleitung &mdash;
+        alles wird als Open-Source-Projekt veröffentlicht.
+      </p>
+      <a href="#" class="btn btn-github disabled">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+        GitHub (bald verfügbar)
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">Mund<span>Maus</span></div>
+    <ul class="footer-links">
+      <li><a href="/impressum.html">Impressum</a></li>
+      <li><a href="/datenschutz.html">Datenschutz</a></li>
+    </ul>
+  </div>
+</footer>
+
+<script>
+(function() {
+  var header = document.getElementById('header');
+  var lastY = 0;
+  window.addEventListener('scroll', function() {
+    if (window.scrollY > 40) header.classList.add('scrolled');
+    else header.classList.remove('scrolled');
+    lastY = window.scrollY;
+  }, { passive: true });
+
+  var observer = new IntersectionObserver(function(entries) {
+    entries.forEach(function(e) {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        observer.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+  document.querySelectorAll('.reveal, .reveal-stagger').forEach(function(el) {
+    observer.observe(el);
+  });
+})();
+</script>
+
+</body>
+</html>
