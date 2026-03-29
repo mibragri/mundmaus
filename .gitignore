@@ -3,6 +3,20 @@ __pycache__/
 *.pyc
 *.mpy
 
+# Credentials (WiFi passwords on ESP32)
+wifi.json
+
 # Agent worktrees
 .worktrees/
 .git-main/
+
+# IDE / tools
+.mypy_cache/
+.venv/
+.playwright-mcp/
+result.json
+enclosure/result.json
+enclosure/bambu-profiles/result.json
+
+# Temp files
+*.tmp
