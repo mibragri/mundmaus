@@ -172,11 +172,11 @@ document.getElementById('wm').textContent=d.message||'OK'}}
 catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
 async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
 document.getElementById('wm').textContent='Neustart...'}}}}
-const ws=new WebSocket('ws://'+location.hostname+':81');
-ws.onmessage=function(e){{const d=JSON.parse(e.data);
+function connectWS(){{const ws=new WebSocket('ws://'+location.hostname+':81');ws.onclose=function(){{setTimeout(connectWS,3000)}};ws.onmessage=function(e){{const d=JSON.parse(e.data);
 if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.textContent='Offline \u2014 keine Update-Pruefung'}}else if(d.available&&d.available.length>0){{info.textContent=d.available.length+' Update(s) verfuegbar';btn.style.display='block'}}else{{info.textContent='Aktuell'}}}}
 else if(d.type==='update_progress'){{document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}}
-else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none'}}}};
+else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none'}}
+else if(d.type==='update_error'){{document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}}}};}}connectWS();
 async function startUpdate(){{document.getElementById('upd-info').textContent='Starte Update...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
 </script>
 </body></html>"""
@@ -297,11 +297,11 @@ class MundMausServer:
             self._send_json(client, {'ok': False, 'error': str(e)}, 500)
 
     def _send_json(self, client, data, status=200):
-        body = json.dumps(data)
+        body = json.dumps(data).encode()
         client.send(f'HTTP/1.1 {status} OK\r\n'.encode())
         client.send(b'Content-Type: application/json\r\nAccess-Control-Allow-Origin: *\r\n')
         client.send(f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n'.encode())
-        client.send(body.encode())
+        client.send(body)
 
     def _serve_setup(self, client):
         html = f"""<!DOCTYPE html><html><head><meta charset="utf-8">

@@ -87,7 +87,7 @@ async def _run_update_async(server):
             server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
         def on_error(f, err):
             server.ws_send_all({'type': 'update_error', 'file': f, 'error': err})
-        ok, msg = run_update(available, progress_cb=on_progress, error_cb=on_error)
+        ok, msg = await run_update(available, progress_cb=on_progress, error_cb=on_error)
         server.ws_send_all({'type': 'update_complete',
                             'firmware_updated': any(u.get('firmware') for u in available),
                             'message': msg, 'ok': ok})
@@ -130,6 +130,7 @@ async def server_loop(server, wifi):
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
             gc.collect()
+            loop_count = 0
 
         await asyncio.sleep_ms(10)
 
@@ -164,6 +165,11 @@ def _mark_boot_ok():
                     except:
                         pass
             print("  Update: Boot OK, Status gesetzt")
+        # Also clear recovery flag if present
+        if state.get('recovery'):
+            with open(UPDATE_STATE_FILE, 'w') as f:
+                _json.dump({'status': 'ok'}, f)
+            print("  Recovery-Warnung zurueckgesetzt")
     except OSError:
         pass
 

@@ -18,6 +18,8 @@ print(f"MundMaus booting... ({_m})")
 # UPDATE ROLLBACK
 # ============================================================
 
+# Intentionally hardcoded — boot.py must not import config.py
+# (if config.py is broken, boot.py is the safety net)
 _STATE_FILE = 'update_state.json'
 _MAX_ATTEMPTS = 2
 

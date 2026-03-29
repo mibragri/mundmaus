@@ -4,6 +4,11 @@ import gc
 import json
 import os
 
+try:
+    import asyncio
+except ImportError:
+    import uasyncio as asyncio
+
 from config import OTA_BASE_URL, UPDATE_STATE_FILE, VERSIONS_FILE
 
 
@@ -74,7 +79,7 @@ def check_manifest(notify_cb=None):
     return result
 
 
-def run_update(available, progress_cb=None, error_cb=None):
+async def run_update(available, progress_cb=None, error_cb=None):
     """Download and install updates. Returns (success, message).
     progress_cb(file, current, total) called per file.
     """
@@ -104,6 +109,7 @@ def run_update(available, progress_cb=None, error_cb=None):
             _safe_remove(fname + '.new')
             if error_cb:
                 error_cb(fname, "Download fehlgeschlagen")
+        await asyncio.sleep_ms(0)
 
     # Firmware (all-or-nothing)
     fw_ok = True
@@ -119,6 +125,7 @@ def run_update(available, progress_cb=None, error_cb=None):
             if error_cb:
                 error_cb(fname, "Download fehlgeschlagen")
             break
+        await asyncio.sleep_ms(0)
 
     if not fw_ok:
         # Clean up ALL firmware .new files
@@ -220,11 +227,12 @@ def _http_get(url, timeout=5):
     path = '/' + path
 
     addr = socket.getaddrinfo(host, 443)[0][-1]
-    sock = socket.socket()
-    sock.settimeout(timeout)
+    raw_sock = socket.socket()
+    raw_sock.settimeout(timeout)
+    sock = raw_sock
     try:
-        sock.connect(addr)
-        sock = ssl.wrap_socket(sock, server_hostname=host)
+        raw_sock.connect(addr)
+        sock = ssl.wrap_socket(raw_sock, server_hostname=host)
         sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'.encode())
 
         # Read header
@@ -240,7 +248,7 @@ def _http_get(url, timeout=5):
 
         header_end = header.index(b'\r\n\r\n') + 4
         status_line = header.split(b'\r\n')[0]
-        if b'200' not in status_line:
+        if b' 200 ' not in status_line:
             print(f"  HTTP {status_line} ({host})")
             return None
         body = header[header_end:]
@@ -251,6 +259,9 @@ def _http_get(url, timeout=5):
             if not chunk:
                 break
             body += chunk
+            if len(body) > 16384:
+                print(f"  Body zu gross ({host})")
+                return None
 
         return body
     except Exception as e:
@@ -261,6 +272,11 @@ def _http_get(url, timeout=5):
             sock.close()
         except:
             pass
+        if sock is not raw_sock:
+            try:
+                raw_sock.close()
+            except:
+                pass
 
 
 def _download_file(fname, dest):
@@ -277,10 +293,11 @@ def _download_file(fname, dest):
 
     try:
         addr = socket.getaddrinfo(host, 443)[0][-1]
-        sock = socket.socket()
-        sock.settimeout(10)
-        sock.connect(addr)
-        sock = ssl.wrap_socket(sock, server_hostname=host)
+        raw_sock = socket.socket()
+        raw_sock.settimeout(10)
+        sock = raw_sock
+        raw_sock.connect(addr)
+        sock = ssl.wrap_socket(raw_sock, server_hostname=host)
         sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'.encode())
 
         # Skip header
@@ -299,7 +316,7 @@ def _download_file(fname, dest):
 
         # Check HTTP status
         status_line = header.split(b'\r\n')[0]
-        if b'200' not in status_line:
+        if b' 200 ' not in status_line:
             print(f"  Download {fname}: {status_line}")
             return False
 
@@ -315,6 +332,14 @@ def _download_file(fname, dest):
                     break
                 f.write(buf[:n])
 
+        # Verify non-empty download
+        try:
+            if os.stat(dest)[6] == 0:
+                print(f"  Download {fname}: leer")
+                _safe_remove(dest)
+                return False
+        except:
+            pass
         return True
     except Exception as e:
         print(f"  Download {fname}: {e}")
@@ -324,6 +349,11 @@ def _download_file(fname, dest):
             sock.close()
         except:
             pass
+        if sock is not raw_sock:
+            try:
+                raw_sock.close()
+            except:
+                pass
         gc.collect()
 
 
