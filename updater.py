@@ -16,7 +16,7 @@ def _load_versions():
     try:
         with open(VERSIONS_FILE) as f:
             return json.load(f)
-    except OSError:
+    except (OSError, ValueError):
         return {}
 
 
@@ -148,6 +148,10 @@ async def run_update(available, progress_cb=None, error_cb=None):
 
     # Install firmware (backup first, then rename)
     if firmware:
+        # Step 0: set pending state BEFORE any destructive operations
+        with open(UPDATE_STATE_FILE, 'w') as f:
+            json.dump({'status': 'pending', 'attempts': 0}, f)
+
         # Step a: create all backups
         for upd in firmware:
             fname = upd['file']
@@ -170,10 +174,6 @@ async def run_update(available, progress_cb=None, error_cb=None):
                     os.rename(fname + '.bak', fname)
             _safe_remove(UPDATE_STATE_FILE)
             return False, f"Install fehlgeschlagen: {e}, Rollback durchgefuehrt"
-
-        # Step c: set pending state
-        with open(UPDATE_STATE_FILE, 'w') as f:
-            json.dump({'status': 'pending', 'attempts': 0}, f)
 
     # Delete removed files
     for upd in deletes:
@@ -320,6 +320,13 @@ def _download_file(fname, dest):
             print(f"  Download {fname}: {status_line}")
             return False
 
+        # Extract Content-Length for verification
+        expected_size = 0
+        for hline in header.split(b'\r\n'):
+            if hline.lower().startswith(b'content-length:'):
+                expected_size = int(hline.split(b':')[1].strip())
+                break
+
         # Write to file in chunks
         _ensure_dir(dest)
         buf = bytearray(2048)
@@ -332,14 +339,18 @@ def _download_file(fname, dest):
                     break
                 f.write(buf[:n])
 
+        # Verify download size against Content-Length
+        actual_size = os.stat(dest)[6]
+        if expected_size > 0 and actual_size != expected_size:
+            print(f"  Download {fname}: {actual_size}/{expected_size} bytes (unvollstaendig)")
+            _safe_remove(dest)
+            return False
+
         # Verify non-empty download
-        try:
-            if os.stat(dest)[6] == 0:
-                print(f"  Download {fname}: leer")
-                _safe_remove(dest)
-                return False
-        except:
-            pass
+        if actual_size == 0:
+            print(f"  Download {fname}: leer")
+            _safe_remove(dest)
+            return False
         return True
     except Exception as e:
         print(f"  Download {fname}: {e}")

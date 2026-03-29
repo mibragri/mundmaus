@@ -71,7 +71,7 @@ def _generate_portal(wifi, wifi_ip):
     except:
         pass
 
-    recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">Update fehlgeschlagen &mdash; alte Version wiederhergestellt</div>' if recovery else ''
+    recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">Update fehlgeschlagen - alte Version wiederhergestellt</div>' if recovery else ''
 
     games = []
     try:
@@ -144,7 +144,7 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 </div>
 </div>
 <div class="wf">
-<h2><span class="wd"></span> {mode_label}: {ssid} &mdash; {wifi_ip}</h2>
+<h2><span class="wd"></span> {mode_label}: {ssid} - {wifi_ip}</h2>
 <button class="wsc" onclick="sc()">Netzwerke suchen</button>
 <label>SSID</label>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
@@ -173,9 +173,9 @@ catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
 async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
 document.getElementById('wm').textContent='Neustart...'}}}}
 function connectWS(){{const ws=new WebSocket('ws://'+location.hostname+':81');ws.onclose=function(){{setTimeout(connectWS,3000)}};ws.onmessage=function(e){{const d=JSON.parse(e.data);
-if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.textContent='Offline \u2014 keine Update-Pruefung'}}else if(d.available&&d.available.length>0){{info.textContent=d.available.length+' Update(s) verfuegbar';btn.style.display='block'}}else{{info.textContent='Aktuell'}}}}
+if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.textContent='Offline - keine Update-Pruefung'}}else if(d.available&&d.available.length>0){{info.textContent=d.available.length+' Update(s) verfuegbar';btn.style.display='block'}}else{{info.textContent='Aktuell'}}}}
 else if(d.type==='update_progress'){{document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}}
-else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none'}}
+else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').textContent='Erneut pruefen';document.getElementById('upd-btn').style.display='block';document.getElementById('upd-btn').onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});document.getElementById('upd-info').textContent='Pruefe...';document.getElementById('upd-btn').style.display='none'}}}}
 else if(d.type==='update_error'){{document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}}}};}}connectWS();
 async function startUpdate(){{document.getElementById('upd-info').textContent='Starte Update...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
 </script>
@@ -197,6 +197,7 @@ class MundMausServer:
         self._pending_reboot = False
         self._update_info = None  # Set by updater after manifest check
         self._updating = False
+        self._recheck_updates = False
 
     def start(self):
         self.http_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -250,6 +251,9 @@ class MundMausServer:
                 self._send_json(client, self._update_info)
             else:
                 self._send_json(client, {'available': [], 'offline': True})
+        elif 'POST /api/updates/check' in fl:
+            self._send_json(client, {'ok': True})
+            self._recheck_updates = True
         elif 'POST /api/update/start' in fl:
             if self._updating:
                 self._send_json(client, {'ok': False, 'error': 'Update laeuft bereits'})
@@ -266,10 +270,11 @@ class MundMausServer:
                 _send_404(client, path)
         elif 'GET / ' in fl or 'GET /index' in fl:
             p = _generate_portal(self.wifi, self.wifi.ip)
+            p_bytes = p.encode('utf-8') if isinstance(p, str) else p
             client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
-            client.send(f'Content-Length: {len(p)}\r\nConnection: close\r\n\r\n'.encode())
-            for i in range(0, len(p), 2048):
-                client.send(p[i:i+2048].encode() if isinstance(p, str) else p[i:i+2048])
+            client.send(f'Content-Length: {len(p_bytes)}\r\nConnection: close\r\n\r\n'.encode())
+            for i in range(0, len(p_bytes), 2048):
+                client.send(p_bytes[i:i+2048])
         elif 'GET /favicon' in fl:
             client.send(b'HTTP/1.1 204 No Content\r\n\r\n')
         else:
@@ -318,7 +323,7 @@ border-radius:6px;font-size:18px;font-weight:bold;cursor:pointer}}
 #sb{{background:#333;color:#ccc;font-size:14px;padding:8px}}
 </style></head><body><div class="b">
 <h1>MundMaus</h1>
-<p>{BOARD} &mdash; v{VERSION}</p>
+<p>{BOARD} - v{VERSION}</p>
 <button id="sb" onclick="sc()">Netzwerke suchen</button>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
 <input id="si" placeholder="WLAN Name (SSID)">
@@ -356,6 +361,12 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
                     'ssid': self.wifi.ssid or AP_SSID,
                     'ip': self.wifi.ip, 'mode': self.wifi.mode
                 })
+                if self._update_info:
+                    msg = {'type': 'update_status'}
+                    msg.update(self._update_info)
+                    self.ws_send_one(client, msg)
+                if self._updating:
+                    self.ws_send_one(client, {'type': 'update_status', 'updating': True})
             else:
                 client.close()
         except OSError:

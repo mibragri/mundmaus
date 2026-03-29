@@ -127,6 +127,10 @@ async def server_loop(server, wifi):
             server._update_task_running = True
             asyncio.create_task(_run_update_async(server))
 
+        if server._recheck_updates:
+            server._recheck_updates = False
+            asyncio.create_task(update_check(server, wifi))
+
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
             gc.collect()
