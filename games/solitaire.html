@@ -47,6 +47,8 @@
     color: var(--text);
     overflow: hidden;
     height: 100vh;
+    max-width: 1920px;
+    margin: 0 auto;
     width: 100vw;
     -webkit-user-select: none;
     user-select: none;
@@ -79,8 +81,8 @@
   }
 
   .pile-slot {
-    width: 11vw;
-    min-height: 15.4vw;
+    width: 10.2vw;
+    min-height: 13.3vw;
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: var(--card-radius);
     position: relative;
@@ -144,15 +146,15 @@
   }
 
   .tableau-col {
-    width: 11vw;
+    width: 10.2vw;
     position: relative;
     min-height: 20vh;
   }
 
   /* CARDS */
   .card {
-    width: 11vw;
-    height: 15.4vw;
+    width: 10.2vw;
+    height: 13.3vw;
     border-radius: var(--card-radius);
     position: absolute;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -422,7 +424,7 @@
     position: absolute;
     top: 0;
     height: 0.5vw;
-    width: 11vw;
+    width: 10.2vw;
     background: var(--nav-color);
     border-radius: 4px;
     box-shadow: 0 0 10px rgba(255,255,255,0.5);
@@ -438,16 +440,17 @@
 
   /* ===== ACTION COLUMN (right of tableau) ===== */
   .action-col {
-    width: 11vw;
+    width: 10.2vw;
     display: flex;
     flex-direction: column;
     gap: 1vw;
     padding-top: 0.5vw;
     position: relative;
+    margin-left: auto;
   }
 
   .action-btn {
-    width: 11vw;
+    width: 10.2vw;
     height: 4.5vw;
     border-radius: var(--card-radius);
     background: rgba(255,255,255,0.06);
@@ -549,13 +552,13 @@
 </head>
 <body>
 
-<div id="ws-status" title="ESP32 nicht verbunden"></div>
+<div id="ws-status" title="ESP32 ✗"></div>
 
 <div id="header">
   <h1>Mund<span>Maus</span> Solitär</h1>
   <div class="stat-bar">
-    <div class="stat"><span class="label">Züge:</span> <span class="value" id="moves">0</span></div>
-    <div class="stat"><span class="label">Punkte:</span> <span class="value" id="score">0</span></div>
+    <div class="stat"><span class="label">#</span> <span class="value" id="moves">0</span></div>
+    <div class="stat"><span class="label">★</span> <span class="value" id="score">0</span></div>
     <span id="auto-hint"></span>
   </div>
 </div>
@@ -569,22 +572,22 @@
 <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
 
 <div id="footer">
-  <span><kbd>←↑→↓</kbd> Navigieren</span>
-  <span><kbd>Leertaste</kbd> Auswählen/Ablegen</span>
-  <span><kbd>U</kbd> Rückgängig</span>
-  <span><kbd>N</kbd> Neues Spiel</span>
+  <span><kbd>←↑→↓</kbd></span>
+  <span><kbd>⏎</kbd> ●</span>
+  <span><kbd>U</kbd> ↩</span>
+  <span><kbd>N</kbd> NEW</span>
   <span><kbd>K</kbd> Kiosk</span>
-  <span><kbd>P</kbd> Portal</span>
+  <span><kbd>P</kbd> 🏠</span>
 </div>
 
 <div id="kiosk-status">
   <div class="kiosk-dot" id="ws-dot"></div>
-  <span id="ws-label">Getrennt</span>
+  <span id="ws-label">✗</span>
 </div>
 
 <div id="idle-overlay">
-  <div class="idle-text">Mundmaus Solitär</div>
-  <div class="idle-sub">Pusten zum Starten</div>
+  <div class="idle-text">MundMaus Solitaire</div>
+  <div class="idle-sub">⏎</div>
 </div>
 
 <script>
@@ -717,7 +720,7 @@ function getFaceUpRange(ci) {
   const col=tableau[ci],s=col.findIndex(c=>c.faceUp);
   if(s===-1)return{start:0,end:0,count:0};return{start:s,end:col.length-1,count:col.length-s};
 }
-function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉 Gewonnen!','win');} }
+function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉','win');} }
 function canAutoComplete() { return stock.length===0&&waste.length===0&&tableau.every(col=>col.every(c=>c.faceUp)); }
 function autoComplete() {
   if(!canAutoComplete())return;
@@ -737,7 +740,7 @@ function updateStatus() {
   document.getElementById('moves').textContent=moves;
   document.getElementById('score').textContent=score;
   const h=document.getElementById('auto-hint');
-  if(canAutoComplete()){h.textContent='✨ Auto-Lösen verfügbar';h.style.color='var(--highlight)';}else h.textContent='';
+  if(canAutoComplete()){h.textContent='✨ Auto';h.style.color='var(--highlight)';}else h.textContent='';
 }
 
 // ============================================================
@@ -793,7 +796,7 @@ function getSelCards() {
 
 function renderTableau() {
   const cont=document.getElementById('tableau');cont.innerHTML='';
-  const CARD_H=15.4,FDO=1.2,FUO=3.2;
+  const CARD_H=13.3,FDO=1.0,FUO=2.6;
   let maxBottom=CARD_H; // minimum: one card height (empty slot)
   for(let ci=0;ci<7;ci++){
     const cd=document.createElement('div');cd.className='tableau-col';
@@ -801,7 +804,7 @@ function renderTableau() {
     const col=tableau[ci];
 
     if(!col.length){
-      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:15.4vw;';
+      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:13.3vw;';
       if(navZone==='tableau'&&navCol===ci)slot.classList.add('nav-active');
       if(hintsEnabled&&selectedCard){const cards=getSelCards();if(cards&&cards.length&&cards[0].rank==='K'){slot.classList.add('target');addBadge(slot,'target-mark');}}
       const l=document.createElement('div');l.className='empty-label';l.textContent='K';slot.appendChild(l);cd.appendChild(slot);
@@ -843,14 +846,14 @@ function renderTableau() {
   // Action column (Help + New Game)
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
-  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
-  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu','⬅ Portal'];
-  const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
-  for(let i=0;i<3;i++){
+  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,3)):-1;
+  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠','<span style="display:inline-grid;grid-template-columns:1fr 1fr;width:1.2em;height:1.2em;line-height:1;font-size:.55em;text-align:center"><span>↖</span><span>↗</span><span>↙</span><span>↘</span></span>'];
+  const actFns=[toggleHints,initGame,()=>{window.location.href='/';},toggleKiosk];
+  for(let i=0;i<4;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
     if(i===0&&hintsEnabled)btn.classList.add('active');
-    btn.textContent=actLabels[i];btn.onclick=actFns[i];
+    btn.innerHTML=actLabels[i];btn.onclick=actFns[i];
     actCol.appendChild(btn);
   }
   cont.appendChild(actCol);
@@ -906,7 +909,7 @@ function navigate(dir) {
     } else if(dir==='down'&&navZone==='top'){
       navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx<2){navCardIdx++;sndNav();}render();return;}
+      if(navCol===7){if(navCardIdx<3){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur<end){navCardIdx=cur+1;sndNav();}}
     }
@@ -919,7 +922,7 @@ function doPuff() {
   if(document.getElementById('idle-overlay').classList.contains('visible')){hideIdle();initGame();return;}
   if(gameWon){initGame();return;}
   if(navZone==='top'&&navCol===0){drawFromStock();selectedCard=null;render();return;}
-  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';return;}
+  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';else if(ai===3)toggleKiosk();return;}
   if(!selectedCard){selectCurrentCard();return;}
   if(isSamePos(selectedCard,navZone,navCol)){selectedCard=null;sndNav();render();return;}
   placeSelectedCard();
@@ -954,7 +957,7 @@ function placeSelectedCard() {
   }
   if(!moved){sndError();render();updateStatus();return;}
   selectedCard=null;render();updateStatus();checkWin();
-  if(canAutoComplete())setTimeout(()=>{showMessage('Auto-Lösen...','');setTimeout(autoComplete,800);},400);
+  if(canAutoComplete())setTimeout(()=>{showMessage('✨...','');setTimeout(autoComplete,800);},400);
 }
 
 function getSrc(z,c) { if(z==='top'&&c===1)return'waste';if(z==='top'&&c>=2)return'foundation';return'tableau'; }
@@ -1007,10 +1010,10 @@ function connectWebSocket() {
 
 function updateWs(on) {
   const d=document.getElementById('ws-dot'),l=document.getElementById('ws-label');
-  if(on){d.classList.add('connected');l.textContent='Verbunden';}
-  else{d.classList.remove('connected');l.textContent='Getrennt';}
+  if(on){d.classList.add('connected');l.textContent='✓';}
+  else{d.classList.remove('connected');l.textContent='✗';}
   const dot=document.getElementById('ws-status');
-  if(dot){if(on){dot.classList.add('connected');dot.title='ESP32 verbunden';}else{dot.classList.remove('connected');dot.title='ESP32 nicht verbunden';}}
+  if(dot){if(on){dot.classList.add('connected');dot.title='ESP32 ✓';}else{dot.classList.remove('connected');dot.title='ESP32 ✗';}}
 }
 
 // Start
