@@ -299,29 +299,16 @@ async def async_main():
     }
     server.start()
 
+    # Apply pre-asyncio update check result
+    if _update_result:
+        server._update_info = _update_result
+
     display_status(tft, ip, mode,
                    (joystick.center_x, joystick.center_y),
                    puff.baseline if puff else 0, 0)
 
     # Mark boot successful (rollback protection)
     _mark_boot_ok()
-
-    # Check for OTA updates BEFORE launching tasks (SSL needs max RAM)
-    if wifi.mode == 'station':
-        print("\n[Updates]")
-        from updater import check_manifest
-        for _try in range(3):
-            await asyncio.sleep_ms(5000)
-            gc.collect()
-            print(f"  Versuch {_try + 1}/3 (RAM={gc.mem_free()})")
-            result = check_manifest()
-            server._update_info = result
-            if not result.get('offline'):
-                n = len(result.get('available', []))
-                print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
-                break
-            print("  Offline, retry...")
-        gc.collect()
 
     # Hardware watchdog — resets device if asyncio deadlocks
     wdt = machine.WDT(timeout=60000)
@@ -343,7 +330,39 @@ async def async_main():
         await asyncio.sleep_ms(60000)
 
 
+_update_result = None  # Shared between main() and async_main()
+
+
+def _check_updates_sync():
+    """Run OTA check synchronously BEFORE asyncio starts.
+    SSL and asyncio conflict on ESP32 — SSL handshake fails inside asyncio loop.
+    """
+    global _update_result
+    from wifi_manager import WiFiManager
+    wifi = WiFiManager()
+    if not wifi.load_credentials():
+        return
+    ip = wifi.connect_station(timeout_ms=15000)
+    if not ip:
+        return
+    print("\n[Updates]")
+    from updater import check_manifest
+    for _try in range(3):
+        gc.collect()
+        print(f"  Versuch {_try + 1}/3 (RAM={gc.mem_free()})")
+        result = check_manifest()
+        if not result.get('offline'):
+            n = len(result.get('available', []))
+            print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
+            _update_result = result
+            return
+        print("  Retry...")
+        time.sleep(3)
+    _update_result = result  # Last result, even if offline
+
+
 def main():
+    _check_updates_sync()
     try:
         asyncio.run(async_main())
     except KeyboardInterrupt:
