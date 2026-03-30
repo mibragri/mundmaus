@@ -795,7 +795,7 @@ function getSelCards() {
 
 function renderTableau() {
   const cont=document.getElementById('tableau');cont.innerHTML='';
-  const CARD_H=15.4,FDO=1.2,FUO=3.2;
+  const CARD_H=13.3,FDO=1.0,FUO=2.0;
   let maxBottom=CARD_H; // minimum: one card height (empty slot)
   for(let ci=0;ci<7;ci++){
     const cd=document.createElement('div');cd.className='tableau-col';
