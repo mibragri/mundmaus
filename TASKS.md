@@ -3,9 +3,10 @@
 ## Backlog
 - [ ] USB-HID Mouse Mode — ESP32-S3 Dynamic USB, Maussteuerung ohne WiFi (#high)
 - [ ] Sip-and-Puff — Differenzdrucksensor MPXV7002DP als Alternative zum Joystick (#medium)
-- [ ] Weitere Spiele — Memory, Snake, Schach (#medium)
+- [ ] Weitere Spiele — Snake, weitere Kartenspiele (#medium)
 - [ ] Settings Panel — Threshold/Deadzone über Browser-UI einstellen (#medium)
 - [ ] Input-Profile — Puff/Sip/Wangenluft konfigurierbar je Behinderungsgrad, Action-Mapping im Portal (#high)
+- [ ] Solitaire Ultrawide-Skalierung — vw-Einheiten vs Container-basiert (#low)
 - [ ] mDNS — `mundmaus.local` statt IP-Adresse (#medium)
 - [ ] Housing — Mikrofon-Schwenkarm-Halterung für Joystick (#low)
 - [ ] Raspberry Pi Kiosk — Auto-Start-Script für Kiosk-Modus (#low)
@@ -18,6 +19,27 @@
 - [ ] Gehäuse v5.6 — Cantilever-Clips statt Schrauben (Daumen-lösbar, selten geöffnet)
 - [ ] Gehäuse v5.6 — Joystick-PCB Niederhalter (Druckstege im Lid-Inneren, ~0.5mm Spiel)
 - [ ] Gehäuse v5.6 — Schraubbosses entfernen (durch Clips ersetzt)
+
+## Done (2026-03-30)
+- [x] OTA Auto-Update — Manifest auf mundmaus.de, atomare Installation, Rollback, Recovery-AP
+- [x] Firmware-Modularisierung — main.py (1009 Zeilen) → 8 Module + .mpy Pre-Compilation
+- [x] Portal Joystick-Navigation — Spiele per Joystick+Puff wählbar
+- [x] Portal Status-Chips — WiFi-RSSI, Sensor-Status, WS-Verbindung
+- [x] Portal Auto-Reconnect — Seite lädt neu nach ESP32-Reboot
+- [x] Robustheit — Hardware-Watchdog, WiFi-Reconnect, SSL vor asyncio
+- [x] Zurück-zum-Portal — 🏠 Button + P-Taste in allen Spielen
+- [x] Kiosk-Button — ↖↗↙↘ per Joystick navigierbar in allen Spielen
+- [x] Icon UI — Universelle Icons statt deutsche Texte, bilingual Pfleger-Labels
+- [x] Level-Menü — 🏋️ Gewichtheber-Icons statt Text
+- [x] Schach Zuganzeige — ⚪/⚫ Farbpunkt + Spinner statt Text
+- [x] Full HD Layout — max-width 1920px für TV-Ausgang
+- [x] Solitaire Layout — Engere Kartenstapelung, rechts-bündige Buttons
+- [x] Memory → Memo — Ravensburger-Marke vermieden
+- [x] Favicon — Goldenes M auf allen Seiten
+- [x] Playwright E2E Tests — 66 Tests gegen echten ESP32
+- [x] OTA Basic Auth — mundmaus.de/ota passwortgeschützt
+- [x] Upload-Tool — tools/upload-esp32.sh mit Auto-Reset+Reboot
+- [x] Deploy-Tools — deploy-ota.sh, test-esp32.sh, provision-esp32.sh
 
 ## Done (2026-03-19)
 - [x] Solitaire: Key-Repeat-Bug behoben (e.repeat Guard)

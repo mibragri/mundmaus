@@ -24,5 +24,12 @@ enclosure/bambu-profiles/result.json
 # Temp files
 *.tmp
 
+# Brainstorm sessions
+.superpowers/
+
+# Playwright
+tests/e2e/node_modules/
+tests/e2e/test-results/
+
 # Downloaded firmware binary (re-downloaded on demand)
 tools/.micropython-firmware.bin
