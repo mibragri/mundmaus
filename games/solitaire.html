@@ -441,14 +441,14 @@
     width: 11vw;
     display: flex;
     flex-direction: column;
-    gap: 1.5vw;
+    gap: 1vw;
     padding-top: 0.5vw;
     position: relative;
   }
 
   .action-btn {
     width: 11vw;
-    height: 6vw;
+    height: 4.5vw;
     border-radius: var(--card-radius);
     background: rgba(255,255,255,0.06);
     border: 2px solid rgba(255,255,255,0.12);
@@ -898,14 +898,14 @@ function navigate(dir) {
   }
   if(dir==='up'||dir==='down'){
     if(dir==='up'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx>0){navCardIdx=0;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndNav();render();return;}
+      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndNav();render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur>start){navCardIdx=cur-1;sndNav();render();return;}}
       navZone='top';if(navCol>1)navCol=Math.min(navCol-1,5);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='top'){
       navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx<1){navCardIdx=1;sndNav();}render();return;}
+      if(navCol===7){if(navCardIdx<2){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur<end){navCardIdx=cur+1;sndNav();}}
     }
@@ -918,7 +918,7 @@ function doPuff() {
   if(document.getElementById('idle-overlay').classList.contains('visible')){hideIdle();initGame();return;}
   if(gameWon){initGame();return;}
   if(navZone==='top'&&navCol===0){drawFromStock();selectedCard=null;render();return;}
-  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:1;if(ai===0)toggleHints();else initGame();return;}
+  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';return;}
   if(!selectedCard){selectCurrentCard();return;}
   if(isSamePos(selectedCard,navZone,navCol)){selectedCard=null;sndNav();render();return;}
   placeSelectedCard();
