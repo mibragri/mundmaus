@@ -301,7 +301,7 @@ async def async_main():
     _mark_boot_ok()
 
     # Hardware watchdog (already started in main(), get reference)
-    wdt = machine.WDT(timeout=60000)
+    wdt = machine.WDT(timeout=120000)
 
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
@@ -356,7 +356,7 @@ def _check_updates_sync():
 
 def main():
     # WDT before OTA check — protects against hangs during SSL
-    wdt = machine.WDT(timeout=60000)
+    wdt = machine.WDT(timeout=120000)
     _check_updates_sync()
     wdt.feed()
     try:
