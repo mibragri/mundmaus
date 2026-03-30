@@ -33,8 +33,11 @@ def _read_state():
 
 
 def _write_state(state):
-    with open(_STATE_FILE, 'w') as f:
-        json.dump(state, f)
+    try:
+        with open(_STATE_FILE, 'w') as f:
+            json.dump(state, f)
+    except:
+        print("  WARNUNG: State-Datei konnte nicht geschrieben werden")
 
 
 def _file_exists(path):
@@ -48,16 +51,18 @@ def _file_exists(path):
 def _rollback():
     """Restore all .bak files."""
     count = 0
-    for entry in os.listdir('/'):
-        if entry.endswith('.bak'):
-            orig = entry[:-4]
-            try:
-                os.remove(orig)
-            except:
-                pass
-            os.rename(entry, orig)
-            count += 1
-            print(f"  Rollback: {entry} -> {orig}")
+    try:
+        for entry in os.listdir('/'):
+            if entry.endswith('.bak'):
+                orig = entry[:-4]
+                try:
+                    os.rename(entry, orig)
+                    count += 1
+                    print(f"  Rollback: {entry} -> {orig}")
+                except:
+                    print(f"  Rollback FEHLER: {entry}")
+    except:
+        print("  Rollback: Dateisystem-Fehler")
     return count
 
 

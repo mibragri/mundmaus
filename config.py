@@ -76,6 +76,6 @@ GC_INTERVAL = 500
 
 # OTA
 OTA_BASE_URL = 'https://mundmaus.de/ota'
-OTA_AUTH = 'REDACTED_OTA_AUTH'  # base64(mundmaus:REDACTED_OTA_PASS)
+OTA_AUTH = 'REDACTED_OTA_AUTH'
 VERSIONS_FILE = 'versions.json'
 UPDATE_STATE_FILE = 'update_state.json'

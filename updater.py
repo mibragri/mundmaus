@@ -172,7 +172,13 @@ async def run_update(available, progress_cb=None, error_cb=None):
                 if _file_exists(fname + '.bak'):
                     _safe_remove(fname)
                     os.rename(fname + '.bak', fname)
-            _safe_remove(UPDATE_STATE_FILE)
+            # Do NOT delete state file — let boot.py handle rollback on next reboot
+            # if immediate rollback was incomplete
+            try:
+                with open(UPDATE_STATE_FILE, 'w') as f:
+                    json.dump({'status': 'ok'}, f)
+            except:
+                pass
             return False, f"Install fehlgeschlagen: {e}, Rollback durchgefuehrt"
 
     # Delete removed files

@@ -30,7 +30,7 @@ def test_scan_files_finds_py_and_games(project_dir):
     files = scan_files(project_dir)
     names = {f['name'] for f in files}
     assert 'main.py' in names
-    assert 'boot.py' in names
+    assert 'boot.py' not in names  # boot.py excluded — never OTA-update the safety net
     assert 'config.py' in names
     assert 'www/chess.html' in names
     assert 'www/memory.html' in names

@@ -45,35 +45,38 @@ async def sensor_loop(joystick, puff, server):
     last_puff_send = 0
 
     while True:
-        now = time.ticks_ms()
+        try:
+            now = time.ticks_ms()
 
-        nav = joystick.poll_navigation()
-        if nav:
-            server.send_nav(nav)
-            idle_start = now
-
-        if joystick.poll_button():
-            server.send_action('press')
-            idle_start = now
-
-        if puff:
-            if time.ticks_diff(now, last_puff_send) > PUFF_SEND_INTERVAL_MS:
-                level = puff.get_level()
-                if level > 0.02:
-                    server.send_puff_level(level)
-                last_puff_send = now
-            if puff.detect_puff():
-                server.send_action('puff')
+            nav = joystick.poll_navigation()
+            if nav:
+                server.send_nav(nav)
                 idle_start = now
 
-        if joystick.is_idle():
-            if time.ticks_diff(now, idle_start) > RECAL_IDLE_MS:
-                if time.ticks_diff(now, last_recal) > 60000:
-                    joystick.calibrate(samples=20)
-                    last_recal = now
+            if joystick.poll_button():
+                server.send_action('press')
+                idle_start = now
+
+            if puff:
+                if time.ticks_diff(now, last_puff_send) > PUFF_SEND_INTERVAL_MS:
+                    level = puff.get_level()
+                    if level > 0.02:
+                        server.send_puff_level(level)
+                    last_puff_send = now
+                if puff.detect_puff():
+                    server.send_action('puff')
                     idle_start = now
-        else:
-            idle_start = now
+
+            if joystick.is_idle():
+                if time.ticks_diff(now, idle_start) > RECAL_IDLE_MS:
+                    if time.ticks_diff(now, last_recal) > 60000:
+                        joystick.calibrate(samples=20)
+                        last_recal = now
+                        idle_start = now
+            else:
+                idle_start = now
+        except Exception as e:
+            print(f"  sensor_loop: {e}")
 
         await asyncio.sleep_ms(SENSOR_POLL_MS)
 
@@ -106,32 +109,35 @@ async def _run_update_async(server):
 async def server_loop(server, wifi):
     loop_count = 0
     while True:
-        server.poll_http()
-        server.poll_ws()
+        try:
+            server.poll_http()
+            server.poll_ws()
 
-        for msg in server.ws_read_all():
-            if msg.get('type') == 'wifi_config':
-                ssid = msg.get('ssid', '')
-                pw = msg.get('password', '')
-                if ssid:
-                    wifi.save_credentials(ssid, pw)
-                    server.ws_send_all({'type': 'wifi_status', 'status': 'saved',
-                                        'ssid': ssid, 'message': 'Gespeichert. Neustart...'})
-                    await asyncio.sleep_ms(2000)
-                    machine.reset()
-            elif msg.get('type') == 'wifi_scan':
-                server.ws_send_all({'type': 'wifi_networks',
-                                    'networks': wifi.scan_networks()})
+            for msg in server.ws_read_all():
+                if msg.get('type') == 'wifi_config':
+                    ssid = msg.get('ssid', '')
+                    pw = msg.get('password', '')
+                    if ssid:
+                        wifi.save_credentials(ssid, pw)
+                        server.ws_send_all({'type': 'wifi_status', 'status': 'saved',
+                                            'ssid': ssid, 'message': 'Gespeichert. Neustart...'})
+                        await asyncio.sleep_ms(2000)
+                        machine.reset()
+                elif msg.get('type') == 'wifi_scan':
+                    server.ws_send_all({'type': 'wifi_networks',
+                                        'networks': wifi.scan_networks()})
 
-        server.check_reboot()
+            server.check_reboot()
 
-        if server._updating and not getattr(server, '_update_task_running', False):
-            server._update_task_running = True
-            asyncio.create_task(_run_update_async(server))
+            if server._updating and not getattr(server, '_update_task_running', False):
+                server._update_task_running = True
+                asyncio.create_task(_run_update_async(server))
 
-        if server._recheck_updates:
-            server._recheck_updates = False
-            asyncio.create_task(update_check(server, wifi))
+            if server._recheck_updates:
+                server._recheck_updates = False
+                asyncio.create_task(update_check(server, wifi))
+        except Exception as e:
+            print(f"  server_loop: {e}")
 
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
@@ -139,6 +145,26 @@ async def server_loop(server, wifi):
             loop_count = 0
 
         await asyncio.sleep_ms(10)
+
+
+async def wifi_monitor(wifi):
+    """Reconnect WiFi if connection drops. Essential for remote deployment."""
+    while True:
+        await asyncio.sleep_ms(30000)
+        if wifi.mode == 'station' and not wifi.sta.isconnected():
+            print("  WiFi verloren, reconnect...")
+            ip = wifi.connect_station()
+            if ip:
+                print(f"  WiFi reconnected: {ip}")
+            else:
+                print("  WiFi reconnect fehlgeschlagen, retry in 30s")
+
+
+async def watchdog_feed(wdt):
+    """Feed hardware watchdog. If asyncio deadlocks, WDT resets device."""
+    while True:
+        wdt.feed()
+        await asyncio.sleep_ms(10000)
 
 
 async def display_loop(tft, ip, mode, joystick, puff, server):
@@ -160,23 +186,24 @@ def _mark_boot_ok():
     try:
         with open(UPDATE_STATE_FILE) as f:
             state = _json.load(f)
-        needs_write = False
-        if state.get('status') == 'pending':
-            # Clean up .bak files from successful update
-            for entry in os.listdir('/'):
-                if entry.endswith('.bak'):
-                    try:
-                        os.remove(entry)
-                    except:
-                        pass
-            print("  Update: Boot OK, Status gesetzt")
-            needs_write = True
-        if state.get('recovery'):
-            print("  Recovery-Warnung zurueckgesetzt")
-            needs_write = True
-        if needs_write:
+        if state.get('status') == 'pending' or state.get('recovery'):
+            # Write state FIRST — if this fails, .bak files remain as safety net
             with open(UPDATE_STATE_FILE, 'w') as f:
                 _json.dump({'status': 'ok'}, f)
+            if state.get('status') == 'pending':
+                print("  Update: Boot OK, Status gesetzt")
+            if state.get('recovery'):
+                print("  Recovery-Warnung zurueckgesetzt")
+            # Clean up .bak files AFTER state is safe
+            try:
+                for entry in os.listdir('/'):
+                    if entry.endswith('.bak'):
+                        try:
+                            os.remove(entry)
+                        except:
+                            pass
+            except:
+                pass
     except (OSError, ValueError):
         pass
 
@@ -190,11 +217,11 @@ async def update_check(server, wifi, initial=False):
     if initial:
         # Wait for WiFi to be fully ready (DNS, routing)
         import socket
-        for _ in range(15):
-            await asyncio.sleep_ms(2000)
+        for _ in range(5):
+            await asyncio.sleep_ms(3000)
             try:
                 socket.getaddrinfo('mundmaus.de', 443)
-                break  # DNS works, network is ready
+                break
             except:
                 pass
     from updater import check_manifest
@@ -281,13 +308,19 @@ async def async_main():
     # Check for OTA updates in background
     asyncio.create_task(update_check(server, wifi, initial=True))
 
+    # Hardware watchdog — resets device if asyncio deadlocks
+    wdt = machine.WDT(timeout=60000)
+    print("  Watchdog: 60s")
+
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
     print("Bereit.\n")
 
     # Launch tasks
+    asyncio.create_task(watchdog_feed(wdt))
     asyncio.create_task(sensor_loop(joystick, puff, server))
     asyncio.create_task(server_loop(server, wifi))
+    asyncio.create_task(wifi_monitor(wifi))
     if tft:
         asyncio.create_task(display_loop(tft, ip, mode, joystick, puff, server))
 

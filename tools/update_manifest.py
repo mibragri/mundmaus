@@ -6,7 +6,8 @@ import json
 from pathlib import Path
 
 # Files that should be in the manifest
-FIRMWARE_EXCLUDES = {'wifi.json', 'versions.json', 'update_state.json',
+FIRMWARE_EXCLUDES = {'boot.py',  # NEVER OTA-update boot.py — it's the safety net
+                     'wifi.json', 'versions.json', 'update_state.json',
                      'deploy.sh', 'pyproject.toml', 'uv.lock'}
 GAME_DIR = 'games'  # Source dir in repo (mapped to www/ on ESP32)
 
