@@ -101,7 +101,7 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
 
     return f"""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MundMaus</title><style>
+<title>MundMaus</title><link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>"><style>
 *{{margin:0;padding:0;box-sizing:border-box}}
 body{{font-family:system-ui,sans-serif;background:#0a1628;color:#e0e0e0;
 min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2em}}
