@@ -224,6 +224,7 @@ async def update_check(server, wifi, initial=False):
                 break
             except:
                 pass
+    gc.collect()
     from updater import check_manifest
     def on_result(result):
         server._update_info = result

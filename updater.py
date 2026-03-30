@@ -232,6 +232,7 @@ def _http_get(url, timeout=5):
     _, _, host, path = url.split('/', 3)
     path = '/' + path
 
+    gc.collect()  # SSL handshake needs ~20KB free RAM
     addr = socket.getaddrinfo(host, 443)[0][-1]
     raw_sock = socket.socket()
     raw_sock.settimeout(timeout)
@@ -297,6 +298,7 @@ def _download_file(fname, dest):
     _, _, host, path = url.split('/', 3)
     path = '/' + path
 
+    gc.collect()  # SSL handshake needs ~20KB free RAM
     addr = socket.getaddrinfo(host, 443)[0][-1]
     raw_sock = socket.socket()
     raw_sock.settimeout(10)
