@@ -216,8 +216,6 @@ class MundMausServer:
         self.http_server = None
         self._pending_reboot = False
         self._update_info = None  # Set by updater after manifest check
-        self._updating = False
-        self._update_task_running = False
 
     def start(self):
         self.http_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -277,13 +275,17 @@ class MundMausServer:
             self._send_json(client, {'ok': True, 'message': 'Neustart...'})
             self._pending_reboot = True
         elif 'POST /api/update/start' in fl:
-            if self._updating:
-                self._send_json(client, {'ok': False, 'error': 'Update laeuft bereits'})
-            elif not self._update_info or not self._update_info.get('available'):
+            if not self._update_info or not self._update_info.get('available'):
                 self._send_json(client, {'ok': False, 'error': 'Keine Updates'})
             else:
-                self._updating = True
-                self._send_json(client, {'ok': True})
+                # Set flag file and reboot — SSL must run outside asyncio
+                try:
+                    with open('_do_update', 'w') as f:
+                        f.write('1')
+                except:
+                    pass
+                self._send_json(client, {'ok': True, 'message': 'Neustart fuer Installation...'})
+                self._pending_reboot = True
         elif f'GET /{WWW_DIR}/' in fl:
             path = fl.split(' ')[1].lstrip('/')
             if '..' not in path and _file_exists(path):
@@ -389,8 +391,6 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
                     msg = {'type': 'update_status'}
                     msg.update(self._update_info)
                     self.ws_send_one(client, msg)
-                if self._updating:
-                    self.ws_send_one(client, {'type': 'update_status', 'updating': True})
             else:
                 client.close()
         except OSError:

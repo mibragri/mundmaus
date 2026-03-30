@@ -4,11 +4,6 @@ import gc
 import json
 import os
 
-try:
-    import asyncio
-except ImportError:
-    import uasyncio as asyncio
-
 from config import OTA_AUTH, OTA_BASE_URL, UPDATE_STATE_FILE, VERSIONS_FILE
 
 
@@ -79,9 +74,10 @@ def check_manifest(notify_cb=None):
     return result
 
 
-async def run_update(available, progress_cb=None, error_cb=None):
+def run_update(available, progress_cb=None, error_cb=None):
     """Download and install updates. Returns (success, message).
     progress_cb(file, current, total) called per file.
+    Synchronous — must run OUTSIDE asyncio (SSL/asyncio conflict on ESP32).
     """
     if not available:
         return True, "Nichts zu aktualisieren"
@@ -109,7 +105,7 @@ async def run_update(available, progress_cb=None, error_cb=None):
             _safe_remove(fname + '.new')
             if error_cb:
                 error_cb(fname, "Download fehlgeschlagen")
-        await asyncio.sleep_ms(0)
+        gc.collect()
 
     # Firmware (all-or-nothing)
     fw_ok = True
@@ -125,7 +121,7 @@ async def run_update(available, progress_cb=None, error_cb=None):
             if error_cb:
                 error_cb(fname, "Download fehlgeschlagen")
             break
-        await asyncio.sleep_ms(0)
+        gc.collect()
 
     if not fw_ok:
         # Clean up ALL firmware .new files
@@ -204,6 +200,10 @@ async def run_update(available, progress_cb=None, error_cb=None):
     if has_firmware:
         msg += ", wird beim naechsten Start aktiv"
     return True, msg
+
+
+# Alias for explicit sync usage
+run_update_sync = run_update
 
 
 # ============================================================

@@ -81,29 +81,6 @@ async def sensor_loop(joystick, puff, server):
         await asyncio.sleep_ms(SENSOR_POLL_MS)
 
 
-async def _run_update_async(server):
-    """Run update in background, yielding to event loop between files."""
-    try:
-        if not server._update_info:
-            return
-        from updater import run_update
-        available = server._update_info.get('available', [])
-        def on_progress(f, cur, tot):
-            server.ws_send_all({'type': 'update_progress', 'file': f, 'current': cur, 'total': tot})
-        def on_error(f, err):
-            server.ws_send_all({'type': 'update_error', 'file': f, 'error': err})
-        ok, msg = await run_update(available, progress_cb=on_progress, error_cb=on_error)
-        server.ws_send_all({'type': 'update_complete',
-                            'firmware_updated': any(u.get('firmware') for u in available),
-                            'message': msg, 'ok': ok})
-    except Exception as e:
-        print(f"  Update-Fehler: {e}")
-        server.ws_send_all({'type': 'update_complete', 'ok': False,
-                            'message': f'Update-Fehler: {e}', 'firmware_updated': False})
-    finally:
-        server._updating = False
-        server._update_info = None
-        server._update_task_running = False
 
 
 async def server_loop(server, wifi):
@@ -128,10 +105,6 @@ async def server_loop(server, wifi):
                                         'networks': wifi.scan_networks()})
 
             server.check_reboot()
-
-            if server._updating and not server._update_task_running:
-                server._update_task_running = True
-                asyncio.create_task(_run_update_async(server))
 
         except Exception as e:
             print(f"  server_loop: {e}")
@@ -303,9 +276,10 @@ async def async_main():
 _update_result = None  # Shared between main() and async_main()
 
 
-def _check_updates_sync():
-    """Run OTA check synchronously BEFORE asyncio starts.
+def _check_and_install_updates_sync():
+    """Run OTA check + install synchronously BEFORE asyncio starts.
     SSL and asyncio conflict on ESP32 — SSL handshake fails inside asyncio loop.
+    ALL network operations must happen here, before asyncio.run().
     """
     global _update_result
     from wifi_manager import WiFiManager
@@ -315,6 +289,16 @@ def _check_updates_sync():
     ip = wifi.connect_station(timeout_ms=15000)
     if not ip:
         return
+
+    # Check if install was requested (flag set by /api/update/start)
+    install_requested = False
+    try:
+        with open('_do_update'):
+            install_requested = True
+        os.remove('_do_update')
+    except:
+        pass
+
     print("\n[Updates]")
     from updater import check_manifest
     for _try in range(2):
@@ -329,6 +313,19 @@ def _check_updates_sync():
             n = len(result.get('available', []))
             print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
             _update_result = result
+
+            # Install if requested
+            if install_requested and n > 0:
+                print("\n[Installation]")
+                available = result.get('available', [])
+                def on_progress(f, cur, tot):
+                    print(f"  {cur}/{tot}: {f}")
+                gc.collect()
+                from updater import run_update_sync
+                ok, msg = run_update_sync(available, progress_cb=on_progress)
+                print(f"  {msg}")
+                if ok:
+                    _update_result = {'available': [], 'offline': False}
             return
         print("  Retry...")
         time.sleep(3)
@@ -338,7 +335,7 @@ def _check_updates_sync():
 def main():
     # WDT before OTA check — protects against hangs during SSL
     wdt = machine.WDT(timeout=120000)
-    _check_updates_sync()
+    _check_and_install_updates_sync()
     wdt.feed()
     try:
         asyncio.run(async_main())
