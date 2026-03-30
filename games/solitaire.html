@@ -79,8 +79,8 @@
   }
 
   .pile-slot {
-    width: 11vw;
-    min-height: 15.4vw;
+    width: 9.5vw;
+    min-height: 13.3vw;
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: var(--card-radius);
     position: relative;
@@ -144,15 +144,15 @@
   }
 
   .tableau-col {
-    width: 11vw;
+    width: 9.5vw;
     position: relative;
     min-height: 20vh;
   }
 
   /* CARDS */
   .card {
-    width: 11vw;
-    height: 15.4vw;
+    width: 9.5vw;
+    height: 13.3vw;
     border-radius: var(--card-radius);
     position: absolute;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -422,7 +422,7 @@
     position: absolute;
     top: 0;
     height: 0.5vw;
-    width: 11vw;
+    width: 9.5vw;
     background: var(--nav-color);
     border-radius: 4px;
     box-shadow: 0 0 10px rgba(255,255,255,0.5);
@@ -438,7 +438,7 @@
 
   /* ===== ACTION COLUMN (right of tableau) ===== */
   .action-col {
-    width: 11vw;
+    width: 9.5vw;
     display: flex;
     flex-direction: column;
     gap: 1vw;
@@ -447,7 +447,7 @@
   }
 
   .action-btn {
-    width: 11vw;
+    width: 9.5vw;
     height: 4.5vw;
     border-radius: var(--card-radius);
     background: rgba(255,255,255,0.06);
@@ -801,7 +801,7 @@ function renderTableau() {
     const col=tableau[ci];
 
     if(!col.length){
-      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:15.4vw;';
+      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:13.3vw;';
       if(navZone==='tableau'&&navCol===ci)slot.classList.add('nav-active');
       if(hintsEnabled&&selectedCard){const cards=getSelCards();if(cards&&cards.length&&cards[0].rank==='K'){slot.classList.add('target');addBadge(slot,'target-mark');}}
       const l=document.createElement('div');l.className='empty-label';l.textContent='K';slot.appendChild(l);cd.appendChild(slot);
