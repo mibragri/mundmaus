@@ -221,7 +221,7 @@ def _fetch_json(url):
         return None
 
 
-def _http_get(url, timeout=5):
+def _http_get(url, timeout=15):
     """Simple HTTPS GET, returns response body as bytes or None."""
     import socket
     try:
@@ -301,7 +301,7 @@ def _download_file(fname, dest):
     gc.collect()  # SSL handshake needs ~20KB free RAM
     addr = socket.getaddrinfo(host, 443)[0][-1]
     raw_sock = socket.socket()
-    raw_sock.settimeout(10)
+    raw_sock.settimeout(20)
     sock = raw_sock
     try:
         raw_sock.connect(addr)
