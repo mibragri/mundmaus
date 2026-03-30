@@ -506,15 +506,15 @@
 <body>
 
 <!-- WS Status -->
-<div id="ws-status" title="ESP32 nicht verbunden"></div>
+<div id="ws-status" title="ESP32 ✗"></div>
 
 <!-- Header -->
 <div id="header">
   <h1>Mund<span>Maus</span> Memo</h1>
   <div class="stat-bar">
-    <div class="stat"><span class="label">Züge:</span> <span class="value" id="moves">0</span></div>
-    <div class="stat"><span class="label">Paare:</span> <span class="value" id="pairs">0</span>/<span class="value" id="total-pairs">0</span></div>
-    <div class="stat"><span class="label">Zeit:</span> <span class="value" id="timer">0:00</span></div>
+    <div class="stat"><span class="label">#</span> <span class="value" id="moves">0</span></div>
+    <div class="stat"><span class="label">🃏</span> <span class="value" id="pairs">0</span>/<span class="value" id="total-pairs">0</span></div>
+    <div class="stat"><span class="label">⏱</span> <span class="value" id="timer">0:00</span></div>
   </div>
 </div>
 
@@ -522,54 +522,54 @@
 <div id="game-area">
   <div id="board"></div>
   <div id="action-col">
-    <div class="action-btn" id="btn-new">↻ Neu</div>
-    <div class="action-btn" id="btn-back" onclick="window.location.href='/'">⬅ Portal</div>
+    <div class="action-btn" id="btn-new"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+    <div class="action-btn" id="btn-back" onclick="window.location.href='/'">🏠</div>
   </div>
 </div>
 
 <!-- Footer (Hilfe) -->
 <div id="footer">
-  <span><kbd>←↑→↓</kbd> Navigieren</span>
-  <span><kbd>Leertaste</kbd> Aufdecken</span>
-  <span><kbd>N</kbd> Neues Spiel</span>
+  <span><kbd>←↑→↓</kbd></span>
+  <span><kbd>⏎</kbd> ●</span>
+  <span><kbd>N</kbd> NEW</span>
   <span><kbd>K</kbd> Kiosk</span>
-  <span><kbd>P</kbd> Portal</span>
+  <span><kbd>P</kbd> 🏠</span>
 </div>
 
 <!-- Schwierigkeitsmenü -->
 <div id="difficulty-menu" class="hidden">
   <h2>🧠 Schwierigkeit wählen</h2>
   <div class="diff-option" data-level="0">
-    <div class="diff-title">Leicht</div>
-    <div class="diff-desc">4 × 3 — 6 Paare</div>
+    <div class="diff-title">🧠</div>
+    <div class="diff-desc">4×3</div>
   </div>
   <div class="diff-option" data-level="1">
-    <div class="diff-title">Mittel</div>
-    <div class="diff-desc">4 × 4 — 8 Paare</div>
+    <div class="diff-title">🧠🧠</div>
+    <div class="diff-desc">4×4</div>
   </div>
   <div class="diff-option" data-level="2">
-    <div class="diff-title">Schwer</div>
-    <div class="diff-desc">6 × 4 — 12 Paare</div>
+    <div class="diff-title">🧠🧠🧠</div>
+    <div class="diff-desc">6×4</div>
   </div>
   <div class="diff-option" data-level="3">
-    <div class="diff-title">Experte</div>
-    <div class="diff-desc">6 × 6 — 18 Paare</div>
+    <div class="diff-title">🧠🧠🧠🧠</div>
+    <div class="diff-desc">6×6</div>
   </div>
 </div>
 
 <!-- Gewonnen -->
 <div id="win-screen" class="hidden">
-  <h2>🎉 Geschafft!</h2>
+  <h2>🎉</h2>
   <div class="win-stars" id="win-stars"></div>
   <div class="win-stats" id="win-stats"></div>
-  <div class="win-btn cursor" id="btn-new-game">Neues Spiel</div>
-  <div class="win-btn" id="btn-same" style="margin-top: 1.5vh;">Nochmal (gleiche Stufe)</div>
+  <div class="win-btn cursor" id="btn-new-game"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+  <div class="win-btn" id="btn-same" style="margin-top: 1.5vh;">⟳</div>
 </div>
 
 <!-- Idle Screen -->
 <div id="idle-screen" class="hidden">
   <h2>🧠 MundMaus Memo</h2>
-  <p>Pusten zum Starten</p>
+  <p>⏎</p>
 </div>
 
 <script>
@@ -579,24 +579,24 @@
 
 // ── Symbole: Form + Farbe + Text-Label (3-fach kodiert, farbenblindheit-sicher) ──
 const SYMBOLS = [
-  { emoji: '★',  label: 'Stern',    color: '#c03030' },
-  { emoji: '♦',  label: 'Diamant',  color: '#8a7000' },
-  { emoji: '●',  label: 'Kreis',    color: '#2d7a3a' },
-  { emoji: '▲',  label: 'Dreieck',  color: '#2060c0' },
-  { emoji: '■',  label: 'Quadrat',  color: '#a85800' },
-  { emoji: '♥',  label: 'Herz',     color: '#8b30a8' },
+  { emoji: '★',  label: 'Star',     color: '#c03030' },
+  { emoji: '♦',  label: 'Diamond',  color: '#8a7000' },
+  { emoji: '●',  label: 'Circle',   color: '#2d7a3a' },
+  { emoji: '▲',  label: 'Triangle', color: '#2060c0' },
+  { emoji: '■',  label: 'Square',   color: '#a85800' },
+  { emoji: '♥',  label: 'Heart',    color: '#8b30a8' },
   { emoji: '⬟',  label: 'Pentagon', color: '#0a7a58' },
-  { emoji: '✦',  label: 'Funkel',   color: '#b03060' },
-  { emoji: '◆',  label: 'Raute',    color: '#1a5fa0' },
-  { emoji: '▼',  label: 'Pfeil',    color: '#9a5500' },
+  { emoji: '✦',  label: 'Sparkle',  color: '#b03060' },
+  { emoji: '◆',  label: 'Rhombus',  color: '#1a5fa0' },
+  { emoji: '▼',  label: 'Arrow',    color: '#9a5500' },
   { emoji: '⬣',  label: 'Hexagon',  color: '#7a2898' },
-  { emoji: '⊕',  label: 'Ziel',     color: '#0a7058' },
-  { emoji: '◈',  label: 'Juwel',    color: '#882898' },
-  { emoji: '⬢',  label: 'Wabe',     color: '#8a6800' },
-  { emoji: '☆',  label: 'Hohlstern',color: '#b03030' },
-  { emoji: '◐',  label: 'Halbmond', color: '#3050a0' },
-  { emoji: '♣',  label: 'Kreuz',    color: '#1a6830' },
-  { emoji: '♠',  label: 'Pik',      color: '#5a30a0' },
+  { emoji: '⊕',  label: 'Target',   color: '#0a7058' },
+  { emoji: '◈',  label: 'Jewel',    color: '#882898' },
+  { emoji: '⬢',  label: 'Hive',     color: '#8a6800' },
+  { emoji: '☆',  label: 'Outline',  color: '#b03030' },
+  { emoji: '◐',  label: 'Crescent', color: '#3050a0' },
+  { emoji: '♣',  label: 'Club',     color: '#1a6830' },
+  { emoji: '♠',  label: 'Spade',    color: '#5a30a0' },
 ];
 
 const LEVELS = [
@@ -1042,7 +1042,7 @@ function wsConnect() {
 
     ws.onopen = () => {
       $wsStatus.className = 'connected';
-      $wsStatus.title = 'ESP32 verbunden';
+      $wsStatus.title = 'ESP32 ✓';
       wsBackoff = WS_BACKOFF_INIT; // reset on success
     };
 
@@ -1069,7 +1069,7 @@ function wsConnect() {
 
     ws.onclose = () => {
       $wsStatus.className = '';
-      $wsStatus.title = 'ESP32 nicht verbunden';
+      $wsStatus.title = 'ESP32 ✗';
       ws = null;
       if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
       wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
