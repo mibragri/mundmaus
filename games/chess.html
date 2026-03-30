@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MundMaus Schach</title>
+<title>MundMaus Chess</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
 <style>
   /* ═══════════════════════════════════════════════════════════
@@ -523,6 +523,18 @@
     color: var(--text-dim);
   }
 
+  /* ── Turn indicator spin ────────────────────── */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+  }
+  #status-text .spin {
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+    margin-left: 0.3em;
+    font-style: normal;
+  }
+
   /* ── Kiosk ──────────────────────────────────── */
   body.kiosk #footer { display: none; }
   body.kiosk { cursor: none; }
@@ -550,8 +562,8 @@
 <div id="ws-status" title="ESP32 nicht verbunden"></div>
 
 <div id="header">
-  <h1>Mund<span>Maus</span> Schach</h1>
-  <span id="status-text">Weiß am Zug</span>
+  <h1>Mund<span>Maus</span> Chess</h1>
+  <span id="status-text">⚪</span>
   <div class="stat-bar">
     <div class="stat"><span class="label">Züge:</span> <span class="value" id="move-num">1</span></div>
   </div>
@@ -567,20 +579,20 @@
       <div class="file-labels" id="file-labels"></div>
     </div>
     <div id="action-col">
-      <div class="action-btn disabled" id="btn-undo" data-btn="0">↩ Zurück</div>
-      <div class="action-btn" id="btn-new" data-btn="1">↻ Neu</div>
-      <div class="action-btn" id="btn-back" data-btn="2" onclick="window.location.href='/'">⬅ Portal</div>
+      <div class="action-btn disabled" id="btn-undo" data-btn="0">↩</div>
+      <div class="action-btn" id="btn-new" data-btn="1"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+      <div class="action-btn" id="btn-back" data-btn="2" onclick="window.location.href='/'">🏠</div>
     </div>
   </div>
 </div>
 
 <div id="footer">
-  <span><kbd>←↑→↓</kbd> Navigieren</span>
-  <span><kbd>Leertaste</kbd> Auswählen/Ziehen</span>
-  <span><kbd>N</kbd> Neues Spiel</span>
-  <span><kbd>U</kbd> Rückgängig</span>
+  <span><kbd>←↑→↓</kbd></span>
+  <span><kbd>⏎</kbd> <kbd>●</kbd></span>
+  <span><kbd>N</kbd> <span style="border:1px solid currentColor;border-radius:3px;padding:0 4px;font-size:.85em;font-weight:900;letter-spacing:1px">NEW</span></span>
+  <span><kbd>U</kbd> ↩</span>
   <span><kbd>K</kbd> Kiosk</span>
-  <span><kbd>P</kbd> Portal</span>
+  <span><kbd>P</kbd> 🏠</span>
 </div>
 
 <div id="promo-overlay" class="hidden">
@@ -598,10 +610,10 @@
 
 <div id="diff-menu">
   <h2>♟ Schwierigkeit</h2>
-  <div class="diff-opt" data-d="1"><div class="dt">Anfänger</div><div class="dd">Zufällige Züge</div></div>
-  <div class="diff-opt" data-d="2"><div class="dt">Leicht</div><div class="dd">Denkt 2 Züge voraus</div></div>
-  <div class="diff-opt" data-d="3"><div class="dt">Mittel</div><div class="dd">Denkt 3 Züge voraus</div></div>
-  <div class="diff-opt" data-d="4"><div class="dt">Schwer</div><div class="dd">Denkt 4 Züge voraus</div></div>
+  <div class="diff-opt" data-d="1"><div class="dt">🧠</div></div>
+  <div class="diff-opt" data-d="2"><div class="dt">🧠🧠</div></div>
+  <div class="diff-opt" data-d="3"><div class="dt">🧠🧠🧠</div></div>
+  <div class="diff-opt" data-d="4"><div class="dt">🧠🧠🧠🧠</div></div>
 </div>
 
 <div id="thinking" class="hidden">
@@ -1304,11 +1316,11 @@ function updateStatus() {
   }
 
   if (inCheck) {
-    $statusText.textContent = (game.turn === W ? 'Weiß' : 'Schwarz') + ' im Schach!';
+    $statusText.innerHTML = (game.turn === W ? '⚪' : '⚫');
     $statusText.className = 'check';
     sndCheck();
   } else {
-    $statusText.textContent = (game.turn === W ? 'Weiß' : 'Schwarz') + ' am Zug';
+    $statusText.innerHTML = (game.turn === W ? '⚪' : '⚫');
     $statusText.className = '';
   }
 }
@@ -1488,7 +1500,7 @@ function deselect() {
 function scheduleAI() {
   if (game.turn !== B || ui.phase !== 'playing') return;
 
-  $statusText.textContent = 'Schwarz denkt...';
+  $statusText.innerHTML = '⚫ <i class="spin">⟳</i>';
   $thinking.classList.remove('hidden');
 
   setTimeout(() => {
