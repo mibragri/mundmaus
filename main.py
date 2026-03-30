@@ -306,8 +306,31 @@ async def async_main():
     # Mark boot successful (rollback protection)
     _mark_boot_ok()
 
-    # Check for OTA updates in background
-    asyncio.create_task(update_check(server, wifi, initial=True))
+    # Check for OTA updates BEFORE launching tasks (SSL needs max RAM)
+    if wifi.mode == 'station':
+        print("\n[Updates]")
+        gc.collect()
+        print(f"  RAM vor Check: {gc.mem_free()}")
+        import socket as _sock
+        for _try in range(5):
+            await asyncio.sleep_ms(3000)
+            try:
+                _sock.getaddrinfo('mundmaus.de', 443)
+                print("  DNS OK")
+                from updater import check_manifest
+                result = check_manifest()
+                server._update_info = result
+                n = len(result.get('available', []))
+                if result.get('offline'):
+                    print("  Offline")
+                elif n:
+                    print(f"  {n} Update(s) verfuegbar")
+                else:
+                    print("  Alles aktuell")
+                break
+            except Exception:
+                pass
+        gc.collect()
 
     # Hardware watchdog — resets device if asyncio deadlocks
     wdt = machine.WDT(timeout=60000)
