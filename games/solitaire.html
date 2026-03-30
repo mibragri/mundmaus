@@ -844,7 +844,7 @@ function renderTableau() {
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
   const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
-  const actLabels=[hintsEnabled?'? ✔':'?','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠'];
+  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠'];
   const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
   for(let i=0;i<3;i++){
     const btn=document.createElement('div');btn.className='action-btn';
