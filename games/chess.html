@@ -1604,7 +1604,7 @@ document.addEventListener('keydown', e => {
     case 'ArrowDown':  e.preventDefault(); navigate('down'); break;
     case ' ':
     case 'Enter':      e.preventDefault(); action(); break;
-    case 'Escape':     deselect(); break;
+    case 'Escape':     if (ui.selected) { deselect(); } else { window.location.href = '/'; return; } break;
     case 'u': case 'U': undo(); break;
     case 'n': case 'N': showDiffMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;

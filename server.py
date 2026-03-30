@@ -163,6 +163,10 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <span title="Joystick: {'verbunden' if hw_status and hw_status.get('joystick') else 'nicht angeschlossen'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('joystick') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'}"></span>Joystick</span>
 <span title="Drucksensor: {'verbunden' if hw_status and hw_status.get('puff') else 'nicht angeschlossen'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('puff') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'}"></span>Puff</span>
 <span id="ws-chip" title="Geraet erreichbar" style="display:inline-flex;align-items:center;gap:4px;background:rgba(212,42,42,.15);border:1px solid #d42a2a;border-radius:12px;padding:2px 10px;font-size:.8em"><span id="ws-dot" style="width:6px;height:6px;border-radius:50%;background:#d42a2a"></span><span id="ws-text">Nicht erreichbar</span></span></div>
+<div style="margin-top:1em;color:#546e7a;font-size:.8em">
+<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#8592;&#8593;&#8594;&#8595;</kbd> Navigieren
+<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">Leertaste</kbd> Auswaehlen
+</div>
 <script>
 async function sc(){{document.getElementById('wm').textContent='Suche Netzwerke...';try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
 s.innerHTML='<option>-- waehlen --</option>';

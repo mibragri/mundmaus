@@ -49,7 +49,6 @@
     width: 100vw;
     -webkit-user-select: none;
     user-select: none;
-    cursor: none;
   }
 
   body::before {
@@ -309,7 +308,7 @@
   }
   .stat { display: flex; align-items: center; gap: 0.5vw; }
   .stat .label { color: var(--text-dim); }
-  .stat .value { font-weight: 700; color: var(--highlight); }
+  .stat .value { font-weight: 700; color: var(--highlight); font-variant-numeric: tabular-nums; }
 
   #auto-hint { font-size: 1.8vh; color: var(--highlight); }
 
@@ -478,9 +477,9 @@
   }
 
   /* ===== KIOSK MODE ===== */
-  body.kiosk-mode { cursor: none !important; }
-  body.kiosk-mode #footer { display: none; }
-  body.kiosk-mode #kiosk-status { display: flex; }
+  body.kiosk { cursor: none !important; }
+  body.kiosk #footer { display: none; }
+  body.kiosk #kiosk-status { display: flex; }
 
   #kiosk-status {
     display: none;
@@ -571,6 +570,7 @@
 <div id="footer">
   <span><kbd>←↑→↓</kbd> Navigieren</span>
   <span><kbd>Leertaste</kbd> Auswählen/Ablegen</span>
+  <span><kbd>U</kbd> Rückgängig</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
   <span><kbd>B</kbd> Portal</span>
@@ -656,7 +656,7 @@ function _isFullscreen() {
 }
 function toggleKiosk() {
   kioskMode=!kioskMode;
-  document.body.classList.toggle('kiosk-mode',kioskMode);
+  document.body.classList.toggle('kiosk',kioskMode);
   if(kioskMode){resetIdleTimer();try{_requestFullscreen();}catch(e){}}
   else{clearIdleTimer();hideIdle();try{if(_isFullscreen())_exitFullscreen();}catch(e){}}
 }
@@ -969,6 +969,7 @@ document.addEventListener('keydown',(e)=>{
     case'ArrowUp':navigate('up');break;case'ArrowDown':navigate('down');break;
     case' ':case'Enter':e.preventDefault();if(!e.repeat)doPuff();break;
     case'Backspace':e.preventDefault();if(!e.repeat){doUndo();render();updateStatus();}break;
+    case'u':case'U':doUndo();render();updateStatus();break;
     case'n':initGame();break;
     case'k':case'K':toggleKiosk();break;
     case'b':case'B':window.location.href='/';return;
@@ -980,7 +981,8 @@ document.addEventListener('keydown',(e)=>{
 // WEBSOCKET - ESP32 Connection
 // ============================================================
 
-let ws=null,wsReconnectTimer=null;
+let ws=null;
+let wsBackoff=3000;
 
 function connectWebSocket() {
   const host=location.hostname===''||location.hostname==='localhost'?'localhost':location.hostname;
@@ -990,14 +992,14 @@ function connectWebSocket() {
     ws.onopen=()=>{
       console.log('ESP32 connected');
       updateWs(true);
-      if(wsReconnectTimer){clearInterval(wsReconnectTimer);wsReconnectTimer=null;}
+      wsBackoff=3000;
     };
     ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
       if(m.type==='nav')navigate(m.dir);
       else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':doPuff();break;case'press':doUndo();render();updateStatus();break;case'new_game':initGame();break;}}
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
-    ws.onclose=()=>{console.log('WS disconnected');updateWs(false);if(!wsReconnectTimer)wsReconnectTimer=setInterval(connectWebSocket,3000);};
+    ws.onclose=()=>{console.log('WS disconnected');updateWs(false);setTimeout(connectWebSocket,wsBackoff);wsBackoff=Math.min(wsBackoff*2,30000);};
     ws.onerror=()=>ws.close();
   }catch(e){console.log('WS not available');updateWs(false);}
 }
