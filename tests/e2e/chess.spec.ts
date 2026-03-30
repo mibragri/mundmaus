@@ -17,7 +17,7 @@ test.describe('Chess', () => {
   test('2. portal button visible in action column', async ({ page }) => {
     const portalBtn = page.locator('#btn-back');
     await expect(portalBtn).toBeVisible();
-    await expect(portalBtn).toContainText('Portal');
+    await expect(portalBtn).toContainText('🏠');
   });
 
   test('3. P key navigates to portal', async ({ page }) => {

@@ -44,7 +44,7 @@ test.describe('Memo', () => {
     // Portal button in action column
     const portalBtn = page.locator('#btn-back');
     await expect(portalBtn).toBeVisible();
-    await expect(portalBtn).toContainText('Portal');
+    await expect(portalBtn).toContainText('🏠');
   });
 
   test('4. P key navigates to portal', async ({ page }) => {
@@ -64,8 +64,8 @@ test.describe('Memo', () => {
       await expect(kbd.first()).toBeVisible();
     }
 
-    const spaceHint = footer.locator('kbd', { hasText: 'Leertaste' });
-    await expect(spaceHint).toBeVisible();
+    const enterHint = footer.locator('kbd', { hasText: '⏎' });
+    await expect(enterHint).toBeVisible();
   });
 
   test('6. title says Memo not Memory', async ({ page }) => {

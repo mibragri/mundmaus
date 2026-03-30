@@ -40,7 +40,7 @@ test.describe('Portal (ESP32 root)', () => {
     await expect(joystickChip).toBeVisible();
     await expect(joystickChip).toContainText('Joystick');
 
-    const puffChip = page.locator('span[title*="Drucksensor"]');
+    const puffChip = page.locator('span[title*="Puff"]');
     await expect(puffChip).toBeVisible();
     await expect(puffChip).toContainText('Puff');
 
@@ -60,7 +60,7 @@ test.describe('Portal (ESP32 root)', () => {
     await expect(wsDot).toHaveCSS('background-color', 'rgb(76, 175, 80)', { timeout: 15_000 });
 
     const wsText = page.locator('#ws-text');
-    await expect(wsText).toContainText('Erreichbar');
+    await expect(wsText).toContainText('✓');
   });
 
   test('7. keyboard nav: arrow keys move highlight between game buttons', async ({ page }) => {
@@ -118,8 +118,8 @@ test.describe('Portal (ESP32 root)', () => {
     const arrowHint = page.locator('kbd', { hasText: /[←↑→↓]/ });
     await expect(arrowHint.first()).toBeVisible();
 
-    // Leertaste hint
-    const spaceHint = page.locator('kbd', { hasText: 'Leertaste' });
+    // Enter/Return hint (⏎ = &#9166;)
+    const spaceHint = page.locator('kbd', { hasText: '⏎' });
     await expect(spaceHint).toBeVisible();
   });
 });

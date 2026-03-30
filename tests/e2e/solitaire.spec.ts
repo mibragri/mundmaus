@@ -17,18 +17,17 @@ test.describe('Solitaire', () => {
     expect(count).toBeGreaterThan(0);
   });
 
-  test('2. three action buttons visible (Hilfe, Neu, Portal)', async ({ page }) => {
+  test('2. four action buttons visible (💡, NEW, 🏠, kiosk)', async ({ page }) => {
     const actionCol = page.locator('.action-col');
     await expect(actionCol).toBeVisible({ timeout: 15_000 });
 
-    const hilfeBtn = actionCol.locator(':has-text("Hilfe")').first();
-    await expect(hilfeBtn).toBeVisible();
+    // 4 action buttons: hints, new game, portal, kiosk
+    const actionBtns = actionCol.locator('.action-btn');
+    await expect(actionBtns).toHaveCount(4);
 
-    const neuBtn = actionCol.locator(':has-text("Neu")').first();
-    await expect(neuBtn).toBeVisible();
-
-    const portalBtn = actionCol.locator(':has-text("Portal")').first();
-    await expect(portalBtn).toBeVisible();
+    // Home/portal button contains 🏠
+    const homeBtn = actionCol.locator('.action-btn', { hasText: '🏠' });
+    await expect(homeBtn).toBeVisible();
   });
 
   test('3. P key navigates to portal', async ({ page }) => {
@@ -45,8 +44,9 @@ test.describe('Solitaire', () => {
     const undoHint = footer.locator('kbd', { hasText: 'U' });
     await expect(undoHint.first()).toBeVisible();
 
+    // Footer shows ↩ icon for undo (icon-based UI, no German text)
     const footerText = await footer.textContent();
-    expect(footerText).toContain('ckgängig');
+    expect(footerText).toContain('↩');
   });
 
   test('5. mouse cursor visible (not hidden)', async ({ page }) => {
@@ -77,7 +77,7 @@ test.describe('Solitaire', () => {
       await expect(kbd.first()).toBeVisible();
     }
 
-    const spaceHint = footer.locator('kbd', { hasText: 'Leertaste' });
-    await expect(spaceHint).toBeVisible();
+    const enterHint = footer.locator('kbd', { hasText: '⏎' });
+    await expect(enterHint).toBeVisible();
   });
 });

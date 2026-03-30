@@ -53,8 +53,8 @@ test.describe('Cross-game consistency', () => {
       const arrowHint = footer.locator('kbd', { hasText: /[←↑→↓]/ });
       await expect(arrowHint.first(), `${game.name} arrow keys`).toBeVisible();
 
-      const spaceHint = footer.locator('kbd', { hasText: 'Leertaste' });
-      await expect(spaceHint, `${game.name} Leertaste`).toBeVisible();
+      const enterHint = footer.locator('kbd', { hasText: '⏎' });
+      await expect(enterHint, `${game.name} ⏎ enter`).toBeVisible();
       await page.waitForTimeout(1500);
     }
   });
