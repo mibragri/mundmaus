@@ -133,9 +133,6 @@ async def server_loop(server, wifi):
                 server._update_task_running = True
                 asyncio.create_task(_run_update_async(server))
 
-            if server._recheck_updates:
-                server._recheck_updates = False
-                asyncio.create_task(update_check(server, wifi))
         except Exception as e:
             print(f"  server_loop: {e}")
 
@@ -206,22 +203,6 @@ def _mark_boot_ok():
                 pass
     except (OSError, ValueError):
         pass
-
-
-async def update_check(server, wifi):
-    """Re-check for updates (triggered by user via portal). Non-blocking."""
-    if wifi.mode != 'station':
-        server._update_info = {'available': [], 'offline': True}
-        server.ws_send_all({'type': 'update_status', 'available': [], 'offline': True})
-        return
-    gc.collect()
-    from updater import check_manifest
-    def on_result(result):
-        server._update_info = result
-        msg = {'type': 'update_status'}
-        msg.update(result)
-        server.ws_send_all(msg)
-    check_manifest(notify_cb=on_result)
 
 
 async def async_main():
