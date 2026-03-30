@@ -161,9 +161,9 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <button class="rb" onclick="rb()">Neustart</button>
 <div class="i">{wifi_ip} &nbsp;|&nbsp; {BOARD} &nbsp;|&nbsp; v{VERSION}
 &nbsp;|&nbsp; RAM: {gc.mem_free()//1024}KB
-&nbsp;|&nbsp; <span title="Joystick: {'verbunden' if hw_status and hw_status.get('joystick') else 'nicht angeschlossen'}" style="cursor:help"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'};vertical-align:middle"></span> Joystick</span>
-&nbsp;|&nbsp; <span title="Drucksensor: {'verbunden' if hw_status and hw_status.get('puff') else 'nicht angeschlossen'}" style="cursor:help"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'};vertical-align:middle"></span> Puff</span>
-&nbsp;|&nbsp; <span title="WebSocket: Echtzeit-Verbindung" style="cursor:help"><span id="ws-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d42a2a;vertical-align:middle"></span> Live</span></div>
+&nbsp;|&nbsp; <span title="Joystick: {'verbunden' if hw_status and hw_status.get('joystick') else 'nicht angeschlossen'}" style="cursor:default"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'};vertical-align:middle"></span> Joystick</span>
+&nbsp;|&nbsp; <span title="Drucksensor: {'verbunden' if hw_status and hw_status.get('puff') else 'nicht angeschlossen'}" style="cursor:default"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'};vertical-align:middle"></span> Puff</span>
+&nbsp;|&nbsp; <span title="Verbindung zum Geraet" style="cursor:default"><span id="ws-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#d42a2a;vertical-align:middle"></span> Verbunden</span></div>
 <script>
 async function sc(){{try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
 s.innerHTML='<option>-- waehlen --</option>';
