@@ -584,6 +584,7 @@
       <div class="action-btn disabled" id="btn-undo" data-btn="0">↩</div>
       <div class="action-btn" id="btn-new" data-btn="1"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
       <div class="action-btn" id="btn-back" data-btn="2" onclick="window.location.href='/'">🏠</div>
+      <div class="action-btn" id="btn-kiosk" data-btn="3"><span style="display:inline-grid;grid-template-columns:1fr 1fr;width:.8em;height:.8em;line-height:.9;font-size:.7em">↖↗↙↘</span></div>
     </div>
   </div>
 </div>
@@ -1434,6 +1435,7 @@ function action() {
     if (ui.btnCursor === 0) undo();
     else if (ui.btnCursor === 1) showDiffMenu();
     else if (ui.btnCursor === 2) window.location.href = '/';
+    else if (ui.btnCursor === 3) toggleKiosk();
     return;
   }
 

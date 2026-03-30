@@ -845,10 +845,10 @@ function renderTableau() {
   // Action column (Help + New Game)
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
-  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
-  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠'];
-  const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
-  for(let i=0;i<3;i++){
+  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,3)):-1;
+  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠','<span style="display:inline-grid;grid-template-columns:1fr 1fr;width:.8em;height:.8em;line-height:.9;font-size:.7em">↖↗↙↘</span>'];
+  const actFns=[toggleHints,initGame,()=>{window.location.href='/';},toggleKiosk];
+  for(let i=0;i<4;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
     if(i===0&&hintsEnabled)btn.classList.add('active');
@@ -908,7 +908,7 @@ function navigate(dir) {
     } else if(dir==='down'&&navZone==='top'){
       navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx<2){navCardIdx++;sndNav();}render();return;}
+      if(navCol===7){if(navCardIdx<3){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur<end){navCardIdx=cur+1;sndNav();}}
     }
@@ -921,7 +921,7 @@ function doPuff() {
   if(document.getElementById('idle-overlay').classList.contains('visible')){hideIdle();initGame();return;}
   if(gameWon){initGame();return;}
   if(navZone==='top'&&navCol===0){drawFromStock();selectedCard=null;render();return;}
-  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';return;}
+  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';else if(ai===3)toggleKiosk();return;}
   if(!selectedCard){selectCurrentCard();return;}
   if(isSamePos(selectedCard,navZone,navCol)){selectedCard=null;sndNav();render();return;}
   placeSelectedCard();

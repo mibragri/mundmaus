@@ -526,6 +526,7 @@
   <div id="action-col">
     <div class="action-btn" id="btn-new"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
     <div class="action-btn" id="btn-back" onclick="window.location.href='/'">🏠</div>
+    <div class="action-btn" id="btn-kiosk"><span style="display:inline-grid;grid-template-columns:1fr 1fr;width:.8em;height:.8em;line-height:.9;font-size:.7em">↖↗↙↘</span></div>
   </div>
 </div>
 
@@ -678,7 +679,8 @@ const $idleScreen = document.getElementById('idle-screen');
 const $wsStatus = document.getElementById('ws-status');
 const $btnNew = document.getElementById('btn-new');
 const $btnBack = document.getElementById('btn-back');
-const $actionBtns = [$btnNew, $btnBack];
+const $btnKiosk = document.getElementById('btn-kiosk');
+const $actionBtns = [$btnNew, $btnBack, $btnKiosk];
 
 // ── Shuffle ──────────────────────────────────────────────
 function shuffle(arr) {
@@ -872,6 +874,7 @@ function action() {
   if (state.inBtnCol) {
     if (state.btnIdx === 0) { showMenu(); sndFlip(); }
     else if (state.btnIdx === 1) { window.location.href = '/'; }
+    else if (state.btnIdx === 2) { toggleKiosk(); }
     return;
   }
 
