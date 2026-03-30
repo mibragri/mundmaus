@@ -573,6 +573,7 @@
   <span><kbd>Leertaste</kbd> Auswählen/Ablegen</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>B</kbd> Portal</span>
 </div>
 
 <div id="kiosk-status">
@@ -842,8 +843,8 @@ function renderTableau() {
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
   const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,1)):-1;
-  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu'];
-  const actFns=[toggleHints,initGame];
+  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu','⬅ Portal'];
+  const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
   for(let i=0;i<2;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
@@ -970,6 +971,8 @@ document.addEventListener('keydown',(e)=>{
     case'Backspace':e.preventDefault();if(!e.repeat){doUndo();render();updateStatus();}break;
     case'n':initGame();break;
     case'k':case'K':toggleKiosk();break;
+    case'b':case'B':window.location.href='/';return;
+    case'Escape':window.location.href='/';return;
   }
 });
 

@@ -523,6 +523,7 @@
   <div id="board"></div>
   <div id="action-col">
     <div class="action-btn" id="btn-new">↻ Neu</div>
+    <div class="action-btn" id="btn-back" onclick="window.location.href='/'">⬅ Portal</div>
   </div>
 </div>
 
@@ -532,6 +533,7 @@
   <span><kbd>Leertaste</kbd> Aufdecken</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>B</kbd> Portal</span>
 </div>
 
 <!-- Schwierigkeitsmenü -->
@@ -1009,6 +1011,8 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'n': case 'N': showMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;
+    case 'b': case 'B': window.location.href = '/'; return;
+    case 'Escape': window.location.href = '/'; return;
   }
 });
 
