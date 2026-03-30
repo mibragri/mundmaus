@@ -56,6 +56,10 @@ def _rollback():
             if entry.endswith('.bak'):
                 orig = entry[:-4]
                 try:
+                    try:
+                        os.remove(orig)
+                    except:
+                        pass
                     os.rename(entry, orig)
                     count += 1
                     print(f"  Rollback: {entry} -> {orig}")

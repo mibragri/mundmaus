@@ -129,7 +129,7 @@ async def server_loop(server, wifi):
 
             server.check_reboot()
 
-            if server._updating and not getattr(server, '_update_task_running', False):
+            if server._updating and not server._update_task_running:
                 server._update_task_running = True
                 asyncio.create_task(_run_update_async(server))
 
@@ -208,22 +208,12 @@ def _mark_boot_ok():
         pass
 
 
-async def update_check(server, wifi, initial=False):
-    """Check for updates in background. Non-blocking."""
+async def update_check(server, wifi):
+    """Re-check for updates (triggered by user via portal). Non-blocking."""
     if wifi.mode != 'station':
         server._update_info = {'available': [], 'offline': True}
         server.ws_send_all({'type': 'update_status', 'available': [], 'offline': True})
         return
-    if initial:
-        # Wait for WiFi to be fully ready (DNS, routing)
-        import socket
-        for _ in range(5):
-            await asyncio.sleep_ms(3000)
-            try:
-                socket.getaddrinfo('mundmaus.de', 443)
-                break
-            except:
-                pass
     gc.collect()
     from updater import check_manifest
     def on_result(result):
@@ -310,9 +300,8 @@ async def async_main():
     # Mark boot successful (rollback protection)
     _mark_boot_ok()
 
-    # Hardware watchdog — resets device if asyncio deadlocks
+    # Hardware watchdog (already started in main(), get reference)
     wdt = machine.WDT(timeout=60000)
-    print("  Watchdog: 60s")
 
     gc.collect()
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
@@ -347,10 +336,14 @@ def _check_updates_sync():
         return
     print("\n[Updates]")
     from updater import check_manifest
-    for _try in range(3):
+    for _try in range(2):
         gc.collect()
-        print(f"  Versuch {_try + 1}/3 (RAM={gc.mem_free()})")
-        result = check_manifest()
+        print(f"  Versuch {_try + 1}/2 (RAM={gc.mem_free()})")
+        try:
+            result = check_manifest()
+        except Exception as e:
+            print(f"  Fehler: {e}")
+            result = {'available': [], 'offline': True}
         if not result.get('offline'):
             n = len(result.get('available', []))
             print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
@@ -358,11 +351,14 @@ def _check_updates_sync():
             return
         print("  Retry...")
         time.sleep(3)
-    _update_result = result  # Last result, even if offline
+    _update_result = result
 
 
 def main():
+    # WDT before OTA check — protects against hangs during SSL
+    wdt = machine.WDT(timeout=60000)
     _check_updates_sync()
+    wdt.feed()
     try:
         asyncio.run(async_main())
     except KeyboardInterrupt:

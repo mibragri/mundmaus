@@ -205,6 +205,7 @@ class MundMausServer:
         self._pending_reboot = False
         self._update_info = None  # Set by updater after manifest check
         self._updating = False
+        self._update_task_running = False
         self._recheck_updates = False
 
     def start(self):
