@@ -192,8 +192,8 @@ else if(d.type==='update_complete'){{document.getElementById('upd-progress').sty
 else if(d.type==='update_error'){{document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}}
 else if(d.type==='nav'&&_navItems.length){{if(d.dir==='right'||d.dir==='down'){{_navIdx=Math.min(_navItems.length-1,_navIdx+1)}}else if(d.dir==='left'||d.dir==='up'){{_navIdx=Math.max(0,_navIdx-1)}}  _navUpdate()}}
 else if(d.type==='action'&&_navItems.length){{_navItems[_navIdx].click()}}}};}}connectWS();
-fetch('/api/updates').then(r=>r.json()).then(d=>{{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='Keine Internetverbindung';btn.textContent='Neustart zum Pruefen';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='Wird geprueft...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML=d.available.length+' Verbesserung'+(d.available.length>1?'en':'')+' verfuegbar';btn.textContent='Jetzt installieren';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='Alles auf dem neuesten Stand';btn.style.display='none'}}}}).catch(()=>{{}});
-async function startUpdate(){{document.getElementById('upd-info').textContent='Wird installiert...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
+fetch('/api/updates').then(r=>r.json()).then(d=>{{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='\u2717 Offline';btn.textContent='\u21bb Restart';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='\ud83d\udd0d...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML='\u2b07 '+d.available.length+' update'+(d.available.length>1?'s':'');btn.textContent='\u2b07 Install';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='\u2713 Up to date';btn.style.display='none'}}}}).catch(()=>{{}});
+async function startUpdate(){{document.getElementById('upd-info').textContent='\u2b07...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
 let _navIdx=0;const _navItems=document.querySelectorAll('.g');
 function _navUpdate(){{_navItems.forEach((el,i)=>{{el.style.border=i===_navIdx?'2px solid #FFD700':'2px solid rgba(255,215,0,.3)';el.style.boxShadow=i===_navIdx?'0 0 20px rgba(255,215,0,.5)':'none'}})}}
 if(_navItems.length)_navUpdate();
@@ -349,19 +349,19 @@ border-radius:6px;font-size:18px;font-weight:bold;cursor:pointer}}
 </style></head><body><div class="b">
 <h1>MundMaus</h1>
 <p>{BOARD} - v{VERSION}</p>
-<button id="sb" onclick="sc()">Netzwerke suchen</button>
+<button id="sb" onclick="sc()">&#128269; Scan</button>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
-<input id="si" placeholder="WLAN Name (SSID)">
-<input id="pw" type="password" placeholder="Passwort">
-<button onclick="sv()">Verbinden</button>
+<input id="si" placeholder="SSID">
+<input id="pw" type="password" placeholder="Passwort / Password">
+<button onclick="sv()">Connect</button>
 <div class="s" id="st">IP: {self.wifi.ip}</div></div>
 <script>
 async function sc(){{document.getElementById('sb').textContent='...';
 try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
-s.innerHTML='<option>-- waehlen --</option>';
+s.innerHTML='<option>-- select --</option>';
 d.networks.forEach(n=>{{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)}});
 s.style.display='block'}}catch(e){{document.getElementById('st').textContent='Fehler'}}
-document.getElementById('sb').textContent='Suchen'}}
+document.getElementById('sb').textContent='\ud83d\udd0d Scan'}}
 async function sv(){{const s=document.getElementById('si').value,p=document.getElementById('pw').value;
 if(!s)return alert('SSID!');document.getElementById('st').textContent='Speichere...';
 try{{const r=await fetch('/api/wifi',{{method:'POST',headers:{{'Content-Type':'application/json'}},
