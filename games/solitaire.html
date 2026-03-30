@@ -846,7 +846,7 @@ function renderTableau() {
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
   const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,3)):-1;
-  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠','<span style="display:inline-grid;grid-template-columns:1fr 1fr;width:.8em;height:.8em;line-height:.9;font-size:.7em">↖↗↙↘</span>'];
+  const actLabels=[hintsEnabled?'💡 ✔':'💡','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠','<span style="display:inline-grid;grid-template-columns:1fr 1fr;width:1.2em;height:1.2em;line-height:1;font-size:.55em;text-align:center"><span>↖</span><span>↗</span><span>↙</span><span>↘</span></span>'];
   const actFns=[toggleHints,initGame,()=>{window.location.href='/';},toggleKiosk];
   for(let i=0;i<4;i++){
     const btn=document.createElement('div');btn.className='action-btn';
