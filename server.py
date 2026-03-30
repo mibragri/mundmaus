@@ -63,7 +63,7 @@ def _send_404(client, path):
     client.send(f'Content-Length: {len(body)}\r\nConnection: close\r\n\r\n'.encode())
     client.send(body)
 
-def _generate_portal(wifi, wifi_ip):
+def _generate_portal(wifi, wifi_ip, hw_status=None):
     recovery = False
     try:
         with open('update_state.json') as _f:
@@ -96,6 +96,8 @@ def _generate_portal(wifi, wifi_ip):
     connected = wm.sta.isconnected() if wm and mode == 'station' else False
     mode_label = 'WLAN' if mode == 'station' else 'Hotspot'
     dot_color = '#4caf50' if connected else '#f0a030' if mode == 'ap' else '#d42a2a'
+    rssi, rssi_label = wm.get_rssi() if wm else (0, '')
+    rssi_text = f' ({rssi_label}, {rssi}dBm)' if rssi_label else ''
 
     return f"""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -146,7 +148,7 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 </div>
 </div>
 <div class="wf">
-<h2><span class="wd"></span> {mode_label}: {ssid} - {wifi_ip}</h2>
+<h2><span class="wd"></span> {mode_label}: {ssid} - {wifi_ip}{rssi_text}</h2>
 <button class="wsc" onclick="sc()">Netzwerke suchen</button>
 <label>SSID</label>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
@@ -158,7 +160,10 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 </div>
 <button class="rb" onclick="rb()">Neustart</button>
 <div class="i">{wifi_ip} &nbsp;|&nbsp; {BOARD} &nbsp;|&nbsp; v{VERSION}
-&nbsp;|&nbsp; RAM: {gc.mem_free()//1024}KB frei</div>
+&nbsp;|&nbsp; RAM: {gc.mem_free()//1024}KB frei
+&nbsp;|&nbsp; Joystick: {'OK' if hw_status and hw_status.get('joystick') else '?'}
+&nbsp;|&nbsp; Puff: {'OK' if hw_status and hw_status.get('puff') else 'nicht angeschlossen'}
+</div>
 <script>
 async function sc(){{try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
 s.innerHTML='<option>-- waehlen --</option>';
@@ -274,7 +279,7 @@ class MundMausServer:
             else:
                 _send_404(client, path)
         elif 'GET / ' in fl or 'GET /index' in fl:
-            p = _generate_portal(self.wifi, self.wifi.ip)
+            p = _generate_portal(self.wifi, self.wifi.ip, getattr(self, 'hw_status', None))
             p_bytes = p.encode('utf-8') if isinstance(p, str) else p
             client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
             client.send(f'Content-Length: {len(p_bytes)}\r\nConnection: close\r\n\r\n'.encode())

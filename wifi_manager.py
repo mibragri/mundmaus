@@ -113,13 +113,33 @@ class WiFiManager:
             print(f"  Scan Fehler: {e}")
             return []
 
+    def get_rssi(self):
+        """Get WiFi signal strength. Returns (rssi_dbm, label)."""
+        if self.mode != 'station' or not self.sta.isconnected():
+            return 0, ''
+        try:
+            rssi = self.sta.status('rssi')
+            if rssi >= -50:
+                return rssi, 'Perfekt'
+            elif rssi >= -65:
+                return rssi, 'Gut'
+            elif rssi >= -80:
+                return rssi, 'Schwach'
+            else:
+                return rssi, 'Sehr schwach'
+        except:
+            return 0, ''
+
     def get_status(self):
+        rssi, rssi_label = self.get_rssi()
         return {
             'mode': self.mode or 'disconnected',
             'ssid': self.ssid or '',
             'ip': self.ip or '',
             'ap_ssid': AP_SSID,
-            'connected': self.sta.isconnected() if self.mode == 'station' else False
+            'connected': self.sta.isconnected() if self.mode == 'station' else False,
+            'rssi': rssi,
+            'rssi_label': rssi_label,
         }
 
     def startup(self):

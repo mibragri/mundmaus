@@ -188,7 +188,11 @@ async def update_check(server, wifi, initial=False):
         server.ws_send_all({'type': 'update_status', 'available': [], 'offline': True})
         return
     if initial:
-        await asyncio.sleep_ms(2000)  # Let server settle on first boot
+        # Wait for WiFi to be fully ready (DNS, routing)
+        for _ in range(10):
+            await asyncio.sleep_ms(1000)
+            if wifi.sta.isconnected():
+                break
     from updater import check_manifest
     def on_result(result):
         server._update_info = result
@@ -243,6 +247,12 @@ async def async_main():
     # Server
     print("\n[Server]")
     server = MundMausServer(wifi)
+    server.hw_status = {
+        'joystick': True,
+        'puff': puff is not None,
+        'puff_baseline': puff.baseline if puff else 0,
+        'display': tft is not None,
+    }
     server.start()
 
     display_status(tft, ip, mode,
