@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>MundMaus Memory</title>
+<title>MundMaus Memo</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
 <style>
   /* ═══════════════════════════════════════════════════════════
-     MundMaus Memory v1.0
-     Barrierefreies Memory-Spiel für Tetraplegiker
+     MundMaus Memo v1.0
+     Barrierefreies Memo-Spiel für Tetraplegiker
      Steuerung: Joystick (4 Richtungen) + Pusten
      Protokoll: WebSocket auf ws://${hostname}:81
      ═══════════════════════════════════════════════════════════ */
@@ -87,7 +88,6 @@
   .stat .value {
     font-weight: 700;
     color: var(--cursor-color);
-    font-variant-numeric: tabular-nums;
     font-variant-numeric: tabular-nums;
     min-width: 2ch;
   }
@@ -510,7 +510,7 @@
 
 <!-- Header -->
 <div id="header">
-  <h1>Mund<span>Maus</span> Memory</h1>
+  <h1>Mund<span>Maus</span> Memo</h1>
   <div class="stat-bar">
     <div class="stat"><span class="label">Züge:</span> <span class="value" id="moves">0</span></div>
     <div class="stat"><span class="label">Paare:</span> <span class="value" id="pairs">0</span>/<span class="value" id="total-pairs">0</span></div>
@@ -523,6 +523,7 @@
   <div id="board"></div>
   <div id="action-col">
     <div class="action-btn" id="btn-new">↻ Neu</div>
+    <div class="action-btn" id="btn-back" onclick="window.location.href='/'">⬅ Portal</div>
   </div>
 </div>
 
@@ -532,6 +533,7 @@
   <span><kbd>Leertaste</kbd> Aufdecken</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>P</kbd> Portal</span>
 </div>
 
 <!-- Schwierigkeitsmenü -->
@@ -566,13 +568,13 @@
 
 <!-- Idle Screen -->
 <div id="idle-screen" class="hidden">
-  <h2>🧠 MundMaus Memory</h2>
+  <h2>🧠 MundMaus Memo</h2>
   <p>Pusten zum Starten</p>
 </div>
 
 <script>
 /* ═══════════════════════════════════════════════════════════
-   MundMaus Memory v1.0
+   MundMaus Memo v1.0
    ═══════════════════════════════════════════════════════════ */
 
 // ── Symbole: Form + Farbe + Text-Label (3-fach kodiert, farbenblindheit-sicher) ──
@@ -646,6 +648,7 @@ let state = {
   rows: 4,
   cursor: 0,
   inBtnCol: false, // true when cursor is in the right button column
+  btnIdx: 0,       // which button in the column is focused
   first: null,    // index der ersten aufgedeckten Karte
   second: null,
   moves: 0,
@@ -672,6 +675,8 @@ const $winStats = document.getElementById('win-stats');
 const $idleScreen = document.getElementById('idle-screen');
 const $wsStatus = document.getElementById('ws-status');
 const $btnNew = document.getElementById('btn-new');
+const $btnBack = document.getElementById('btn-back');
+const $actionBtns = [$btnNew, $btnBack];
 
 // ── Shuffle ──────────────────────────────────────────────
 function shuffle(arr) {
@@ -695,6 +700,7 @@ function createBoard(levelIdx) {
   state.second = null;
   state.cursor = 0;
   state.inBtnCol = false;
+  state.btnIdx = 0;
   state.phase = 'playing';
 
   // Symbole auswählen und Paare erstellen
@@ -762,7 +768,9 @@ function updateCursor() {
     el.classList.toggle('selected', state.first === i && state.second === null);
   });
   // Button highlight
-  $btnNew.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol);
+  $actionBtns.forEach((btn, i) => {
+    btn.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol && state.btnIdx === i);
+  });
 }
 
 // ── Navigation ───────────────────────────────────────────
@@ -773,16 +781,20 @@ function navigate(dir) {
   if (state.phase !== 'playing') return;
 
   if (state.inBtnCol) {
-    // In button column
+    // In button column — up/down navigates between buttons
     if (dir === 'left') {
       state.inBtnCol = false;
-      // Move cursor to rightmost column of current row
       const row = Math.floor(state.cursor / state.cols);
       state.cursor = row * state.cols + (state.cols - 1);
       sndNav();
-      updateCursor();
+    } else if (dir === 'up') {
+      state.btnIdx = Math.max(0, state.btnIdx - 1);
+      sndNav();
+    } else if (dir === 'down') {
+      state.btnIdx = Math.min($actionBtns.length - 1, state.btnIdx + 1);
+      sndNav();
     }
-    // Only one button, up/down/right do nothing
+    updateCursor();
     return;
   }
 
@@ -856,8 +868,8 @@ function action() {
 
   // Button column action
   if (state.inBtnCol) {
-    showMenu();
-    sndFlip();
+    if (state.btnIdx === 0) { showMenu(); sndFlip(); }
+    else if (state.btnIdx === 1) { window.location.href = '/'; }
     return;
   }
 
@@ -1009,6 +1021,8 @@ document.addEventListener('keydown', (e) => {
       break;
     case 'n': case 'N': showMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;
+    case 'p': case 'P': window.location.href = '/'; return;
+    case 'Escape': window.location.href = '/'; return;
   }
 });
 

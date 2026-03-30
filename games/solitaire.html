@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Solitär – Mundmaus</title>
+<title>MundMaus Solitaer</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
 <style>
   /* Google Fonts omitted: ESP32 serves this offline, no internet available */
 
@@ -27,9 +28,9 @@
     --target: #ff66ff;
     --target-glow: rgba(255, 102, 255, 0.5);
     --target-border: #ff66ff;
-    --nav-color: #ffffff;
+    --nav-color: #FFD700;
     --success: #4caf50;
-    --text: #e8e0d0;
+    --text: #e8e8e8;
     --text-dim: #b8c4d0;
     --card-shadow: 0 2px 8px rgba(0,0,0,0.4);
     --card-radius: 10px;
@@ -49,7 +50,6 @@
     width: 100vw;
     -webkit-user-select: none;
     user-select: none;
-    cursor: none;
   }
 
   body::before {
@@ -309,7 +309,7 @@
   }
   .stat { display: flex; align-items: center; gap: 0.5vw; }
   .stat .label { color: var(--text-dim); }
-  .stat .value { font-weight: 700; color: var(--highlight); }
+  .stat .value { font-weight: 700; color: var(--highlight); font-variant-numeric: tabular-nums; }
 
   #auto-hint { font-size: 1.8vh; color: var(--highlight); }
 
@@ -441,14 +441,14 @@
     width: 11vw;
     display: flex;
     flex-direction: column;
-    gap: 1.5vw;
+    gap: 1vw;
     padding-top: 0.5vw;
     position: relative;
   }
 
   .action-btn {
     width: 11vw;
-    height: 6vw;
+    height: 4.5vw;
     border-radius: var(--card-radius);
     background: rgba(255,255,255,0.06);
     border: 2px solid rgba(255,255,255,0.12);
@@ -478,9 +478,9 @@
   }
 
   /* ===== KIOSK MODE ===== */
-  body.kiosk-mode { cursor: none !important; }
-  body.kiosk-mode #footer { display: none; }
-  body.kiosk-mode #kiosk-status { display: flex; }
+  body.kiosk { cursor: none !important; }
+  body.kiosk #footer { display: none; }
+  body.kiosk #kiosk-status { display: flex; }
 
   #kiosk-status {
     display: none;
@@ -571,8 +571,10 @@
 <div id="footer">
   <span><kbd>←↑→↓</kbd> Navigieren</span>
   <span><kbd>Leertaste</kbd> Auswählen/Ablegen</span>
+  <span><kbd>U</kbd> Rückgängig</span>
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>P</kbd> Portal</span>
 </div>
 
 <div id="kiosk-status">
@@ -655,7 +657,7 @@ function _isFullscreen() {
 }
 function toggleKiosk() {
   kioskMode=!kioskMode;
-  document.body.classList.toggle('kiosk-mode',kioskMode);
+  document.body.classList.toggle('kiosk',kioskMode);
   if(kioskMode){resetIdleTimer();try{_requestFullscreen();}catch(e){}}
   else{clearIdleTimer();hideIdle();try{if(_isFullscreen())_exitFullscreen();}catch(e){}}
 }
@@ -841,10 +843,10 @@ function renderTableau() {
   // Action column (Help + New Game)
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
-  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,1)):-1;
-  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu'];
-  const actFns=[toggleHints,initGame];
-  for(let i=0;i<2;i++){
+  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
+  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu','⬅ Portal'];
+  const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
+  for(let i=0;i<3;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
     if(i===0&&hintsEnabled)btn.classList.add('active');
@@ -897,14 +899,14 @@ function navigate(dir) {
   }
   if(dir==='up'||dir==='down'){
     if(dir==='up'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx>0){navCardIdx=0;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndNav();render();return;}
+      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndNav();render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur>start){navCardIdx=cur-1;sndNav();render();return;}}
       navZone='top';if(navCol>1)navCol=Math.min(navCol-1,5);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='top'){
       navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndNav();
     } else if(dir==='down'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx<1){navCardIdx=1;sndNav();}render();return;}
+      if(navCol===7){if(navCardIdx<2){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur<end){navCardIdx=cur+1;sndNav();}}
     }
@@ -917,7 +919,7 @@ function doPuff() {
   if(document.getElementById('idle-overlay').classList.contains('visible')){hideIdle();initGame();return;}
   if(gameWon){initGame();return;}
   if(navZone==='top'&&navCol===0){drawFromStock();selectedCard=null;render();return;}
-  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:1;if(ai===0)toggleHints();else initGame();return;}
+  if(navZone==='tableau'&&navCol===7){selectedCard=null;const ai=navCardIdx<=0?0:navCardIdx;if(ai===0)toggleHints();else if(ai===1)initGame();else if(ai===2)window.location.href='/';return;}
   if(!selectedCard){selectCurrentCard();return;}
   if(isSamePos(selectedCard,navZone,navCol)){selectedCard=null;sndNav();render();return;}
   placeSelectedCard();
@@ -968,8 +970,11 @@ document.addEventListener('keydown',(e)=>{
     case'ArrowUp':navigate('up');break;case'ArrowDown':navigate('down');break;
     case' ':case'Enter':e.preventDefault();if(!e.repeat)doPuff();break;
     case'Backspace':e.preventDefault();if(!e.repeat){doUndo();render();updateStatus();}break;
+    case'u':case'U':doUndo();render();updateStatus();break;
     case'n':initGame();break;
     case'k':case'K':toggleKiosk();break;
+    case'p':case'P':window.location.href='/';return;
+    case'Escape':window.location.href='/';return;
   }
 });
 
@@ -977,7 +982,8 @@ document.addEventListener('keydown',(e)=>{
 // WEBSOCKET - ESP32 Connection
 // ============================================================
 
-let ws=null,wsReconnectTimer=null;
+let ws=null;
+let wsBackoff=3000;
 
 function connectWebSocket() {
   const host=location.hostname===''||location.hostname==='localhost'?'localhost':location.hostname;
@@ -987,14 +993,14 @@ function connectWebSocket() {
     ws.onopen=()=>{
       console.log('ESP32 connected');
       updateWs(true);
-      if(wsReconnectTimer){clearInterval(wsReconnectTimer);wsReconnectTimer=null;}
+      wsBackoff=3000;
     };
     ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
       if(m.type==='nav')navigate(m.dir);
       else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':doPuff();break;case'press':doUndo();render();updateStatus();break;case'new_game':initGame();break;}}
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
-    ws.onclose=()=>{console.log('WS disconnected');updateWs(false);if(!wsReconnectTimer)wsReconnectTimer=setInterval(connectWebSocket,3000);};
+    ws.onclose=()=>{console.log('WS disconnected');updateWs(false);setTimeout(connectWebSocket,wsBackoff);wsBackoff=Math.min(wsBackoff*2,30000);};
     ws.onerror=()=>ws.close();
   }catch(e){console.log('WS not available');updateWs(false);}
 }

@@ -1,0 +1,42 @@
+{
+  "manifest_version": 1,
+  "files": {
+    "config.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "display.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "main.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "sensors.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "server.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "updater.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "wifi_manager.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "www/chess.html": {
+      "version": 2
+    },
+    "www/memo.html": {
+      "version": 2
+    },
+    "www/solitaire.html": {
+      "version": 2
+    }
+  }
+}

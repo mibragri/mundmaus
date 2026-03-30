@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>MundMaus Schach</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
 <style>
   /* ═══════════════════════════════════════════════════════════
      MundMaus Schach v1.0
@@ -568,6 +569,7 @@
     <div id="action-col">
       <div class="action-btn disabled" id="btn-undo" data-btn="0">↩ Zurück</div>
       <div class="action-btn" id="btn-new" data-btn="1">↻ Neu</div>
+      <div class="action-btn" id="btn-back" data-btn="2" onclick="window.location.href='/'">⬅ Portal</div>
     </div>
   </div>
 </div>
@@ -578,6 +580,7 @@
   <span><kbd>N</kbd> Neues Spiel</span>
   <span><kbd>U</kbd> Rückgängig</span>
   <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>P</kbd> Portal</span>
 </div>
 
 <div id="promo-overlay" class="hidden">
@@ -1416,6 +1419,7 @@ function action() {
   if (ui.inBtnCol) {
     if (ui.btnCursor === 0) undo();
     else if (ui.btnCursor === 1) showDiffMenu();
+    else if (ui.btnCursor === 2) window.location.href = '/';
     return;
   }
 
@@ -1601,10 +1605,11 @@ document.addEventListener('keydown', e => {
     case 'ArrowDown':  e.preventDefault(); navigate('down'); break;
     case ' ':
     case 'Enter':      e.preventDefault(); action(); break;
-    case 'Escape':     deselect(); break;
+    case 'Escape':     if (ui.selected) { deselect(); } else { window.location.href = '/'; return; } break;
     case 'u': case 'U': undo(); break;
     case 'n': case 'N': showDiffMenu(); break;
     case 'k': case 'K': toggleKiosk(); break;
+    case 'p': case 'P': window.location.href = '/'; return;
   }
 });
 

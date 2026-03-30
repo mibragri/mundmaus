@@ -5,13 +5,14 @@
 - [ ] Sip-and-Puff — Differenzdrucksensor MPXV7002DP als Alternative zum Joystick (#medium)
 - [ ] Weitere Spiele — Memory, Snake, Schach (#medium)
 - [ ] Settings Panel — Threshold/Deadzone über Browser-UI einstellen (#medium)
-- [ ] OTA Firmware Update — Firmware-Update über WiFi (#low)
+- [ ] Input-Profile — Puff/Sip/Wangenluft konfigurierbar je Behinderungsgrad, Action-Mapping im Portal (#high)
 - [ ] mDNS — `mundmaus.local` statt IP-Adresse (#medium)
 - [ ] Housing — Mikrofon-Schwenkarm-Halterung für Joystick (#low)
 - [ ] Raspberry Pi Kiosk — Auto-Start-Script für Kiosk-Modus (#low)
 
 ## In Progress
 - [ ] Gehäuse v5.5 Lid drucken — Grau PETG, Slot 4
+- [ ] Input-Profile Design — Brainstorming + Spec für konfigurierbare Eingabe-Profile
 
 ## Next
 - [ ] Gehäuse v5.6 — Cantilever-Clips statt Schrauben (Daumen-lösbar, selten geöffnet)
