@@ -78,7 +78,9 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     try:
         for entry in os.listdir(WWW_DIR):
             if entry.endswith('.html') and entry != 'index.html':
-                name = entry[:-5].replace('-', ' ').replace('_', ' ')
+                _names = {'memory': 'Memo', 'solitaire': 'Solitaer'}
+                raw = entry[:-5]
+                name = _names.get(raw, raw.replace('-', ' ').replace('_', ' '))
                 name = name[0].upper() + name[1:] if name else name
                 games.append((entry, name))
     except OSError:
