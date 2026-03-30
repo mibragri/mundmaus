@@ -225,10 +225,23 @@ async def async_main():
     print("\n[Hardware]")
     joystick = CalibratedJoystick(PIN_VRX, PIN_VRY, PIN_SW)
 
+    # Plausibility: center ~2048 means ADC connected, near 0 or 4095 = floating pin
+    joy_ok = 200 < joystick.center_x < 3900 and 200 < joystick.center_y < 3900
+    if joy_ok:
+        print("  Joystick: OK")
+    else:
+        print(f"  Joystick: nicht angeschlossen (center={joystick.center_x},{joystick.center_y})")
+
     puff = None
+    puff_ok = False
     try:
         puff = PuffSensor(PIN_PUFF_DATA, PIN_PUFF_CLK)
-        print("  Drucksensor: OK")
+        # Baseline 0 = no sensor (real sensor has baseline in thousands)
+        puff_ok = puff.baseline != 0
+        if puff_ok:
+            print("  Drucksensor: OK")
+        else:
+            print("  Drucksensor: nicht angeschlossen (Baseline=0)")
     except Exception as e:
         print(f"  Drucksensor: {e}")
 
@@ -252,9 +265,8 @@ async def async_main():
     print("\n[Server]")
     server = MundMausServer(wifi)
     server.hw_status = {
-        'joystick': True,
-        'puff': puff is not None,
-        'puff_baseline': puff.baseline if puff else 0,
+        'joystick': joy_ok,
+        'puff': puff_ok,
         'display': tft is not None,
     }
     server.start()
