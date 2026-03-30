@@ -137,9 +137,9 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <div class="gs">{btns}</div>
 {recovery_banner}
 <div class="wf" id="upd" style="display:none">
-<h2>Updates</h2>
+<h2>Software</h2>
 <div id="upd-info"></div>
-<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">Jetzt aktualisieren</button>
+<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">Jetzt installieren</button>
 <div id="upd-progress" style="display:none">
 <div style="background:#333;border-radius:4px;height:24px;margin:8px 0">
 <div id="upd-bar" style="background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s"></div>
@@ -180,11 +180,11 @@ catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
 async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
 document.getElementById('wm').textContent='Neustart...'}}}}
 function connectWS(){{const ws=new WebSocket('ws://'+location.hostname+':81');ws.onclose=function(){{setTimeout(connectWS,3000)}};ws.onmessage=function(e){{const d=JSON.parse(e.data);
-if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.textContent='Offline - keine Update-Pruefung'}}else if(d.available&&d.available.length>0){{info.textContent=d.available.length+' Update(s) verfuegbar';btn.style.display='block'}}else{{info.textContent='Aktuell'}}}}
+if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='Keine Internetverbindung'}}else if(d.available&&d.available.length>0){{info.innerHTML=d.available.length+' Verbesserung'+(d.available.length>1?'en':'')+' verfuegbar';btn.style.display='block'}}else{{info.innerHTML='Alles auf dem neuesten Stand'}}}}
 else if(d.type==='update_progress'){{document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}}
-else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').textContent='Erneut pruefen';document.getElementById('upd-btn').style.display='block';document.getElementById('upd-btn').onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});document.getElementById('upd-info').textContent='Pruefe...';document.getElementById('upd-btn').style.display='none'}}}}
+else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').textContent='Nochmal pruefen';document.getElementById('upd-btn').style.display='block';document.getElementById('upd-btn').onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});document.getElementById('upd-info').textContent='Wird geprueft...';document.getElementById('upd-btn').style.display='none'}}}}
 else if(d.type==='update_error'){{document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}}}};}}connectWS();
-async function startUpdate(){{document.getElementById('upd-info').textContent='Starte Update...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
+async function startUpdate(){{document.getElementById('upd-info').textContent='Wird installiert...';document.getElementById('upd-btn').style.display='none';try{{await fetch('/api/update/start',{{method:'POST'}})}}catch(e){{document.getElementById('upd-info').textContent='Fehler: '+e}}}}
 </script>
 </body></html>"""
 
