@@ -47,7 +47,7 @@ def _serve_file(client, filepath):
         client.send(b'HTTP/1.1 200 OK\r\n')
         client.send(f'Content-Type: {ctype}\r\n'.encode())
         client.send(f'Content-Length: {size}\r\n'.encode())
-        client.send(b'Cache-Control: max-age=3600\r\nConnection: close\r\n\r\n')
+        client.send(b'Cache-Control: no-cache\r\nConnection: close\r\n\r\n')
         buf = bytearray(2048)
         with open(filepath, 'rb') as f:
             while True:

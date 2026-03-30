@@ -648,6 +648,7 @@ let state = {
   rows: 4,
   cursor: 0,
   inBtnCol: false, // true when cursor is in the right button column
+  btnIdx: 0,       // which button in the column is focused
   first: null,    // index der ersten aufgedeckten Karte
   second: null,
   moves: 0,
@@ -674,6 +675,8 @@ const $winStats = document.getElementById('win-stats');
 const $idleScreen = document.getElementById('idle-screen');
 const $wsStatus = document.getElementById('ws-status');
 const $btnNew = document.getElementById('btn-new');
+const $btnBack = document.getElementById('btn-back');
+const $actionBtns = [$btnNew, $btnBack];
 
 // ── Shuffle ──────────────────────────────────────────────
 function shuffle(arr) {
@@ -697,6 +700,7 @@ function createBoard(levelIdx) {
   state.second = null;
   state.cursor = 0;
   state.inBtnCol = false;
+  state.btnIdx = 0;
   state.phase = 'playing';
 
   // Symbole auswählen und Paare erstellen
@@ -764,7 +768,9 @@ function updateCursor() {
     el.classList.toggle('selected', state.first === i && state.second === null);
   });
   // Button highlight
-  $btnNew.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol);
+  $actionBtns.forEach((btn, i) => {
+    btn.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol && state.btnIdx === i);
+  });
 }
 
 // ── Navigation ───────────────────────────────────────────
@@ -775,16 +781,20 @@ function navigate(dir) {
   if (state.phase !== 'playing') return;
 
   if (state.inBtnCol) {
-    // In button column
+    // In button column — up/down navigates between buttons
     if (dir === 'left') {
       state.inBtnCol = false;
-      // Move cursor to rightmost column of current row
       const row = Math.floor(state.cursor / state.cols);
       state.cursor = row * state.cols + (state.cols - 1);
       sndNav();
-      updateCursor();
+    } else if (dir === 'up') {
+      state.btnIdx = Math.max(0, state.btnIdx - 1);
+      sndNav();
+    } else if (dir === 'down') {
+      state.btnIdx = Math.min($actionBtns.length - 1, state.btnIdx + 1);
+      sndNav();
     }
-    // Only one button, up/down/right do nothing
+    updateCursor();
     return;
   }
 
@@ -858,8 +868,8 @@ function action() {
 
   // Button column action
   if (state.inBtnCol) {
-    showMenu();
-    sndFlip();
+    if (state.btnIdx === 0) { showMenu(); sndFlip(); }
+    else if (state.btnIdx === 1) { window.location.href = '/'; }
     return;
   }
 

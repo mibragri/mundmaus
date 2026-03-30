@@ -1418,6 +1418,7 @@ function action() {
   if (ui.inBtnCol) {
     if (ui.btnCursor === 0) undo();
     else if (ui.btnCursor === 1) showDiffMenu();
+    else if (ui.btnCursor === 2) window.location.href = '/';
     return;
   }
 
