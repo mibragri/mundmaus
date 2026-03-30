@@ -73,14 +73,14 @@
 
   #top-row {
     display: flex;
-    gap: 1.2vw;
+    gap: min(1.2vw, 1.3vh);
     margin-bottom: 2vh;
     align-items: flex-start;
   }
 
   .pile-slot {
-    width: 11vw;
-    min-height: 15.4vw;
+    width: min(11vw, 12vh);
+    min-height: min(15.4vw, 16.8vh);
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: var(--card-radius);
     position: relative;
@@ -130,29 +130,29 @@
 
   .pile-slot .empty-label {
     color: rgba(255,255,255,0.2);
-    font-size: 2.5vw;
+    font-size: min(2.5vw, 2.7vh);
     font-weight: 700;
   }
 
-  #spacer { flex: 1; min-width: 2vw; }
+  #spacer { flex: 1; min-width: min(2vw, 2vh); }
 
   #tableau {
     display: flex;
-    gap: 1.2vw;
+    gap: min(1.2vw, 1.3vh);
     flex: 1;
     position: relative;
   }
 
   .tableau-col {
-    width: 11vw;
+    width: min(11vw, 12vh);
     position: relative;
     min-height: 20vh;
   }
 
   /* CARDS */
   .card {
-    width: 11vw;
-    height: 15.4vw;
+    width: min(11vw, 12vh);
+    height: min(15.4vw, 16.8vh);
     border-radius: var(--card-radius);
     position: absolute;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -842,10 +842,10 @@ function renderTableau() {
   // Action column (Help + New Game)
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
-  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,1)):-1;
+  const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
   const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu','⬅ Portal'];
   const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
-  for(let i=0;i<2;i++){
+  for(let i=0;i<3;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
     if(i===0&&hintsEnabled)btn.classList.add('active');
