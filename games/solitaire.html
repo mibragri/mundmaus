@@ -549,13 +549,13 @@
 </head>
 <body>
 
-<div id="ws-status" title="ESP32 nicht verbunden"></div>
+<div id="ws-status" title="ESP32 ✗"></div>
 
 <div id="header">
   <h1>Mund<span>Maus</span> Solitär</h1>
   <div class="stat-bar">
-    <div class="stat"><span class="label">Züge:</span> <span class="value" id="moves">0</span></div>
-    <div class="stat"><span class="label">Punkte:</span> <span class="value" id="score">0</span></div>
+    <div class="stat"><span class="label">#</span> <span class="value" id="moves">0</span></div>
+    <div class="stat"><span class="label">★</span> <span class="value" id="score">0</span></div>
     <span id="auto-hint"></span>
   </div>
 </div>
@@ -569,22 +569,22 @@
 <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
 
 <div id="footer">
-  <span><kbd>←↑→↓</kbd> Navigieren</span>
-  <span><kbd>Leertaste</kbd> Auswählen/Ablegen</span>
-  <span><kbd>U</kbd> Rückgängig</span>
-  <span><kbd>N</kbd> Neues Spiel</span>
+  <span><kbd>←↑→↓</kbd></span>
+  <span><kbd>⏎</kbd> ●</span>
+  <span><kbd>U</kbd> ↩</span>
+  <span><kbd>N</kbd> NEW</span>
   <span><kbd>K</kbd> Kiosk</span>
-  <span><kbd>P</kbd> Portal</span>
+  <span><kbd>P</kbd> 🏠</span>
 </div>
 
 <div id="kiosk-status">
   <div class="kiosk-dot" id="ws-dot"></div>
-  <span id="ws-label">Getrennt</span>
+  <span id="ws-label">✗</span>
 </div>
 
 <div id="idle-overlay">
-  <div class="idle-text">Mundmaus Solitär</div>
-  <div class="idle-sub">Pusten zum Starten</div>
+  <div class="idle-text">MundMaus Solitaire</div>
+  <div class="idle-sub">⏎</div>
 </div>
 
 <script>
@@ -717,7 +717,7 @@ function getFaceUpRange(ci) {
   const col=tableau[ci],s=col.findIndex(c=>c.faceUp);
   if(s===-1)return{start:0,end:0,count:0};return{start:s,end:col.length-1,count:col.length-s};
 }
-function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉 Gewonnen!','win');} }
+function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉','win');} }
 function canAutoComplete() { return stock.length===0&&waste.length===0&&tableau.every(col=>col.every(c=>c.faceUp)); }
 function autoComplete() {
   if(!canAutoComplete())return;
@@ -737,7 +737,7 @@ function updateStatus() {
   document.getElementById('moves').textContent=moves;
   document.getElementById('score').textContent=score;
   const h=document.getElementById('auto-hint');
-  if(canAutoComplete()){h.textContent='✨ Auto-Lösen verfügbar';h.style.color='var(--highlight)';}else h.textContent='';
+  if(canAutoComplete()){h.textContent='✨ Auto';h.style.color='var(--highlight)';}else h.textContent='';
 }
 
 // ============================================================
@@ -844,13 +844,13 @@ function renderTableau() {
   const actCol=document.createElement('div');actCol.className='action-col';
   if(navZone==='tableau'&&navCol===7)actCol.classList.add('nav-active');
   const actIdx=(navZone==='tableau'&&navCol===7)?(navCardIdx<=0?0:Math.min(navCardIdx,2)):-1;
-  const actLabels=[hintsEnabled?'Hilfe ✔':'Hilfe','⟳ Neu','⬅ Portal'];
+  const actLabels=[hintsEnabled?'? ✔':'?','<span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span>','🏠'];
   const actFns=[toggleHints,initGame,()=>{window.location.href='/';}];
   for(let i=0;i<3;i++){
     const btn=document.createElement('div');btn.className='action-btn';
     if(i===actIdx)btn.classList.add('nav-cursor');
     if(i===0&&hintsEnabled)btn.classList.add('active');
-    btn.textContent=actLabels[i];btn.onclick=actFns[i];
+    btn.innerHTML=actLabels[i];btn.onclick=actFns[i];
     actCol.appendChild(btn);
   }
   cont.appendChild(actCol);
@@ -954,7 +954,7 @@ function placeSelectedCard() {
   }
   if(!moved){sndError();render();updateStatus();return;}
   selectedCard=null;render();updateStatus();checkWin();
-  if(canAutoComplete())setTimeout(()=>{showMessage('Auto-Lösen...','');setTimeout(autoComplete,800);},400);
+  if(canAutoComplete())setTimeout(()=>{showMessage('✨...','');setTimeout(autoComplete,800);},400);
 }
 
 function getSrc(z,c) { if(z==='top'&&c===1)return'waste';if(z==='top'&&c>=2)return'foundation';return'tableau'; }
@@ -1007,10 +1007,10 @@ function connectWebSocket() {
 
 function updateWs(on) {
   const d=document.getElementById('ws-dot'),l=document.getElementById('ws-label');
-  if(on){d.classList.add('connected');l.textContent='Verbunden';}
-  else{d.classList.remove('connected');l.textContent='Getrennt';}
+  if(on){d.classList.add('connected');l.textContent='✓';}
+  else{d.classList.remove('connected');l.textContent='✗';}
   const dot=document.getElementById('ws-status');
-  if(dot){if(on){dot.classList.add('connected');dot.title='ESP32 verbunden';}else{dot.classList.remove('connected');dot.title='ESP32 nicht verbunden';}}
+  if(dot){if(on){dot.classList.add('connected');dot.title='ESP32 ✓';}else{dot.classList.remove('connected');dot.title='ESP32 ✗';}}
 }
 
 // Start

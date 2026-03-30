@@ -72,7 +72,7 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     except:
         pass
 
-    recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">Update fehlgeschlagen - alte Version wiederhergestellt</div>' if recovery else ''
+    recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">&#9888; Update failed / Update fehlgeschlagen</div>' if recovery else ''
 
     games = []
     try:
@@ -141,7 +141,7 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <div class="wf" id="upd" style="display:none">
 <h2>Software</h2>
 <div id="upd-info"></div>
-<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">Jetzt installieren</button>
+<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">&#11015; Install</button>
 <div id="upd-progress" style="display:none">
 <div style="background:#333;border-radius:4px;height:24px;margin:8px 0">
 <div id="upd-bar" style="background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s"></div>
@@ -151,33 +151,33 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 </div>
 <div class="wf">
 <h2><span class="wd"></span> {mode_label}: {ssid} - {wifi_ip}{rssi_text}</h2>
-<button class="wsc" onclick="sc()">Netzwerke suchen</button>
+<button class="wsc" onclick="sc()">&#128269; Scan</button>
 <div class="wm" id="wm"></div>
 <select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>
 <label>SSID</label>
-<input id="si" placeholder="WLAN Name (SSID)">
-<label>Passwort</label>
-<input id="pw" type="password" placeholder="Passwort">
-<button class="wb" onclick="sv()">Verbinden</button>
+<input id="si" placeholder="SSID">
+<label>Passwort / Password</label>
+<input id="pw" type="password" placeholder="Passwort / Password">
+<button class="wb" onclick="sv()">Connect</button>
 </div>
-<button class="rb" onclick="rb()">Neustart</button>
+<button class="rb" onclick="rb()">&#8635; Restart</button>
 <div class="i" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center">{wifi_ip} | {BOARD} | v{VERSION} | RAM: {gc.mem_free()//1024}KB
-<span title="Joystick: {'verbunden' if hw_status and hw_status.get('joystick') else 'nicht angeschlossen'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('joystick') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'}"></span>Joystick</span>
-<span title="Drucksensor: {'verbunden' if hw_status and hw_status.get('puff') else 'nicht angeschlossen'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('puff') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'}"></span>Puff</span>
-<span id="ws-chip" title="Geraet erreichbar" style="display:inline-flex;align-items:center;gap:4px;background:rgba(212,42,42,.15);border:1px solid #d42a2a;border-radius:12px;padding:2px 10px;font-size:.8em"><span id="ws-dot" style="width:6px;height:6px;border-radius:50%;background:#d42a2a"></span><span id="ws-text">Nicht erreichbar</span></span></div>
+<span title="{'Joystick \u2713' if hw_status and hw_status.get('joystick') else 'Joystick \u2717'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('joystick') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('joystick') else '#d42a2a'}"></span>Joystick</span>
+<span title="{'Puff \u2713' if hw_status and hw_status.get('puff') else 'Puff \u2717'}" style="display:inline-flex;align-items:center;gap:4px;background:{'rgba(76,175,80,.15)' if hw_status and hw_status.get('puff') else 'rgba(212,42,42,.15)'};border:1px solid {'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'};border-radius:12px;padding:2px 10px;font-size:.8em"><span style="width:6px;height:6px;border-radius:50%;background:{'#4caf50' if hw_status and hw_status.get('puff') else '#d42a2a'}"></span>Puff</span>
+<span id="ws-chip" title="Geraet erreichbar" style="display:inline-flex;align-items:center;gap:4px;background:rgba(212,42,42,.15);border:1px solid #d42a2a;border-radius:12px;padding:2px 10px;font-size:.8em"><span id="ws-dot" style="width:6px;height:6px;border-radius:50%;background:#d42a2a"></span><span id="ws-text">&#10007;</span></span></div>
 <div style="margin-top:1em;color:#546e7a;font-size:.8em">
-<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#8592;&#8593;&#8594;&#8595;</kbd> Navigieren
-<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">Leertaste</kbd> Auswaehlen
+<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#8592;&#8593;&#8594;&#8595;</kbd>
+<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#9166;</kbd>
 </div>
 <script>
-async function sc(){{document.getElementById('wm').textContent='Suche Netzwerke...';try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
-s.innerHTML='<option>-- waehlen --</option>';
+async function sc(){{document.getElementById('wm').textContent='\ud83d\udd0d...';try{{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
+s.innerHTML='<option>-- select --</option>';
 d.networks.forEach(n=>{{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)}});
-s.style.display='block';document.getElementById('wm').textContent=d.networks.length+' Netzwerke gefunden'}}
-catch(e){{document.getElementById('wm').textContent='Scan fehlgeschlagen'}}}}
+s.style.display='block';document.getElementById('wm').textContent='\u2713 '+d.networks.length}}
+catch(e){{document.getElementById('wm').textContent='\u2717 Scan'}}}}
 async function sv(){{const s=document.getElementById('si').value,p=document.getElementById('pw').value;
-if(!s)return(document.getElementById('wm').textContent='SSID eingeben!');
-document.getElementById('wm').textContent='Speichere...';
+if(!s)return(document.getElementById('wm').textContent='SSID!');
+document.getElementById('wm').textContent='...';
 try{{const r=await fetch('/api/wifi',{{method:'POST',headers:{{'Content-Type':'application/json'}},
 body:JSON.stringify({{ssid:s,password:p}})}}),d=await r.json();
 document.getElementById('wm').textContent=d.message||'OK'}}
@@ -185,10 +185,10 @@ catch(e){{document.getElementById('wm').textContent='Fehler: '+e}}}}
 async function rb(){{if(confirm('ESP32 neu starten?')){{try{{await fetch('/api/reboot')}}catch(e){{}}
 document.getElementById('wm').textContent='Neustart...'}}}}
 let _wsLost=0;
-function connectWS(){{const ws=new WebSocket('ws://'+location.hostname+':81');ws.onopen=function(){{if(_wsLost&&(Date.now()-_wsLost)>10000)location.reload();_wsLost=0;const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip');if(d)d.style.background='#4caf50';if(c){{c.style.background='rgba(76,175,80,.15)';c.style.borderColor='#4caf50'}};const t=document.getElementById('ws-text');if(t)t.textContent='Erreichbar';fetch('/api/updates').then(r=>r.json()).then(d=>{{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='Keine Internetverbindung';btn.textContent='Neustart zum Pruefen';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='Wird geprueft...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML=d.available.length+' Verbesserung'+(d.available.length>1?'en':'')+' verfuegbar';btn.textContent='Jetzt installieren';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='Alles auf dem neuesten Stand';btn.style.display='none'}}}}).catch(()=>{{}})}};ws.onclose=function(){{if(!_wsLost)_wsLost=Date.now();const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip'),t=document.getElementById('ws-text');if(d)d.style.background='#d42a2a';if(c){{c.style.background='rgba(212,42,42,.15)';c.style.borderColor='#d42a2a'}};if(t)t.textContent='Nicht erreichbar';setTimeout(connectWS,3000)}};ws.onmessage=function(e){{const d=JSON.parse(e.data);
-if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='Keine Internetverbindung';btn.textContent='Neustart zum Pruefen';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='Wird geprueft...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML=d.available.length+' Verbesserung'+(d.available.length>1?'en':'')+' verfuegbar';btn.textContent='Jetzt installieren';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='Alles auf dem neuesten Stand';btn.style.display='none'}}}}
+function connectWS(){{const ws=new WebSocket('ws://'+location.hostname+':81');ws.onopen=function(){{if(_wsLost&&(Date.now()-_wsLost)>10000)location.reload();_wsLost=0;const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip');if(d)d.style.background='#4caf50';if(c){{c.style.background='rgba(76,175,80,.15)';c.style.borderColor='#4caf50'}};const t=document.getElementById('ws-text');if(t)t.textContent='\u2713';fetch('/api/updates').then(r=>r.json()).then(d=>{{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='\u2717 Offline';btn.textContent='\u21bb Restart';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='\ud83d\udd0d...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML='\u2b07 '+d.available.length+' update'+(d.available.length>1?'s':'');btn.textContent='\u2b07 Install';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='\u2713 Up to date';btn.style.display='none'}}}}).catch(()=>{{}})}};ws.onclose=function(){{if(!_wsLost)_wsLost=Date.now();const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip'),t=document.getElementById('ws-text');if(d)d.style.background='#d42a2a';if(c){{c.style.background='rgba(212,42,42,.15)';c.style.borderColor='#d42a2a'}};if(t)t.textContent='\u2717';setTimeout(connectWS,3000)}};ws.onmessage=function(e){{const d=JSON.parse(e.data);
+if(d.type==='update_status'){{const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');el.style.display='block';if(d.offline){{info.innerHTML='\u2717 Offline';btn.textContent='\u21bb Restart';btn.style.display='block';btn.onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});info.textContent='\ud83d\udd0d...';btn.style.display='none'}}}}else if(d.available&&d.available.length>0){{info.innerHTML='\u2b07 '+d.available.length+' update'+(d.available.length>1?'s':'');btn.textContent='\u2b07 Install';btn.onclick=startUpdate;btn.style.display='block'}}else{{info.innerHTML='\u2713 Up to date';btn.style.display='none'}}}}
 else if(d.type==='update_progress'){{document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}}
-else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').textContent='Neustart zum Pruefen';document.getElementById('upd-btn').style.display='block';document.getElementById('upd-btn').onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});document.getElementById('upd-info').textContent='Wird geprueft...';document.getElementById('upd-btn').style.display='none'}}}}
+else if(d.type==='update_complete'){{document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').textContent='\u21bb Restart';document.getElementById('upd-btn').style.display='block';document.getElementById('upd-btn').onclick=function(){{fetch('/api/updates/check',{{method:'POST'}});document.getElementById('upd-info').textContent='\ud83d\udd0d...';document.getElementById('upd-btn').style.display='none'}}}}
 else if(d.type==='update_error'){{document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}}
 else if(d.type==='nav'&&_navItems.length){{if(d.dir==='right'||d.dir==='down'){{_navIdx=Math.min(_navItems.length-1,_navIdx+1)}}else if(d.dir==='left'||d.dir==='up'){{_navIdx=Math.max(0,_navIdx-1)}}  _navUpdate()}}
 else if(d.type==='action'&&_navItems.length){{_navItems[_navIdx].click()}}}};}}connectWS();
