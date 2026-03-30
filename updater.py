@@ -9,7 +9,7 @@ try:
 except ImportError:
     import uasyncio as asyncio
 
-from config import OTA_BASE_URL, UPDATE_STATE_FILE, VERSIONS_FILE
+from config import OTA_AUTH, OTA_BASE_URL, UPDATE_STATE_FILE, VERSIONS_FILE
 
 
 def _load_versions():
@@ -233,7 +233,7 @@ def _http_get(url, timeout=5):
     try:
         raw_sock.connect(addr)
         sock = ssl.wrap_socket(raw_sock, server_hostname=host)
-        sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'.encode())
+        sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\nAuthorization: Basic {OTA_AUTH}\r\n\r\n'.encode())
 
         # Read header
         header = b''
@@ -298,7 +298,7 @@ def _download_file(fname, dest):
     try:
         raw_sock.connect(addr)
         sock = ssl.wrap_socket(raw_sock, server_hostname=host)
-        sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\n\r\n'.encode())
+        sock.write(f'GET {path} HTTP/1.0\r\nHost: {host}\r\nAuthorization: Basic {OTA_AUTH}\r\n\r\n'.encode())
 
         # Skip header
         header = b''
