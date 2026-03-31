@@ -12,10 +12,9 @@
 - [ ] Raspberry Pi Kiosk — Auto-Start-Script für Kiosk-Modus (#low)
 
 ## In Progress
-- [ ] Gehäuse v5.5 Lid drucken — Grau PETG, Slot 4
-- [ ] Input-Profile Design — Brainstorming + Spec für konfigurierbare Eingabe-Profile
 
 ## Next
+- [ ] Input-Profile Design — Brainstorming + Spec für konfigurierbare Eingabe-Profile
 
 ## Done (2026-03-30)
 - [x] OTA Auto-Update — Manifest auf mundmaus.de, atomare Installation, Rollback, Recovery-AP
@@ -58,3 +57,4 @@
 - [x] Bambu Print: Thumbnail-Injection (CadQuery-Render → 3MF)
 - [x] Bambu Print: iPhone-Notification bei Start/Fertig/Fehler (bambu-monitor.py)
 - [x] Gehäuse v5.5 Base gedruckt — Grau PETG, Slot 4, ~1h33m (2026-03-20)
+- [x] Gehäuse v5.5 Lid gedruckt — Grau PETG, Slot 4
