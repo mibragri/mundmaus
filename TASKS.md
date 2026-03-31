@@ -16,7 +16,6 @@
 - [ ] Input-Profile Design — Brainstorming + Spec für konfigurierbare Eingabe-Profile
 
 ## Next
-- [ ] Gehäuse v5.6 — Cantilever-Clips statt Schrauben (Daumen-lösbar, selten geöffnet)
 
 ## Done (2026-03-30)
 - [x] OTA Auto-Update — Manifest auf mundmaus.de, atomare Installation, Rollback, Recovery-AP
