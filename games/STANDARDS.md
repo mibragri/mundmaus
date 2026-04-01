@@ -58,10 +58,16 @@ Kein Keyboard, keine Maus, kein Touch.
 - KEIN separater Vollbild-Modus (F) — alles ueber K
 
 ## Layout-Reihenfolge
-1. Header (oben): Spielname links, Status mitte/rechts, WS-Indikator rechts
+1. Header (oben): Spielname links, Puff-Indicator mitte, Stats rechts, WS-Indikator rechts
 2. Spielfeld (mitte): So gross wie moeglich
 3. Buttons (rechts): Neben dem Spielfeld, nicht darunter
 4. Footer (unten): Keyboard-Hints fuer Betreuer
+
+## Ultrawide / Skalierung
+- **body**: `max-width: 1920px; width: 100%` (nicht 100vw!)
+- **Keine rohen vw-Einheiten**: Alle `vw`-Werte als `calc(X * var(--vw))` mit `--vw: min(1vw, 19.2px)` in `:root`
+- **Grund**: Auf Ultrawide (3440px) wuerden vw-Werte den 1920px-Body sprengen
+- **JS Inline-Styles**: Ebenfalls `calc(X * var(--vw))` verwenden, nicht `X + 'vw'`
 
 ## Footer-Hints (konsistent in ALLEN Spielen)
 Format mit kbd-Tags fuer Tastatur-Shortcuts:
@@ -72,6 +78,14 @@ Format mit kbd-Tags fuer Tastatur-Shortcuts:
 - Spielspezifisch: `U` Rueckgaengig (Chess), `F` Vollbild etc.
 Hinweise dienen Betreuern (wechselnde Pfleger, keine Schulung).
 Der Nutzer selbst braucht nur Joystick + Pusten.
+
+## Puff-Indicator
+- **Position**: Im Header, zwischen Titel und Stats
+- **Aufbau**: Emoji (💨) + schmaler Balken (8vw breit, 0.6vh hoch)
+- **Balken**: Gold-Farbe (--highlight/--cursor-color), Breite = puff_level (0-100%)
+- **Pflicht**: JEDES Spiel muss den Puff-Indicator im Header haben
+- **JS**: WebSocket `puff_level` Event setzt `puff-bar` Breite
+- **NICHT** als fixed-Element unten positionieren (kollidiert mit Footer)
 
 ## Header-Stats
 - Stat-Werte in Gold (#FFD700), Labels in heller Schrift

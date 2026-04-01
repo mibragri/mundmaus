@@ -49,6 +49,7 @@
     --piece-white-stroke: #333333;
     --piece-black: #1a1a1a;
     --piece-black-stroke: #000000;
+    --vw: min(1vw, 19.2px);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,7 +62,7 @@
     max-width: 1920px;
     margin: 0 auto;
     height: 100vh;
-    width: 100vw;
+    width: 100%;
     user-select: none;
     -webkit-user-select: none;
     display: flex;
@@ -73,7 +74,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.8vh 2vw;
+    padding: 0.8vh calc(2 * var(--vw));
     background: var(--header-bg);
     backdrop-filter: blur(10px);
     height: 6vh;
@@ -90,11 +91,11 @@
 
   .stat-bar {
     display: flex;
-    gap: 2vw;
+    gap: calc(2 * var(--vw));
     align-items: center;
     font-size: 2vh;
   }
-  .stat { display: flex; align-items: center; gap: 0.5vw; }
+  .stat { display: flex; align-items: center; gap: calc(0.5 * var(--vw)); }
   .stat .label { color: var(--text-dim); }
   .stat .value { font-weight: 700; color: var(--cursor-color); font-variant-numeric: tabular-nums; }
 
@@ -111,7 +112,7 @@
   #ws-status {
     position: fixed;
     top: 1vh;
-    right: 1vw;
+    right: calc(1 * var(--vw));
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -309,13 +310,39 @@
     opacity: 0.7;
   }
 
+  /* ── Puff Indicator ─────────────────────────── */
+  #puff-indicator {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--vw));
+  }
+  #puff-icon {
+    font-size: calc(1.4 * var(--vw));
+    color: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+  }
+  #puff-track {
+    width: calc(8 * var(--vw));
+    height: 0.6vh;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #puff-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--cursor-color);
+    border-radius: 4px;
+    transition: width 0.05s;
+  }
+
   /* ── Footer ─────────────────────────────────── */
   #footer {
     height: 5vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 2vw;
+    gap: calc(2 * var(--vw));
     font-size: 1.5vh;
     color: var(--text-dim);
     background: var(--header-bg);
@@ -403,7 +430,7 @@
     color: var(--text-dim);
   }
   .go-btn {
-    padding: 1.5vh 3vw;
+    padding: 1.5vh calc(3 * var(--vw));
     border-radius: 1vmin;
     background: var(--bg-light);
     border: 0.3vmin solid rgba(255,255,255,0.1);
@@ -436,9 +463,9 @@
   #diff-menu h2 { font-size: 4vh; margin-bottom: 1vh; }
 
   .diff-opt {
-    width: 38vw;
+    width: calc(38 * var(--vw));
     max-width: 380px;
-    padding: 2vh 2.5vw;
+    padding: 2vh calc(2.5 * var(--vw));
     border-radius: 1.2vmin;
     background: var(--bg-light);
     border: 0.3vmin solid rgba(255,255,255,0.1);
@@ -461,13 +488,13 @@
     left: 50%;
     transform: translateX(-50%);
     background: rgba(15,52,96,0.9);
-    padding: 0.8vh 2vw;
+    padding: 0.8vh calc(2 * var(--vw));
     border-radius: 1vmin;
     font-size: 2vh;
     z-index: 50;
     display: flex;
     align-items: center;
-    gap: 0.8vw;
+    gap: calc(0.8 * var(--vw));
   }
   #thinking.hidden { display: none; }
   #thinking .dots span {
@@ -477,7 +504,7 @@
     border-radius: 50%;
     background: #FFD700;
     animation: dot-pulse 1.2s ease-in-out infinite;
-    margin: 0 0.15vw;
+    margin: 0 calc(0.15 * var(--vw));
   }
   #thinking .dots span:nth-child(2) { animation-delay: 0.2s; }
   #thinking .dots span:nth-child(3) { animation-delay: 0.4s; }
@@ -566,6 +593,7 @@
 <div id="header">
   <h1>Mund<span>Maus</span> Chess</h1>
   <span id="status-text">⚪</span>
+  <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
   <div class="stat-bar">
     <div class="stat"><span class="label">Züge:</span> <span class="value" id="move-num">1</span></div>
   </div>
@@ -608,7 +636,8 @@
 <div id="game-over" class="hidden">
   <h2 id="go-title"></h2>
   <div class="go-info" id="go-info"></div>
-  <div class="go-btn cursor" id="go-new">Neues Spiel</div>
+  <div class="go-btn cursor" id="go-new"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+  <div class="go-btn" id="go-portal" onclick="window.location.href='/'">🏠</div>
 </div>
 
 <div id="diff-menu">
@@ -1333,7 +1362,14 @@ function navigate(dir) {
   resetIdle();
   if (ui.phase === 'menu') return navMenu(dir);
   if (ui.phase === 'promoting') return navPromo(dir);
-  if (ui.phase === 'gameover') return;
+  if (ui.phase === 'gameover') {
+    if (dir === 'up' || dir === 'down') {
+      ui.goCursor = ui.goCursor === 0 ? 1 : 0;
+      document.getElementById('go-new').classList.toggle('cursor', ui.goCursor === 0);
+      document.getElementById('go-portal').classList.toggle('cursor', ui.goCursor === 1);
+    }
+    return;
+  }
   if (ui.phase !== 'playing' || game.turn !== W) return;
 
   let [r, c] = ui.cursor;
@@ -1405,6 +1441,10 @@ function action() {
   }
 
   if (ui.phase === 'gameover') {
+    if (ui.goCursor === 1) {
+      window.location.href = '/';
+      return;
+    }
     $gameOver.classList.add('hidden');
     showDiffMenu();
     return;
@@ -1550,9 +1590,12 @@ function showPromoDialog() {
 // ── Game Over ────────────────────────────────────────────
 function showGameOver(title, info) {
   ui.phase = 'gameover';
+  ui.goCursor = 0;
   $goTitle.textContent = title;
   $goInfo.textContent = info;
   $gameOver.classList.remove('hidden');
+  document.getElementById('go-new').classList.add('cursor');
+  document.getElementById('go-portal').classList.remove('cursor');
 }
 
 // ── Menu ─────────────────────────────────────────────────
@@ -1655,6 +1698,9 @@ function wsConnect() {
           else if (msg.kind === 'undo') undo();
           else if (msg.kind === 'new_game') showDiffMenu();
           else if (msg.kind === 'kiosk') toggleKiosk();
+        }
+        else if (msg.type === 'puff_level') {
+          document.getElementById('puff-bar').style.width = (msg.value * 100) + '%';
         }
       } catch(e) {}
     };

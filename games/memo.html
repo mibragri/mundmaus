@@ -37,6 +37,7 @@
     --pair5: #8b30a8; /* Lila */
     --pair6: #0a7a58; /* Teal */
     --pair7: #b03060; /* Pink */
+    --vw: min(1vw, 19.2px);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -49,7 +50,7 @@
     max-width: 1920px;
     margin: 0 auto;
     height: 100vh;
-    width: 100vw;
+    width: 100%;
     user-select: none;
     -webkit-user-select: none;
   }
@@ -59,7 +60,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.8vh 2vw;
+    padding: 0.8vh calc(2 * var(--vw));
     background: var(--header-bg);
     backdrop-filter: blur(10px);
     height: 6vh;
@@ -80,12 +81,12 @@
 
   .stat-bar {
     display: flex;
-    gap: 2vw;
+    gap: calc(2 * var(--vw));
     align-items: center;
     font-size: 2vh;
   }
 
-  .stat { display: flex; align-items: center; gap: 0.5vw; }
+  .stat { display: flex; align-items: center; gap: calc(0.5 * var(--vw)); }
   .stat .label { color: var(--text-dim); }
   .stat .value {
     font-weight: 700;
@@ -98,7 +99,7 @@
   #ws-status {
     position: fixed;
     top: 1vh;
-    right: 1vw;
+    right: calc(1 * var(--vw));
     width: 10px;
     height: 10px;
     border-radius: 50%;
@@ -339,13 +340,39 @@
     80% { transform: rotateY(180deg) translateX(3px); }
   }
 
+  /* ── Puff Indicator ─────────────────────────── */
+  #puff-indicator {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--vw));
+  }
+  #puff-icon {
+    font-size: calc(1.4 * var(--vw));
+    color: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+  }
+  #puff-track {
+    width: calc(8 * var(--vw));
+    height: 0.6vh;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #puff-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--cursor-color);
+    border-radius: 4px;
+    transition: width 0.05s;
+  }
+
   /* ── Footer / Hilfe ─────────────────────────── */
   #footer {
     height: 5vh;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 2vw;
+    gap: calc(2 * var(--vw));
     font-size: 1.5vh;
     color: var(--text-dim);
     background: var(--header-bg);
@@ -384,9 +411,9 @@
   }
 
   .diff-option {
-    width: 40vw;
+    width: calc(40 * var(--vw));
     max-width: 400px;
-    padding: 2.5vh 3vw;
+    padding: 2.5vh calc(3 * var(--vw));
     border-radius: 1.5vmin;
     background: var(--bg-light);
     border: 0.3vmin solid rgba(255,255,255,0.1);
@@ -446,11 +473,11 @@
   #win-screen .win-stars {
     font-size: 5vh;
     margin-bottom: 3vh;
-    letter-spacing: 1vw;
+    letter-spacing: calc(1 * var(--vw));
   }
 
   .win-btn {
-    padding: 2vh 4vw;
+    padding: 2vh calc(4 * var(--vw));
     border-radius: 1.5vmin;
     background: var(--card-back);
     border: 0.3vmin solid rgba(255,255,255,0.1);
@@ -513,6 +540,7 @@
 <!-- Header -->
 <div id="header">
   <h1>Mund<span>Maus</span> Memo</h1>
+  <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
   <div class="stat-bar">
     <div class="stat"><span class="label">#</span> <span class="value" id="moves">0</span></div>
     <div class="stat"><span class="label">🃏</span> <span class="value" id="pairs">0</span>/<span class="value" id="total-pairs">0</span></div>
@@ -567,6 +595,7 @@
   <div class="win-stats" id="win-stats"></div>
   <div class="win-btn cursor" id="btn-new-game"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
   <div class="win-btn" id="btn-same" style="margin-top: 1.5vh;">⟳</div>
+  <div class="win-btn" id="btn-portal" onclick="window.location.href='/'" style="margin-top: 1.5vh;">🏠</div>
 </div>
 
 <!-- Idle Screen -->
@@ -838,12 +867,15 @@ function navigateMenu(dir) {
 }
 
 function navigateWin(dir) {
-  if (dir === 'up' || dir === 'down') {
-    state.winCursor = state.winCursor === 0 ? 1 : 0;
-    sndMenuNav();
-    document.getElementById('btn-new-game').classList.toggle('cursor', state.winCursor === 0);
-    document.getElementById('btn-same').classList.toggle('cursor', state.winCursor === 1);
-  }
+  if (dir === 'up') {
+    state.winCursor = Math.max(0, state.winCursor - 1);
+  } else if (dir === 'down') {
+    state.winCursor = Math.min(2, state.winCursor + 1);
+  } else return;
+  sndMenuNav();
+  document.getElementById('btn-new-game').classList.toggle('cursor', state.winCursor === 0);
+  document.getElementById('btn-same').classList.toggle('cursor', state.winCursor === 1);
+  document.getElementById('btn-portal').classList.toggle('cursor', state.winCursor === 2);
 }
 
 // ── Aktion (Pusten) ──────────────────────────────────────
@@ -861,8 +893,11 @@ function action() {
   if (state.phase === 'win') {
     if (state.winCursor === 0) {
       showMenu();
-    } else {
+    } else if (state.winCursor === 1) {
       createBoard(state.level);
+    } else {
+      window.location.href = '/';
+      return;
     }
     sndFlip();
     return;
@@ -971,6 +1006,7 @@ function winGame() {
   state.winCursor = 0;
   document.getElementById('btn-new-game').classList.add('cursor');
   document.getElementById('btn-same').classList.remove('cursor');
+  document.getElementById('btn-portal').classList.remove('cursor');
 
   $winScreen.classList.remove('hidden');
   sndWin();
@@ -1066,6 +1102,8 @@ function wsConnect() {
           } else if (msg.kind === 'kiosk') {
             toggleKiosk();
           }
+        } else if (msg.type === 'puff_level') {
+          document.getElementById('puff-bar').style.width = (msg.value * 100) + '%';
         }
       } catch (err) {
         console.warn('[WS] Parse-Fehler:', err);
