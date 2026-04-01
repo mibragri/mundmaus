@@ -95,6 +95,7 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     btns = ''
     for fn, name in sorted(games, key=lambda x: x[1]):
         btns += f'<a href="/{WWW_DIR}/{fn}" class="g">{name}</a>'
+    btns += f'<a href="/{WWW_DIR}/settings.html" class="g" style="border-color:rgba(255,255,255,.2);color:#aaa;font-size:2em">\u2699</a>'
     if not btns:
         btns = '<p style="color:#78909c">Noch keine Spiele. Lade HTML in <code>www/</code></p>'
 
