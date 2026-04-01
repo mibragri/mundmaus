@@ -40,11 +40,15 @@ def _file_exists(path):
     except OSError:
         return False
 
-def _serve_file(client, filepath):
+def _serve_file(client, filepath, accept_gzip=False):
     ext = filepath[filepath.rfind('.'):]
     ctype = _CONTENT_TYPES.get(ext, 'application/octet-stream')
+    # Try gzipped version first
+    gz_path = filepath + '.gz'
+    use_gz = accept_gzip and _file_exists(gz_path)
+    serve_path = gz_path if use_gz else filepath
     try:
-        size = os.stat(filepath)[6]
+        size = os.stat(serve_path)[6]
         if size > 4096:
             gc.collect()
             if gc.mem_free() < 20000:
@@ -53,9 +57,11 @@ def _serve_file(client, filepath):
         client.send(b'HTTP/1.1 200 OK\r\n')
         client.send(f'Content-Type: {ctype}\r\n'.encode())
         client.send(f'Content-Length: {size}\r\n'.encode())
+        if use_gz:
+            client.send(b'Content-Encoding: gzip\r\n')
         client.send(b'Cache-Control: no-cache\r\nConnection: close\r\n\r\n')
         buf = bytearray(2048)
-        with open(filepath, 'rb') as f:
+        with open(serve_path, 'rb') as f:
             while True:
                 n = f.readinto(buf)
                 if not n: break
@@ -303,8 +309,9 @@ class MundMausServer:
                 self._pending_reboot = True
         elif f'GET /{WWW_DIR}/' in fl:
             path = fl.split(' ')[1].lstrip('/')
+            accept_gz = 'gzip' in request.lower()
             if '..' not in path and _file_exists(path):
-                _serve_file(client, path)
+                _serve_file(client, path, accept_gzip=accept_gz)
             else:
                 _send_404(client, path)
         elif 'GET / ' in fl or 'GET /index' in fl:
