@@ -44,6 +44,11 @@ def _serve_file(client, filepath):
     ctype = _CONTENT_TYPES.get(ext, 'application/octet-stream')
     try:
         size = os.stat(filepath)[6]
+        if size > 4096:
+            gc.collect()
+            if gc.mem_free() < 20000:
+                client.send(b'HTTP/1.1 503 Service Unavailable\r\nRetry-After: 3\r\nConnection: close\r\n\r\n')
+                return
         client.send(b'HTTP/1.1 200 OK\r\n')
         client.send(f'Content-Type: {ctype}\r\n'.encode())
         client.send(f'Content-Length: {size}\r\n'.encode())

@@ -78,6 +78,7 @@ async def sensor_loop(joystick, puff, server):
         except Exception as e:
             print(f"  sensor_loop: {e}")
 
+        _heartbeat['sensor'] = time.ticks_ms()
         await asyncio.sleep_ms(SENSOR_POLL_MS)
 
 
@@ -109,6 +110,7 @@ async def server_loop(server, wifi):
         except Exception as e:
             print(f"  server_loop: {e}")
 
+        _heartbeat['server'] = time.ticks_ms()
         loop_count += 1
         if loop_count % GC_INTERVAL == 0:
             gc.collect()
@@ -130,10 +132,18 @@ async def wifi_monitor(wifi):
                 print("  WiFi reconnect fehlgeschlagen, retry in 30s")
 
 
+_heartbeat = {'sensor': 0, 'server': 0}
+
 async def watchdog_feed(wdt):
-    """Feed hardware watchdog. If asyncio deadlocks, WDT resets device."""
+    """Feed hardware watchdog only if both sensor_loop and server_loop are alive."""
     while True:
-        wdt.feed()
+        now = time.ticks_ms()
+        sensor_age = time.ticks_diff(now, _heartbeat['sensor'])
+        server_age = time.ticks_diff(now, _heartbeat['server'])
+        if sensor_age < 30000 and server_age < 30000:
+            wdt.feed()
+        else:
+            print(f"  WDT: NOT feeding (sensor={sensor_age}ms, server={server_age}ms)")
         await asyncio.sleep_ms(10000)
 
 
@@ -286,7 +296,7 @@ def _check_and_install_updates_sync():
     wifi = WiFiManager()
     if not wifi.load_credentials():
         return
-    ip = wifi.connect_station(timeout_ms=15000)
+    ip = wifi.connect_station(timeout_ms=8000)
     if not ip:
         return
 
@@ -301,9 +311,9 @@ def _check_and_install_updates_sync():
 
     print("\n[Updates]")
     from updater import check_manifest
-    for _try in range(2):
+    for _try in range(1):
         gc.collect()
-        print(f"  Versuch {_try + 1}/2 (RAM={gc.mem_free()})")
+        print(f"  Update-Check (RAM={gc.mem_free()})")
         try:
             result = check_manifest()
         except Exception as e:
@@ -327,8 +337,6 @@ def _check_and_install_updates_sync():
                 if ok:
                     _update_result = {'available': [], 'offline': False}
             return
-        print("  Retry...")
-        time.sleep(3)
     _update_result = result
 
 
