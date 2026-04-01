@@ -83,7 +83,7 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     games = []
     try:
         for entry in os.listdir(WWW_DIR):
-            if entry.endswith('.html') and entry != 'index.html':
+            if entry.endswith('.html') and entry not in ('index.html', 'settings.html'):
                 _names = {'memo': 'Memo', 'solitaire': 'Solitaer'}
                 raw = entry[:-5]
                 name = _names.get(raw, raw.replace('-', ' ').replace('_', ' '))
@@ -95,7 +95,7 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     btns = ''
     for fn, name in sorted(games, key=lambda x: x[1]):
         btns += f'<a href="/{WWW_DIR}/{fn}" class="g">{name}</a>'
-    btns += f'<a href="/{WWW_DIR}/settings.html" class="g" style="border-color:rgba(255,255,255,.2);color:#aaa;font-size:2em">\u2699</a>'
+    settings_link = f'<a href="/{WWW_DIR}/settings.html" style="display:inline-flex;align-items:center;gap:6px;color:#78909c;text-decoration:none;font-size:.9em;margin-top:1.5em;padding:8px 16px;border:1px solid #333;border-radius:8px;transition:all .2s">\u2699 Einstellungen / Settings</a>'
     if not btns:
         btns = '<p style="color:#78909c">Noch keine Spiele. Lade HTML in <code>www/</code></p>'
 
@@ -144,6 +144,7 @@ code{{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}}
 <h1>MundMaus</h1>
 <p class="sub">Assistive Gaming Controller v{VERSION}</p>
 <div class="gs">{btns}</div>
+{settings_link}
 {recovery_banner}
 <div class="wf" id="upd" style="display:none">
 <h2>Software</h2>

@@ -215,7 +215,6 @@
     cursor: pointer;
     text-align: center;
     transition: background 0.2s, color 0.2s, transform 0.1s;
-    white-space: nowrap;
   }
   .action-btn:hover {
     background: var(--gold);
@@ -417,15 +416,9 @@
 
   <!-- Action Buttons -->
   <div id="actions">
-    <button class="action-btn primary" id="btn-save" onclick="doSave()">
-      💾 Speichern / Save
-    </button>
-    <button class="action-btn danger" id="btn-reset" onclick="doReset()">
-      ↩ Werkseinstellungen / Reset
-    </button>
-    <button class="action-btn" id="btn-calibrate" onclick="doCalibrate()">
-      🎯 Kalibrieren / Calibrate
-    </button>
+    <button class="action-btn primary" id="btn-save" onclick="doSave()">💾 Save</button>
+    <button class="action-btn danger" id="btn-reset" onclick="doReset()">↩ Reset</button>
+    <button class="action-btn" id="btn-calibrate" onclick="doCalibrate()">🎯 Calibrate</button>
   </div>
 
   <!-- Expert Section -->
