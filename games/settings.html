@@ -675,16 +675,14 @@ function doSave() {
 }
 
 function doCancel() {
-  // Revert to saved state (saved values + defaults for the rest)
+  // Revert live preview to saved state, then go to portal
   const effective = Object.assign({}, defaults, saved);
-  for (const [k, v] of Object.entries(effective)) {
-    if (current[k] !== v) {
-      current[k] = v;
-      wsSend({ type: 'config_preview', key: k, value: v });
+  for (const k in effective) {
+    if (current[k] !== effective[k]) {
+      wsSend({ type: 'config_preview', key: k, value: effective[k] });
     }
   }
-  updateUI();
-  showToast('Verworfen / Cancelled', '');
+  window.location.href = '/';
 }
 
 function doReset() {
