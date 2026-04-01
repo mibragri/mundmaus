@@ -79,3 +79,63 @@ OTA_BASE_URL = 'https://mundmaus.de/ota'
 OTA_AUTH = 'REDACTED_OTA_AUTH'
 VERSIONS_FILE = 'versions.json'
 UPDATE_STATE_FILE = 'update_state.json'
+
+# ============================================================
+# RUNTIME CONFIG (live-adjustable via Settings UI)
+# ============================================================
+
+CONFIGURABLE_KEYS = [
+    'DEADZONE', 'NAV_THRESHOLD', 'NAV_REPEAT_MS',
+    'PUFF_THRESHOLD', 'PUFF_COOLDOWN_MS', 'PUFF_SAMPLES',
+    'SENSOR_POLL_MS',
+]
+
+DEFAULTS = {k: globals()[k] for k in CONFIGURABLE_KEYS}
+
+def update(key, value):
+    """Update a config value at runtime (RAM only, not persisted)."""
+    if key in CONFIGURABLE_KEYS:
+        globals()[key] = value
+
+def get_all():
+    """Return dict of all configurable values."""
+    return {k: globals()[k] for k in CONFIGURABLE_KEYS}
+
+def get_saved():
+    """Return only non-default values from settings.json."""
+    import json
+    try:
+        with open('settings.json') as f:
+            return json.load(f)
+    except:
+        return {}
+
+def save(values):
+    """Write non-default values to settings.json."""
+    import json
+    diff = {}
+    for k, v in values.items():
+        if k in CONFIGURABLE_KEYS and v != DEFAULTS[k]:
+            diff[k] = v
+    with open('settings.json', 'w') as f:
+        json.dump(diff, f)
+
+def reset():
+    """Delete settings.json and restore all defaults in RAM."""
+    import os
+    for k in CONFIGURABLE_KEYS:
+        globals()[k] = DEFAULTS[k]
+    try:
+        os.remove('settings.json')
+    except OSError:
+        pass
+
+# Load saved settings at import time
+try:
+    import json as _json
+    with open('settings.json') as _f:
+        for _k, _v in _json.load(_f).items():
+            if _k in CONFIGURABLE_KEYS:
+                globals()[_k] = _v
+except:
+    pass
