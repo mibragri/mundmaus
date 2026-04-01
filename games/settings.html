@@ -417,8 +417,9 @@
   <!-- Action Buttons -->
   <div id="actions">
     <button class="action-btn primary" id="btn-save" onclick="doSave()">💾 Save</button>
-    <button class="action-btn danger" id="btn-reset" onclick="doReset()">↩ Reset</button>
+    <button class="action-btn" id="btn-cancel" onclick="doCancel()">✕ Cancel</button>
     <button class="action-btn" id="btn-calibrate" onclick="doCalibrate()">🎯 Calibrate</button>
+    <button class="action-btn danger" id="btn-reset" onclick="doReset()">↩ Reset</button>
   </div>
 
   <!-- Expert Section -->
@@ -671,6 +672,19 @@ function toggleExpert() {
 function doSave() {
   wsSend({ type: 'config_save' });
   showToast('Speichern... / Saving...', '');
+}
+
+function doCancel() {
+  // Revert to saved state (saved values + defaults for the rest)
+  const effective = Object.assign({}, defaults, saved);
+  for (const [k, v] of Object.entries(effective)) {
+    if (current[k] !== v) {
+      current[k] = v;
+      wsSend({ type: 'config_preview', key: k, value: v });
+    }
+  }
+  updateUI();
+  showToast('Verworfen / Cancelled', '');
 }
 
 function doReset() {
