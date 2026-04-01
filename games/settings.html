@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MundMaus Einstellungen</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
+<style>
+  /* ═══════════════════════════════════════════════════════════
+     MundMaus Settings v1.0
+     Caregiver sliders + Expert raw values
+     Protocol: HTTP GET /api/settings + WebSocket ws://${hostname}:81
+     ═══════════════════════════════════════════════════════════ */
+
+  :root {
+    --bg: #1a1a2e;
+    --bg-light: #16213e;
+    --gold: #FFD700;
+    --gold-dim: rgba(255, 215, 0, 0.3);
+    --gold-glow: rgba(255, 215, 0, 0.15);
+    --text: #e8e8e8;
+    --text-dim: #aaa;
+    --success: #76ff03;
+    --error: #ff5252;
+    --warn: #ffab40;
+    --header-bg: rgba(15, 52, 96, 0.6);
+    --card-bg: rgba(15, 52, 96, 0.3);
+    --card-border: rgba(255, 215, 0, 0.15);
+    --vw: min(1vw, 19.2px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    max-width: 1920px;
+    margin: 0 auto;
+    min-height: 100vh;
+    width: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ── WS Status Dot ─────────────────────────── */
+  #ws-status {
+    position: fixed;
+    top: 1vh;
+    right: calc(1 * var(--vw));
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #666;
+    z-index: 200;
+    transition: background 0.3s;
+  }
+  #ws-status.connected { background: var(--success); box-shadow: 0 0 6px var(--success); }
+
+  /* ── Header ─────────────────────────────────── */
+  #header {
+    display: flex;
+    align-items: center;
+    padding: 0 calc(2 * var(--vw));
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+    height: 6vh;
+    min-height: 42px;
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+    gap: calc(1.5 * var(--vw));
+  }
+
+  #btn-home {
+    font-size: 2.4vh;
+    text-decoration: none;
+    cursor: pointer;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    opacity: 0.8;
+    transition: opacity 0.2s;
+  }
+  #btn-home:hover { opacity: 1; }
+
+  #header h1 {
+    font-size: 2.4vh;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    flex: 1;
+  }
+  #header h1 .brand { color: var(--gold); }
+
+  #unsaved-badge {
+    display: none;
+    background: var(--warn);
+    color: #000;
+    font-size: 1.4vh;
+    font-weight: 700;
+    padding: 0.3vh 1vh;
+    border-radius: 4px;
+    white-space: nowrap;
+    animation: pulse-badge 2s ease-in-out infinite;
+  }
+  #unsaved-badge.visible { display: inline-block; }
+
+  @keyframes pulse-badge {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+
+  /* ── Main Content ──────────────────────────── */
+  #content {
+    padding: 2vh calc(3 * var(--vw));
+    max-width: 700px;
+    margin: 0 auto;
+  }
+
+  /* ── Slider Card ───────────────────────────── */
+  .slider-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 2vh calc(2 * var(--vw));
+    margin-bottom: 1.5vh;
+  }
+
+  .slider-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 0.8vh;
+  }
+  .slider-label .de {
+    font-size: 2vh;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .slider-label .en {
+    font-size: 1.5vh;
+    color: var(--text-dim);
+    font-style: italic;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: calc(1.5 * var(--vw));
+  }
+
+  .slider-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 8px;
+    border-radius: 4px;
+    background: linear-gradient(to right, var(--gold-dim), var(--gold));
+    outline: none;
+    cursor: pointer;
+  }
+  .slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+    cursor: pointer;
+  }
+  .slider-row input[type="range"]::-moz-range-thumb {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--gold);
+    border: 2px solid var(--bg);
+    box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+    cursor: pointer;
+  }
+
+  .slider-value {
+    min-width: 3ch;
+    text-align: center;
+    font-size: 2.4vh;
+    font-weight: 700;
+    color: var(--gold);
+  }
+
+  .slider-hint {
+    font-size: 1.3vh;
+    color: var(--text-dim);
+    margin-top: 0.5vh;
+  }
+
+  /* ── Action Buttons ────────────────────────── */
+  #actions {
+    display: flex;
+    gap: calc(1.5 * var(--vw));
+    margin-top: 2.5vh;
+    flex-wrap: wrap;
+  }
+
+  .action-btn {
+    flex: 1;
+    min-width: 120px;
+    padding: 1.5vh calc(1.5 * var(--vw));
+    border: 2px solid var(--gold);
+    border-radius: 10px;
+    background: transparent;
+    color: var(--gold);
+    font-size: 1.8vh;
+    font-weight: 700;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .action-btn:hover {
+    background: var(--gold);
+    color: var(--bg);
+  }
+  .action-btn:active {
+    transform: scale(0.97);
+  }
+
+  .action-btn.primary {
+    background: var(--gold);
+    color: var(--bg);
+  }
+  .action-btn.primary:hover {
+    background: #ffe44d;
+  }
+
+  .action-btn.danger {
+    border-color: var(--error);
+    color: var(--error);
+  }
+  .action-btn.danger:hover {
+    background: var(--error);
+    color: #fff;
+  }
+
+  /* ── Status Toast ──────────────────────────── */
+  #toast {
+    position: fixed;
+    bottom: 3vh;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--bg-light);
+    border: 1px solid var(--gold);
+    color: var(--text);
+    padding: 1vh 2.5vh;
+    border-radius: 8px;
+    font-size: 1.6vh;
+    font-weight: 600;
+    z-index: 300;
+    opacity: 0;
+    transition: transform 0.3s, opacity 0.3s;
+    pointer-events: none;
+  }
+  #toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  #toast.success { border-color: var(--success); color: var(--success); }
+  #toast.error { border-color: var(--error); color: var(--error); }
+
+  /* ── Expert Section ────────────────────────── */
+  #expert-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.8vh;
+    margin-top: 3vh;
+    padding: 1.2vh 0;
+    cursor: pointer;
+    color: var(--text-dim);
+    font-size: 1.6vh;
+    font-weight: 600;
+    border: none;
+    background: none;
+    transition: color 0.2s;
+    width: 100%;
+    text-align: left;
+  }
+  #expert-toggle:hover { color: var(--text); }
+
+  #expert-toggle .arrow {
+    display: inline-block;
+    transition: transform 0.3s;
+    font-size: 1.2vh;
+  }
+  #expert-toggle.open .arrow {
+    transform: rotate(90deg);
+  }
+
+  #expert-panel {
+    display: none;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 2vh calc(2 * var(--vw));
+    margin-top: 1vh;
+  }
+  #expert-panel.open { display: block; }
+
+  .expert-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.8vh 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+  }
+  .expert-row:last-child { border-bottom: none; }
+
+  .expert-row label {
+    font-size: 1.5vh;
+    font-family: 'Consolas', 'Courier New', monospace;
+    color: var(--text-dim);
+    flex: 1;
+  }
+
+  .expert-row .unit {
+    font-size: 1.3vh;
+    color: var(--text-dim);
+    margin-left: 1vh;
+    min-width: 3ch;
+  }
+
+  .expert-row input[type="number"] {
+    width: 10ch;
+    padding: 0.5vh 0.8vh;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 6px;
+    color: var(--gold);
+    font-size: 1.6vh;
+    font-family: 'Consolas', 'Courier New', monospace;
+    text-align: right;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .expert-row input[type="number"]:focus {
+    border-color: var(--gold);
+  }
+  /* Hide spinner in Webkit */
+  .expert-row input[type="number"]::-webkit-inner-spin-button,
+  .expert-row input[type="number"]::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+
+  /* ── Footer ────────────────────────────────── */
+  #footer {
+    margin-top: 3vh;
+    padding: 1.5vh 0;
+    text-align: center;
+    font-size: 1.2vh;
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+</style>
+</head>
+<body>
+
+<!-- WS Status -->
+<div id="ws-status" title="ESP32 ✗"></div>
+
+<!-- Header -->
+<div id="header">
+  <a id="btn-home" href="/" title="Home">🏠</a>
+  <h1><span class="brand">Mund</span>Maus Einstellungen</h1>
+  <span id="unsaved-badge">● Ungespeichert / Unsaved</span>
+</div>
+
+<!-- Main Content -->
+<div id="content">
+
+  <!-- Slider: Joystick Sensitivity -->
+  <div class="slider-card">
+    <div class="slider-label">
+      <span class="de">Joystick-Empfindlichkeit</span>
+      <span class="en">Joystick sensitivity</span>
+    </div>
+    <div class="slider-row">
+      <input type="range" id="slider-joy" min="1" max="10" step="1" value="5">
+      <span class="slider-value" id="val-joy">5</span>
+    </div>
+    <div class="slider-hint">1 = wenig empfindlich / low &nbsp; 10 = sehr empfindlich / high</div>
+  </div>
+
+  <!-- Slider: Puff Strength -->
+  <div class="slider-card">
+    <div class="slider-label">
+      <span class="de">Puste-Empfindlichkeit</span>
+      <span class="en">Puff sensitivity</span>
+    </div>
+    <div class="slider-row">
+      <input type="range" id="slider-puff" min="1" max="10" step="1" value="5">
+      <span class="slider-value" id="val-puff">5</span>
+    </div>
+    <div class="slider-hint">1 = stark pusten / strong puff &nbsp; 10 = leicht pusten / light puff</div>
+  </div>
+
+  <!-- Slider: Speed -->
+  <div class="slider-card">
+    <div class="slider-label">
+      <span class="de">Geschwindigkeit</span>
+      <span class="en">Speed</span>
+    </div>
+    <div class="slider-row">
+      <input type="range" id="slider-speed" min="1" max="10" step="1" value="5">
+      <span class="slider-value" id="val-speed">5</span>
+    </div>
+    <div class="slider-hint">1 = langsam / slow &nbsp; 10 = schnell / fast</div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div id="actions">
+    <button class="action-btn primary" id="btn-save" onclick="doSave()">
+      💾 Speichern / Save
+    </button>
+    <button class="action-btn danger" id="btn-reset" onclick="doReset()">
+      ↩ Werkseinstellungen / Reset
+    </button>
+    <button class="action-btn" id="btn-calibrate" onclick="doCalibrate()">
+      🎯 Kalibrieren / Calibrate
+    </button>
+  </div>
+
+  <!-- Expert Section -->
+  <button id="expert-toggle" onclick="toggleExpert()">
+    <span class="arrow">▶</span> ⚙ Erweitert / Advanced
+  </button>
+
+  <div id="expert-panel">
+    <div class="expert-row">
+      <label for="exp-DEADZONE">DEADZONE</label>
+      <input type="number" id="exp-DEADZONE" min="50" max="500" step="10" value="150">
+      <span class="unit"></span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-NAV_THRESHOLD">NAV_THRESHOLD</label>
+      <input type="number" id="exp-NAV_THRESHOLD" min="200" max="1500" step="50" value="800">
+      <span class="unit"></span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-NAV_REPEAT_MS">NAV_REPEAT_MS</label>
+      <input type="number" id="exp-NAV_REPEAT_MS" min="50" max="800" step="10" value="300">
+      <span class="unit">ms</span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-PUFF_THRESHOLD">PUFF_THRESHOLD</label>
+      <input type="number" id="exp-PUFF_THRESHOLD" min="0.05" max="0.80" step="0.05" value="0.25">
+      <span class="unit"></span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-PUFF_COOLDOWN_MS">PUFF_COOLDOWN_MS</label>
+      <input type="number" id="exp-PUFF_COOLDOWN_MS" min="100" max="1000" step="50" value="400">
+      <span class="unit">ms</span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-PUFF_SAMPLES">PUFF_SAMPLES</label>
+      <input type="number" id="exp-PUFF_SAMPLES" min="1" max="20" step="1" value="5">
+      <span class="unit"></span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-SENSOR_POLL_MS">SENSOR_POLL_MS</label>
+      <input type="number" id="exp-SENSOR_POLL_MS" min="10" max="100" step="5" value="20">
+      <span class="unit">ms</span>
+    </div>
+  </div>
+
+  <div id="footer">MundMaus Settings v1.0</div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   MundMaus Settings v1.0
+   ═══════════════════════════════════════════════════════════ */
+
+// ── DOM refs ─────────────────────────────────────────────
+const $wsStatus = document.getElementById('ws-status');
+const $unsaved = document.getElementById('unsaved-badge');
+const $toast = document.getElementById('toast');
+const $expertToggle = document.getElementById('expert-toggle');
+const $expertPanel = document.getElementById('expert-panel');
+
+const $sliderJoy = document.getElementById('slider-joy');
+const $sliderPuff = document.getElementById('slider-puff');
+const $sliderSpeed = document.getElementById('slider-speed');
+const $valJoy = document.getElementById('val-joy');
+const $valPuff = document.getElementById('val-puff');
+const $valSpeed = document.getElementById('val-speed');
+
+// ── Config state ─────────────────────────────────────────
+// "current" = what the ESP32 is running right now (may be unsaved preview)
+// "saved"   = what was last persisted to flash
+// "defaults"= factory defaults
+let configCurrent = {};
+let configSaved = {};
+let configDefaults = {};
+
+// Expert field definitions: key → {min, max, step, unit}
+const EXPERT_FIELDS = {
+  DEADZONE:        { min: 50,   max: 500,  step: 10,   unit: '' },
+  NAV_THRESHOLD:   { min: 200,  max: 1500, step: 50,   unit: '' },
+  NAV_REPEAT_MS:   { min: 50,   max: 800,  step: 10,   unit: 'ms' },
+  PUFF_THRESHOLD:  { min: 0.05, max: 0.80, step: 0.05, unit: '' },
+  PUFF_COOLDOWN_MS:{ min: 100,  max: 1000, step: 50,   unit: 'ms' },
+  PUFF_SAMPLES:    { min: 1,    max: 20,   step: 1,    unit: '' },
+  SENSOR_POLL_MS:  { min: 10,   max: 100,  step: 5,    unit: 'ms' }
+};
+
+// ── Slider ↔ Config mapping (inverse) ────────────────────
+// Slider 1-10, higher = more sensitive/faster
+// lerp: slider → config value via linear interpolation between two endpoints
+
+function sliderToConfig(sliderId, sliderVal) {
+  const t = (sliderVal - 1) / 9; // 0..1
+  switch (sliderId) {
+    case 'slider-joy':
+      return {
+        DEADZONE:      Math.round(300 - t * (300 - 50)),
+        NAV_THRESHOLD: Math.round(1200 - t * (1200 - 400))
+      };
+    case 'slider-puff':
+      return {
+        PUFF_THRESHOLD: Math.round((0.5 - t * (0.5 - 0.1)) * 100) / 100
+      };
+    case 'slider-speed':
+      return {
+        NAV_REPEAT_MS: Math.round(500 - t * (500 - 100))
+      };
+  }
+  return {};
+}
+
+function configToSlider(key, value) {
+  // Returns {sliderId, sliderVal} or null if key doesn't map to a slider
+  switch (key) {
+    case 'DEADZONE': {
+      const t = (300 - value) / (300 - 50);
+      return { sliderId: 'slider-joy', sliderVal: Math.round(t * 9 + 1) };
+    }
+    case 'NAV_THRESHOLD': {
+      const t = (1200 - value) / (1200 - 400);
+      return { sliderId: 'slider-joy', sliderVal: Math.round(t * 9 + 1) };
+    }
+    case 'PUFF_THRESHOLD': {
+      const t = (0.5 - value) / (0.5 - 0.1);
+      return { sliderId: 'slider-puff', sliderVal: Math.round(t * 9 + 1) };
+    }
+    case 'NAV_REPEAT_MS': {
+      const t = (500 - value) / (500 - 100);
+      return { sliderId: 'slider-speed', sliderVal: Math.round(t * 9 + 1) };
+    }
+  }
+  return null;
+}
+
+// ── Sync: sliders ↔ expert fields ────────────────────────
+
+function updateExpertFromConfig() {
+  for (const key of Object.keys(EXPERT_FIELDS)) {
+    const el = document.getElementById('exp-' + key);
+    if (el && configCurrent[key] !== undefined) {
+      el.value = configCurrent[key];
+    }
+  }
+}
+
+function updateSlidersFromConfig() {
+  // Use DEADZONE to set joy slider (primary mapping)
+  if (configCurrent.DEADZONE !== undefined) {
+    const m = configToSlider('DEADZONE', configCurrent.DEADZONE);
+    if (m) {
+      $sliderJoy.value = clamp(m.sliderVal, 1, 10);
+      $valJoy.textContent = $sliderJoy.value;
+    }
+  }
+  if (configCurrent.PUFF_THRESHOLD !== undefined) {
+    const m = configToSlider('PUFF_THRESHOLD', configCurrent.PUFF_THRESHOLD);
+    if (m) {
+      $sliderPuff.value = clamp(m.sliderVal, 1, 10);
+      $valPuff.textContent = $sliderPuff.value;
+    }
+  }
+  if (configCurrent.NAV_REPEAT_MS !== undefined) {
+    const m = configToSlider('NAV_REPEAT_MS', configCurrent.NAV_REPEAT_MS);
+    if (m) {
+      $sliderSpeed.value = clamp(m.sliderVal, 1, 10);
+      $valSpeed.textContent = $sliderSpeed.value;
+    }
+  }
+}
+
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
+
+function applyFullConfig(cfg) {
+  configCurrent = Object.assign({}, cfg);
+  updateSlidersFromConfig();
+  updateExpertFromConfig();
+  checkUnsaved();
+}
+
+// ── Unsaved changes detection ────────────────────────────
+
+function checkUnsaved() {
+  // Compare current against saved (or defaults if nothing saved)
+  const reference = Object.keys(configSaved).length > 0 ? configSaved : configDefaults;
+  let dirty = false;
+  for (const key of Object.keys(EXPERT_FIELDS)) {
+    const cur = configCurrent[key];
+    const ref = reference[key];
+    if (cur !== undefined && ref !== undefined && cur !== ref) {
+      dirty = true;
+      break;
+    }
+  }
+  $unsaved.classList.toggle('visible', dirty);
+}
+
+// ── Slider event handlers ────────────────────────────────
+
+function onSliderInput(sliderId) {
+  const el = document.getElementById(sliderId);
+  const valEl = document.getElementById('val-' + sliderId.replace('slider-', ''));
+  valEl.textContent = el.value;
+
+  const mapped = sliderToConfig(sliderId, parseInt(el.value));
+  Object.assign(configCurrent, mapped);
+  updateExpertFromConfig();
+  checkUnsaved();
+
+  // Send live preview for each changed key
+  for (const [key, value] of Object.entries(mapped)) {
+    wsSend({ type: 'config_preview', key: key, value: value });
+  }
+}
+
+$sliderJoy.addEventListener('input', () => onSliderInput('slider-joy'));
+$sliderPuff.addEventListener('input', () => onSliderInput('slider-puff'));
+$sliderSpeed.addEventListener('input', () => onSliderInput('slider-speed'));
+
+// ── Expert field event handlers ──────────────────────────
+
+for (const key of Object.keys(EXPERT_FIELDS)) {
+  const el = document.getElementById('exp-' + key);
+  if (!el) continue;
+
+  el.addEventListener('input', () => {
+    const def = EXPERT_FIELDS[key];
+    let val = parseFloat(el.value);
+    if (isNaN(val)) return;
+    val = clamp(val, def.min, def.max);
+
+    configCurrent[key] = val;
+    updateSlidersFromConfig();
+    checkUnsaved();
+
+    wsSend({ type: 'config_preview', key: key, value: val });
+  });
+}
+
+// ── Expert toggle ────────────────────────────────────────
+
+function toggleExpert() {
+  $expertToggle.classList.toggle('open');
+  $expertPanel.classList.toggle('open');
+}
+
+// ── Action buttons ───────────────────────────────────────
+
+function doSave() {
+  wsSend({ type: 'config_save' });
+  showToast('Speichern... / Saving...', '');
+}
+
+function doReset() {
+  if (!confirm('Werkseinstellungen wiederherstellen?\nRestore factory defaults?')) return;
+  wsSend({ type: 'config_reset' });
+  showToast('Zurücksetzen... / Resetting...', '');
+}
+
+function doCalibrate() {
+  wsSend({ type: 'calibrate' });
+  showToast('Kalibriere... / Calibrating...', '');
+  document.getElementById('btn-calibrate').disabled = true;
+  setTimeout(() => { document.getElementById('btn-calibrate').disabled = false; }, 3000);
+}
+
+// ── Toast ────────────────────────────────────────────────
+
+let toastTimer = null;
+function showToast(msg, cls) {
+  $toast.textContent = msg;
+  $toast.className = 'show' + (cls ? ' ' + cls : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $toast.className = ''; }, 3000);
+}
+
+// ── WebSocket ────────────────────────────────────────────
+let ws = null;
+let wsReconnectTimer = null;
+let wsBackoff = 3000;
+const WS_BACKOFF_INIT = 3000;
+const WS_BACKOFF_MAX = 30000;
+
+function wsSend(obj) {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(obj));
+  }
+}
+
+function wsConnect() {
+  const host = location.hostname || '192.168.4.1';
+  const url = `ws://${host}:81`;
+
+  try {
+    ws = new WebSocket(url);
+
+    ws.onopen = () => {
+      $wsStatus.className = 'connected';
+      $wsStatus.title = 'ESP32 ✓';
+      wsBackoff = WS_BACKOFF_INIT;
+    };
+
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+
+        if (msg.type === 'config_saved') {
+          if (msg.ok) {
+            configSaved = Object.assign({}, configCurrent);
+            checkUnsaved();
+            showToast('✓ Gespeichert / Saved', 'success');
+          } else {
+            showToast('✗ Fehler / Error', 'error');
+          }
+        } else if (msg.type === 'config_values') {
+          // Response to reset or initial load
+          if (msg.current) configCurrent = msg.current;
+          if (msg.defaults) configDefaults = msg.defaults;
+          if (msg.saved !== undefined) configSaved = msg.saved || {};
+          applyFullConfig(configCurrent);
+          showToast('✓ Zurückgesetzt / Reset done', 'success');
+        } else if (msg.type === 'calibrate_done') {
+          const cx = msg.joy_center ? msg.joy_center.join(', ') : '?';
+          const pb = msg.puff_baseline !== undefined ? msg.puff_baseline : '?';
+          showToast(`✓ Kalibriert: Joy(${cx}) Puff(${pb})`, 'success');
+        }
+      } catch (err) {
+        console.warn('[WS] Parse error:', err);
+      }
+    };
+
+    ws.onclose = () => {
+      $wsStatus.className = '';
+      $wsStatus.title = 'ESP32 ✗';
+      ws = null;
+      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+      wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+    };
+
+    ws.onerror = () => {
+      ws?.close();
+    };
+  } catch (e) {
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+    wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+  }
+}
+
+// ── Initial load via HTTP ────────────────────────────────
+
+async function loadSettings() {
+  try {
+    const resp = await fetch('/api/settings');
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    if (data.defaults) configDefaults = data.defaults;
+    if (data.saved !== undefined) configSaved = data.saved || {};
+    if (data.current) {
+      applyFullConfig(data.current);
+    }
+  } catch (err) {
+    console.warn('[Settings] Load failed, using defaults:', err);
+    // Apply hardcoded defaults so the UI is usable offline
+    applyFullConfig({
+      DEADZONE: 150,
+      NAV_THRESHOLD: 800,
+      NAV_REPEAT_MS: 300,
+      PUFF_THRESHOLD: 0.25,
+      PUFF_COOLDOWN_MS: 400,
+      PUFF_SAMPLES: 5,
+      SENSOR_POLL_MS: 20
+    });
+  }
+}
+
+// ── Boot ─────────────────────────────────────────────────
+loadSettings();
+wsConnect();
+</script>
+</body>
+</html>
