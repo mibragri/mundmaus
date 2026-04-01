@@ -8,6 +8,7 @@ import time
 
 import machine
 
+import config
 from config import (
     AP_SSID,
     BOARD,
@@ -263,6 +264,12 @@ class MundMausServer:
         elif 'GET /api/reboot' in fl:
             self._send_json(client, {'ok': True})
             self._pending_reboot = True
+        elif 'GET /api/settings' in fl:
+            self._send_json(client, {
+                'current': config.get_all(),
+                'defaults': config.DEFAULTS,
+                'saved': config.get_saved(),
+            })
         elif 'GET /api/info' in fl:
             self._send_json(client, {
                 'version': VERSION, 'board': BOARD,

@@ -13,6 +13,7 @@ try:
 except ImportError:
     import uasyncio as asyncio
 
+import config
 from config import (
     AP_PASS,
     AP_SSID,
@@ -84,7 +85,7 @@ async def sensor_loop(joystick, puff, server):
 
 
 
-async def server_loop(server, wifi):
+async def server_loop(server, wifi, joystick=None, puff=None):
     loop_count = 0
     while True:
         try:
@@ -104,6 +105,32 @@ async def server_loop(server, wifi):
                 elif msg.get('type') == 'wifi_scan':
                     server.ws_send_all({'type': 'wifi_networks',
                                         'networks': wifi.scan_networks()})
+                elif msg.get('type') == 'config_preview':
+                    key = msg.get('key', '')
+                    val = msg.get('value')
+                    if key and val is not None:
+                        config.update(key, val)
+                elif msg.get('type') == 'config_save':
+                    try:
+                        config.save(config.get_all())
+                        server.ws_send_all({'type': 'config_saved', 'ok': True})
+                    except Exception as e:
+                        server.ws_send_all({'type': 'config_saved', 'ok': False, 'error': str(e)})
+                elif msg.get('type') == 'config_reset':
+                    config.reset()
+                    server.ws_send_all({'type': 'config_values',
+                                        'current': config.get_all(),
+                                        'defaults': config.DEFAULTS,
+                                        'saved': {}})
+                elif msg.get('type') == 'calibrate':
+                    result = {'type': 'calibrate_done'}
+                    if joystick:
+                        joystick.calibrate()
+                        result['joy_center'] = [joystick.center_x, joystick.center_y]
+                    if puff:
+                        puff.calibrate_baseline()
+                        result['puff_baseline'] = puff.baseline
+                    server.ws_send_all(result)
 
             server.check_reboot()
 
@@ -274,7 +301,7 @@ async def async_main():
     # Launch tasks
     asyncio.create_task(watchdog_feed(wdt))
     asyncio.create_task(sensor_loop(joystick, puff, server))
-    asyncio.create_task(server_loop(server, wifi))
+    asyncio.create_task(server_loop(server, wifi, joystick, puff))
     asyncio.create_task(wifi_monitor(wifi))
     if tft:
         asyncio.create_task(display_loop(tft, ip, mode, joystick, puff, server))
