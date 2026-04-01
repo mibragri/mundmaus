@@ -4,19 +4,11 @@ import time
 
 import machine
 
-from config import (
-    CALIBRATION_SAMPLES,
-    DEADZONE,
-    NAV_REPEAT_MS,
-    NAV_THRESHOLD,
-    PUFF_COOLDOWN_MS,
-    PUFF_SAMPLES,
-    PUFF_THRESHOLD,
-)
+import config
 
 
 class CalibratedJoystick:
-    def __init__(self, pin_x, pin_y, pin_sw, deadzone=DEADZONE):
+    def __init__(self, pin_x, pin_y, pin_sw):
         self.adc_x = machine.ADC(machine.Pin(pin_x))
         self.adc_y = machine.ADC(machine.Pin(pin_y))
         self.adc_x.atten(machine.ADC.ATTN_11DB)
@@ -28,7 +20,6 @@ class CalibratedJoystick:
             pass  # Neuere MicroPython brauchen das evtl. nicht
 
         self.sw = machine.Pin(pin_sw, machine.Pin.IN, machine.Pin.PULL_UP)
-        self.deadzone = deadzone
         self.center_x = 2048
         self.center_y = 2048
         self.last_dir = None
@@ -37,7 +28,9 @@ class CalibratedJoystick:
         self.sw_debounce_time = 0
         self.calibrate()
 
-    def calibrate(self, samples=CALIBRATION_SAMPLES):
+    def calibrate(self, samples=None):
+        if samples is None:
+            samples = config.CALIBRATION_SAMPLES
         print("  Joystick Kalibrierung...")
         for _ in range(10):
             self.adc_x.read(); self.adc_y.read()
@@ -48,23 +41,23 @@ class CalibratedJoystick:
             time.sleep_ms(10)
         self.center_x = sx // samples
         self.center_y = sy // samples
-        print(f"  Center=({self.center_x},{self.center_y}) dz=±{self.deadzone}")
+        print(f"  Center=({self.center_x},{self.center_y}) dz=±{config.DEADZONE}")
 
     def read_centered(self):
         dx = self.adc_x.read() - self.center_x
         dy = self.adc_y.read() - self.center_y
-        if abs(dx) < self.deadzone: dx = 0
-        if abs(dy) < self.deadzone: dy = 0
+        if abs(dx) < config.DEADZONE: dx = 0
+        if abs(dy) < config.DEADZONE: dy = 0
         return dx, dy
 
     def get_direction(self):
         dx, dy = self.read_centered()
         if abs(dx) > abs(dy):
-            if dx < -NAV_THRESHOLD: return 'left'
-            elif dx > NAV_THRESHOLD: return 'right'
+            if dx < -config.NAV_THRESHOLD: return 'left'
+            elif dx > config.NAV_THRESHOLD: return 'right'
         else:
-            if dy < -NAV_THRESHOLD: return 'up'
-            elif dy > NAV_THRESHOLD: return 'down'
+            if dy < -config.NAV_THRESHOLD: return 'up'
+            elif dy > config.NAV_THRESHOLD: return 'down'
         return None
 
     def poll_navigation(self):
@@ -73,7 +66,7 @@ class CalibratedJoystick:
         if d is None:
             self.last_dir = None
             return None
-        if d != self.last_dir or time.ticks_diff(now, self.last_nav_time) > NAV_REPEAT_MS:
+        if d != self.last_dir or time.ticks_diff(now, self.last_nav_time) > config.NAV_REPEAT_MS:
             self.last_dir = d
             self.last_nav_time = now
             return d
@@ -92,19 +85,18 @@ class CalibratedJoystick:
 
     def is_idle(self):
         dx, dy = self.read_centered()
-        return abs(dx) < self.deadzone * 2 and abs(dy) < self.deadzone * 2
+        return abs(dx) < config.DEADZONE * 2 and abs(dy) < config.DEADZONE * 2
 
 
 class PuffSensor:
-    def __init__(self, data_pin, clk_pin, threshold=PUFF_THRESHOLD):
+    def __init__(self, data_pin, clk_pin):
         self.data = machine.Pin(data_pin, machine.Pin.IN)
         self.clk = machine.Pin(clk_pin, machine.Pin.OUT)
         self.clk.value(0)
-        self.threshold = threshold
         self.baseline = 0
         self.max_range = 1
         self.last_puff_time = 0
-        self.samples_buf = [0] * PUFF_SAMPLES
+        self.samples_buf = [0] * config.PUFF_SAMPLES
         self.sample_idx = 0
         time.sleep_ms(100)
         self.calibrate_baseline()
@@ -142,13 +134,13 @@ class PuffSensor:
         delta = abs(raw - self.baseline)
         n = min(1.0, delta / self.max_range)
         self.samples_buf[self.sample_idx] = n
-        self.sample_idx = (self.sample_idx + 1) % PUFF_SAMPLES
-        return sum(self.samples_buf) / PUFF_SAMPLES
+        self.sample_idx = (self.sample_idx + 1) % config.PUFF_SAMPLES
+        return sum(self.samples_buf) / config.PUFF_SAMPLES
 
     def detect_puff(self):
         now = time.ticks_ms()
-        if time.ticks_diff(now, self.last_puff_time) < PUFF_COOLDOWN_MS: return False
-        if self.read_normalized() >= self.threshold:
+        if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS: return False
+        if self.read_normalized() >= config.PUFF_THRESHOLD:
             self.last_puff_time = now
             return True
         return False
