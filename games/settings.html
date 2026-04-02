@@ -632,14 +632,12 @@ function doSave() {
 }
 
 function doCancel() {
-  try {
-    const effective = Object.assign({}, defaults, saved);
-    for (const k in effective) {
-      if (current[k] !== effective[k]) {
-        wsSend({ type: 'config_preview', key: k, value: effective[k] });
-      }
+  const effective = Object.assign({}, configDefaults, configSaved);
+  for (const k in effective) {
+    if (configCurrent[k] !== effective[k]) {
+      wsSend({ type: 'config_preview', key: k, value: effective[k] });
     }
-  } catch(e) {}
+  }
   window.location.href = '/';
 }
 

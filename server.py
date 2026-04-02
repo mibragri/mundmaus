@@ -238,8 +238,9 @@ class MundMausServer:
         self.ws_clients = []
         self.ws_server = None
         self.http_server = None
-        self._pending_reboot = False
+        self._pending_reboot = 0  # 0 = no reboot, else = ticks_ms when requested
         self._update_info = None  # Set by updater after manifest check
+        self._portal_cache = None  # Cached portal HTML bytes
 
     def start(self):
         self.http_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -282,7 +283,7 @@ class MundMausServer:
             self._send_json(client, {'networks': self.wifi.scan_networks()})
         elif 'GET /api/reboot' in fl:
             self._send_json(client, {'ok': True})
-            self._pending_reboot = True
+            self._pending_reboot = time.ticks_ms()
         elif 'GET /api/settings' in fl:
             self._send_json(client, {
                 'current': config.get_all(),
@@ -304,7 +305,7 @@ class MundMausServer:
             # SSL+asyncio conflict on ESP32 — can't re-check in-flight.
             # Reboot triggers a fresh check before asyncio starts.
             self._send_json(client, {'ok': True, 'message': 'Neustart...'})
-            self._pending_reboot = True
+            self._pending_reboot = time.ticks_ms()
         elif 'POST /api/update/start' in fl:
             if not self._update_info or not self._update_info.get('available'):
                 self._send_json(client, {'ok': False, 'error': 'Keine Updates'})
@@ -316,7 +317,7 @@ class MundMausServer:
                 except:
                     pass
                 self._send_json(client, {'ok': True, 'message': 'Neustart fuer Installation...'})
-                self._pending_reboot = True
+                self._pending_reboot = time.ticks_ms()
         elif f'GET /{WWW_DIR}/' in fl:
             path = fl.split(' ')[1].lstrip('/')
             accept_gz = 'gzip' in request.lower()
@@ -325,8 +326,10 @@ class MundMausServer:
             else:
                 _send_404(client, path)
         elif 'GET / ' in fl or 'GET /index' in fl:
-            p = _generate_portal(self.wifi, self.wifi.ip, getattr(self, 'hw_status', None))
-            p_bytes = p.encode('utf-8') if isinstance(p, str) else p
+            if not self._portal_cache:
+                p = _generate_portal(self.wifi, self.wifi.ip, getattr(self, 'hw_status', None))
+                self._portal_cache = p.encode('utf-8') if isinstance(p, str) else p
+            p_bytes = self._portal_cache
             client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
             client.send(f'Content-Length: {len(p_bytes)}\r\nConnection: close\r\n\r\n'.encode())
             for i in range(0, len(p_bytes), 2048):
@@ -353,7 +356,7 @@ class MundMausServer:
                               'message': 'Gespeichert. Neustart...'})
             self._send_json(client, {'ok': True, 'ssid': ssid,
                                      'message': f"'{ssid}' gespeichert. Neustart..."})
-            self._pending_reboot = True
+            self._pending_reboot = time.ticks_ms()
         except Exception as e:
             self._send_json(client, {'ok': False, 'error': str(e)}, 500)
 
@@ -455,10 +458,12 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
 
     def _ws_frame(self, payload):
         length = len(payload)
+        if length >= 65536:
+            return None  # Too large for ESP32 — fail loudly
         frame = bytearray([0x81])
         if length < 126:
             frame.append(length)
-        elif length < 65536:
+        else:
             frame.append(126)
             frame.extend(length.to_bytes(2, 'big'))
         frame.extend(payload)
@@ -467,6 +472,7 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
     def ws_send_all(self, message):
         if not self.ws_clients: return
         frame = self._ws_frame(json.dumps(message).encode())
+        if not frame: return
         dead = []
         for i, c in enumerate(self.ws_clients):
             try: c.send(frame)
@@ -487,7 +493,7 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
         dead = []
         for i, c in enumerate(self.ws_clients):
             try:
-                data = c.recv(512)
+                data = c.recv(1024)
                 if not data:
                     # Connection closed
                     dead.append(i)
@@ -532,8 +538,8 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
 
     def check_reboot(self):
         if self._pending_reboot:
-            time.sleep(2)
-            machine.reset()
+            if time.ticks_diff(time.ticks_ms(), self._pending_reboot) > 2000:
+                machine.reset()
 
     def send_nav(self, d): self.ws_send_all({"type": "nav", "dir": d})
     def send_action(self, k): self.ws_send_all({"type": "action", "kind": k})

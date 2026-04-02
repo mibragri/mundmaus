@@ -1,6 +1,7 @@
 # config.py — MundMaus shared configuration
 # Board detection + constants used by all modules
 
+import os
 import sys
 
 # ============================================================
@@ -58,9 +59,9 @@ NAV_REPEAT_MS = 300
 CALIBRATION_SAMPLES = 50
 
 # Puff
-PUFF_THRESHOLD = 0.25
+
 PUFF_COOLDOWN_MS = 400
-PUFF_SAMPLES = 5
+
 
 # Display
 USE_DISPLAY = False
@@ -92,10 +93,23 @@ CONFIGURABLE_KEYS = [
 
 DEFAULTS = {k: globals()[k] for k in CONFIGURABLE_KEYS}
 
+_RANGES = {
+    'DEADZONE': (10, 1000),
+    'NAV_THRESHOLD': (100, 2000),
+    'NAV_REPEAT_MS': (50, 2000),
+    'PUFF_COOLDOWN_MS': (50, 5000),
+    'SENSOR_POLL_MS': (5, 500),
+}
+
 def update(key, value):
     """Update a config value at runtime (RAM only, not persisted)."""
-    if key in CONFIGURABLE_KEYS:
-        globals()[key] = value
+    if key not in CONFIGURABLE_KEYS:
+        return
+    if not isinstance(value, (int, float)):
+        return
+    value = int(value) if isinstance(value, float) and value == int(value) else value
+    lo, hi = _RANGES.get(key, (0, 100000))
+    globals()[key] = max(lo, min(hi, value))
 
 def get_all():
     """Return dict of all configurable values."""
@@ -111,18 +125,20 @@ def get_saved():
         return {}
 
 def save(values):
-    """Write non-default values to settings.json."""
+    """Write non-default values to settings.json (atomic via temp file)."""
     import json
-    diff = {}
-    for k, v in values.items():
-        if k in CONFIGURABLE_KEYS and v != DEFAULTS[k]:
-            diff[k] = v
-    with open('settings.json', 'w') as f:
+    diff = {k: v for k, v in values.items()
+            if k in CONFIGURABLE_KEYS and v != DEFAULTS[k]}
+    with open('settings.tmp', 'w') as f:
         json.dump(diff, f)
+    try:
+        os.remove('settings.json')
+    except OSError:
+        pass
+    os.rename('settings.tmp', 'settings.json')
 
 def reset():
     """Delete settings.json and restore all defaults in RAM."""
-    import os
     for k in CONFIGURABLE_KEYS:
         globals()[k] = DEFAULTS[k]
     try:

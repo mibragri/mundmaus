@@ -210,7 +210,7 @@ def _mark_boot_ok():
         pass
 
 
-async def async_main():
+async def async_main(wdt):
     print("=" * 42)
     print(f"  MUNDMAUS v{VERSION}")
     print(f"  Board: {BOARD}")
@@ -286,9 +286,6 @@ async def async_main():
     # Mark boot successful (rollback protection)
     _mark_boot_ok()
 
-    # Hardware watchdog (already started in main(), get reference)
-    wdt = machine.WDT(timeout=30000)
-
     gc.collect()
     gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
@@ -334,32 +331,29 @@ def _check_and_install_updates_sync():
 
     print("\n[Updates]")
     from updater import check_manifest
-    for _try in range(1):
-        gc.collect()
-        print(f"  Update-Check (RAM={gc.mem_free()})")
-        try:
-            result = check_manifest()
-        except Exception as e:
-            print(f"  Fehler: {e}")
-            result = {'available': [], 'offline': True}
-        if not result.get('offline'):
-            n = len(result.get('available', []))
-            print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
-            _update_result = result
+    gc.collect()
+    print(f"  Update-Check (RAM={gc.mem_free()})")
+    try:
+        result = check_manifest()
+    except Exception as e:
+        print(f"  Fehler: {e}")
+        result = {'available': [], 'offline': True}
+    if not result.get('offline'):
+        n = len(result.get('available', []))
+        print(f"  {'%d Update(s) verfuegbar' % n if n else 'Alles aktuell'}")
 
-            # Install if requested
-            if install_requested and n > 0:
-                print("\n[Installation]")
-                available = result.get('available', [])
-                def on_progress(f, cur, tot):
-                    print(f"  {cur}/{tot}: {f}")
-                gc.collect()
-                from updater import run_update_sync
-                ok, msg = run_update_sync(available, progress_cb=on_progress)
-                print(f"  {msg}")
-                if ok:
-                    _update_result = {'available': [], 'offline': False}
-            return
+        # Install if requested
+        if install_requested and n > 0:
+            print("\n[Installation]")
+            available = result.get('available', [])
+            def on_progress(f, cur, tot):
+                print(f"  {cur}/{tot}: {f}")
+            gc.collect()
+            from updater import run_update_sync
+            ok, msg = run_update_sync(available, progress_cb=on_progress)
+            print(f"  {msg}")
+            if ok:
+                result = {'available': [], 'offline': False}
     _update_result = result
 
 
@@ -369,7 +363,7 @@ def main():
     _check_and_install_updates_sync()
     wdt.feed()
     try:
-        asyncio.run(async_main())
+        asyncio.run(async_main(wdt))
     except KeyboardInterrupt:
         print("\nBeendet.")
     except Exception as e:

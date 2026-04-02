@@ -103,11 +103,12 @@ class PuffSensor:
         self.calibrate_baseline()
 
     def _read_raw(self):
-        # Wait for DATA low (sensor ready)
+        # Wait for DATA low (sensor ready), max ~10ms
         timeout = 0
         while self.data.value() == 1:
             timeout += 1
-            if timeout > 100000: return 0
+            if timeout > 10000: return 0
+            time.sleep_us(1)
         # Disable interrupts during bit-bang (WiFi/asyncio can corrupt timing)
         irq_state = machine.disable_irq()
         value = 0
