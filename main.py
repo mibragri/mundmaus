@@ -26,7 +26,7 @@ from config import (
     PIN_VRY,
     PUFF_SEND_INTERVAL_MS,
     RECAL_IDLE_MS,
-    SENSOR_POLL_MS,
+
     UPDATE_STATE_FILE,
     VERSION,
     WWW_DIR,
@@ -81,7 +81,7 @@ async def sensor_loop(joystick, puff, server):
             print(f"  sensor_loop: {e}")
 
         _heartbeat['sensor'] = time.ticks_ms()
-        await asyncio.sleep_ms(SENSOR_POLL_MS)
+        await asyncio.sleep_ms(config.SENSOR_POLL_MS)
 
 
 
