@@ -8,6 +8,8 @@ Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Kein Loeten noetig
 
 ![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png)
 
+![Portal](screenshots/portal.png) ![Settings](screenshots/settings.png)
+
 ## So funktioniert es
 
 1. ESP32 liest Joystick (Lippe/Zunge) + Drucksensor (Pusten)
@@ -30,6 +32,16 @@ Drucksensor ──┘                          Solitaire / Schach / Memo
 | **Memo** | Memory-Spiel, 4 Feldgroessen |
 
 Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback, Kiosk-Modus fuer den Patienten, Keyboard-Fallback fuer Pfleger.
+
+### Portal & Einstellungen
+
+Das **Spiele-Portal** erscheint automatisch wenn man die ESP32-Adresse im Browser oeffnet — alle Spiele auf einen Blick, WiFi-Status, Software-Updates.
+
+Die **Einstellungen** (⚙) erlauben Pflegern, Joystick-Empfindlichkeit, Puste-Staerke und Geschwindigkeit per Slider anzupassen — ohne technische Kenntnisse.
+
+### OTA Auto-Update
+
+Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. Beim Einschalten prueft der ESP32 ob Updates verfuegbar sind — ein Klick im Portal installiert sie. Bei fehlgeschlagenem Update: automatischer Rollback auf die vorherige Version.
 
 ## Was du brauchst
 
