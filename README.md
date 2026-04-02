@@ -2,9 +2,9 @@
 
 **Mundgesteuerte Spieleplattform fuer Menschen mit Tetraplegie.**
 
-Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten statt klicken, Joystick statt Maus. Kein Loeten, kein Internet, keine App. Nur WLAN und ein Browser.
+Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten statt klicken, Joystick statt Maus. Kein Internet, keine App. Nur WLAN und ein Browser.
 
-Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Kein Loeten noetig
+Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet werden
 
 ![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png)
 
@@ -56,7 +56,7 @@ Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. 
 | 5 | Micro-USB Kabel (Daten, nicht nur Laden!) | ~3 EUR | Beliebig |
 | 6 | Silikonschlauch 4mm Innendurchmesser | ~3 EUR | Aquarium-Zubehoer |
 
-**Gesamtkosten: ~25 EUR** — kein Loeten, nur DuPont-Kabel zusammenstecken.
+**Gesamtkosten: ~25 EUR** — DuPont-Kabel zusammenstecken. Nur der Drucksensor (HX710B) muss geloetet werden.
 
 > **Gehaeuse:** Ein 3D-druckbares Gehaeuse ist enthalten (`enclosure/`). Ohne 3D-Drucker: Komponenten einfach mit DuPont-Kabeln verbinden — fertig.
 
