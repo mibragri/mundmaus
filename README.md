@@ -52,7 +52,7 @@ Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback,
 
 ### Halterung
 
-Der Joystick wird in einen handelsuebllichen **Mikrofon-Tischstaender** (Schwanenhals) eingespannt — so kann der Patient die Position bequem anpassen. Der Staender haelt das Gehaeuse stabil vor dem Mund, waehrend der Silikonschlauch seitlich zum Drucksensor fuehrt.
+Das Gehaeuse wird in eine handelsueblliche **Mikrofonklemme** auf einem **Mikrofon-Bodenstaender** eingespannt (wie fuer Musiker). Der Staender steht neben dem Bett und positioniert den Joystick vor dem Mund des Patienten. Alternative: ein **Schwanenhals-Tischstaender** fuer kleinere Aufbauten.
 
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
