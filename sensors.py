@@ -25,6 +25,7 @@ class CalibratedJoystick:
         self.last_dir = None
         self.last_nav_time = 0
         self._nav_repeating = False
+        self._dir_lost_time = 0
         self.sw_last = 1
         self.sw_debounce_time = 0
         self.calibrate()
@@ -65,8 +66,14 @@ class CalibratedJoystick:
         now = time.ticks_ms()
         d = self.get_direction()
         if d is None:
-            self.last_dir = None
+            # Hold direction for 100ms to absorb joystick jitter at 50Hz
+            if self.last_dir and self._dir_lost_time == 0:
+                self._dir_lost_time = now
+            elif self.last_dir and time.ticks_diff(now, self._dir_lost_time) > 100:
+                self.last_dir = None
+                self._nav_repeating = False
             return None
+        self._dir_lost_time = 0
         if d != self.last_dir:
             # New direction — fire immediately, start initial delay
             self.last_dir = d
