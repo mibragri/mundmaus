@@ -1,5 +1,4 @@
-// updater.cpp -- OTA update: manifest check + game file download
-// Port of MicroPython updater.py to Arduino/ESP32.
+// updater.cpp -- OTA update: manifest check + game/firmware download
 
 #include "updater.h"
 #include "config.h"
@@ -10,6 +9,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <Update.h>
 
 #include <map>
 
@@ -284,6 +284,86 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
     saveVersions();
 
     return allOk;
+}
+
+// ============================================================
+// FIRMWARE OTA (dual-partition)
+// ============================================================
+
+bool installFirmwareUpdate(const UpdateFile& fw,
+                           std::function<void(int, int)> progressCb) {
+    String url = String(Config::OTA_BASE_URL) + "/" + fw.name;
+    Serial.printf("  OTA: downloading firmware %s\n", fw.name.c_str());
+
+    HTTPClient http;
+    if (!_beginHttps(http, url)) {
+        Serial.println("  OTA: firmware HTTPS failed");
+        return false;
+    }
+
+    int code = http.GET();
+    if (code != 200) {
+        Serial.printf("  OTA: firmware HTTP %d\n", code);
+        http.end();
+        return false;
+    }
+
+    int contentLen = http.getSize();
+    if (contentLen <= 0) {
+        Serial.println("  OTA: firmware size unknown");
+        http.end();
+        return false;
+    }
+
+    Serial.printf("  OTA: firmware size %d bytes\n", contentLen);
+
+    if (!Update.begin(contentLen)) {
+        Serial.printf("  OTA: Update.begin failed: %s\n", Update.errorString());
+        http.end();
+        return false;
+    }
+
+    WiFiClient* stream = http.getStreamPtr();
+    uint8_t buf[4096];
+    int written = 0;
+
+    while (written < contentLen) {
+        int avail = stream->available();
+        if (avail <= 0) {
+            delay(1);
+            continue;
+        }
+        int toRead = min(avail, (int)sizeof(buf));
+        toRead = min(toRead, contentLen - written);
+        int n = stream->readBytes(buf, toRead);
+        if (n <= 0) break;
+
+        if (Update.write(buf, n) != (size_t)n) {
+            Serial.printf("  OTA: write error: %s\n", Update.errorString());
+            Update.abort();
+            http.end();
+            return false;
+        }
+
+        written += n;
+        if (progressCb) {
+            progressCb(written, contentLen);
+        }
+    }
+
+    http.end();
+
+    if (!Update.end(true)) {
+        Serial.printf("  OTA: end failed: %s\n", Update.errorString());
+        return false;
+    }
+
+    // Update firmware version tracking
+    _versions[fw.name] = fw.remoteVer;
+    saveVersions();
+
+    Serial.printf("  OTA: firmware installed (%d bytes)\n", written);
+    return true;
 }
 
 // ============================================================

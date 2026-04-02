@@ -543,10 +543,10 @@ void MundMausServer::_updateTaskWrapper(void* param) {
     MundMausServer* self = static_cast<MundMausServer*>(param);
     QueueHandle_t q = self->_sensorQueue;
 
+    // Install game files first
     bool ok = Updater::installGameUpdates(self->_updateResult.available,
         [q](const String& name, int cur, int total) {
             Serial.printf("  OTA: %s (%d/%d)\n", name.c_str(), cur, total);
-            // I2: Push progress through queue for WS broadcast
             SensorEvent ev;
             ev.type = SensorEvent::UPDATE_PROGRESS;
             strncpy(ev.data, name.c_str(), sizeof(ev.data) - 1);
@@ -556,20 +556,58 @@ void MundMausServer::_updateTaskWrapper(void* param) {
             xQueueSend(q, &ev, 0);
         });
 
+    // Install firmware update if available
+    bool needsReboot = false;
+    for (const auto& uf : self->_updateResult.available) {
+        if (uf.firmware && !uf.deleteFile && uf.name.endsWith(".bin")) {
+            Serial.printf("  OTA: firmware update %s\n", uf.name.c_str());
+            {
+                SensorEvent ev;
+                ev.type = SensorEvent::UPDATE_PROGRESS;
+                strncpy(ev.data, "Firmware...", sizeof(ev.data) - 1);
+                ev.data[sizeof(ev.data) - 1] = '\0';
+                ev.intVal = 0; ev.intVal2 = 1;
+                xQueueSend(q, &ev, 0);
+            }
+            bool fwOk = Updater::installFirmwareUpdate(uf,
+                [q](int written, int total) {
+                    SensorEvent ev;
+                    ev.type = SensorEvent::UPDATE_PROGRESS;
+                    strncpy(ev.data, "Firmware", sizeof(ev.data) - 1);
+                    ev.data[sizeof(ev.data) - 1] = '\0';
+                    ev.intVal = written / 1024;
+                    ev.intVal2 = total / 1024;
+                    xQueueSend(q, &ev, 0);
+                });
+            if (fwOk) needsReboot = true;
+            else ok = false;
+        }
+    }
+
     Serial.printf("  OTA install %s\n", ok ? "OK" : "FAILED");
 
-    // I2: Push completion/error event through queue
+    // Push completion event
     {
         SensorEvent ev;
         if (ok) {
             ev.type = SensorEvent::UPDATE_COMPLETE;
-            strncpy(ev.data, "Update abgeschlossen", sizeof(ev.data) - 1);
+            if (needsReboot) {
+                strncpy(ev.data, "Update OK — Neustart...", sizeof(ev.data) - 1);
+            } else {
+                strncpy(ev.data, "Update abgeschlossen", sizeof(ev.data) - 1);
+            }
         } else {
             ev.type = SensorEvent::UPDATE_ERROR;
             strncpy(ev.data, "Update fehlgeschlagen", sizeof(ev.data) - 1);
         }
         ev.data[sizeof(ev.data) - 1] = '\0';
         xQueueSend(q, &ev, 0);
+    }
+
+    // Reboot after firmware update
+    if (needsReboot) {
+        delay(3000);
+        ESP.restart();
     }
 
     // I1: Push UPDATE_RESULT so main core re-checks manifest (no direct write)

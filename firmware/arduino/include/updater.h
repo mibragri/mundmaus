@@ -1,9 +1,8 @@
 #pragma once
-// updater.h -- OTA update: manifest check + game file download
-// Port of MicroPython updater.py to Arduino/ESP32.
+// updater.h -- OTA update: manifest check + game/firmware download
 // Two OTA paths:
 //   1. Game files (HTML on LittleFS): HTTPS download to LittleFS
-//   2. Firmware binary: detection only (full OTA via Update.h is future work)
+//   2. Firmware binary: HTTPS download to inactive OTA partition (dual-partition rollback)
 
 #include <Arduino.h>
 #include <vector>
@@ -38,11 +37,17 @@ struct CheckResult {
 CheckResult checkManifest();
 
 /// Download and install game file updates to LittleFS.
-/// Skips firmware entries (detection only).
+/// Skips firmware entries.
 /// progressCb(filename, current, total) called per file.
 /// Returns true if all downloads succeeded.
 bool installGameUpdates(const std::vector<UpdateFile>& files,
                         std::function<void(const String&, int, int)> progressCb = nullptr);
+
+/// Download and install firmware update to inactive OTA partition.
+/// Returns true if update was written. Caller should reboot after.
+/// Automatic rollback if new firmware fails to boot.
+bool installFirmwareUpdate(const UpdateFile& fw,
+                           std::function<void(int, int)> progressCb = nullptr);
 
 /// Mark current firmware partition as valid (cancel rollback).
 /// Call after successful boot in setup().

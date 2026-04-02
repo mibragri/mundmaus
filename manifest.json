@@ -8,6 +8,7 @@
     "server.py": { "version": 3, "firmware": true },
     "updater.py": { "version": 2, "firmware": true },
     "wifi_manager.py": { "version": 2, "firmware": true },
+    "firmware.bin": { "version": 1, "firmware": true },
     "www/chess.html.gz": { "version": 3 },
     "www/memo.html.gz": { "version": 3 },
     "www/solitaire.html.gz": { "version": 3 },
