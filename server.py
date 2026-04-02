@@ -267,6 +267,7 @@ class MundMausServer:
                 pass
             finally:
                 client.close()
+                gc.collect()
         except OSError:
             pass
 

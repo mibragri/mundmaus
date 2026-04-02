@@ -18,7 +18,7 @@ from config import (
     AP_PASS,
     AP_SSID,
     BOARD,
-    GC_INTERVAL,
+
     PIN_PUFF_CLK,
     PIN_PUFF_DATA,
     PIN_SW,
@@ -86,7 +86,6 @@ async def sensor_loop(joystick, puff, server):
 
 
 async def server_loop(server, wifi, joystick=None, puff=None):
-    loop_count = 0
     while True:
         try:
             server.poll_http()
@@ -138,11 +137,6 @@ async def server_loop(server, wifi, joystick=None, puff=None):
             print(f"  server_loop: {e}")
 
         _heartbeat['server'] = time.ticks_ms()
-        loop_count += 1
-        if loop_count % GC_INTERVAL == 0:
-            gc.collect()
-            loop_count = 0
-
         await asyncio.sleep_ms(10)
 
 
@@ -295,6 +289,7 @@ async def async_main():
     wdt = machine.WDT(timeout=30000)
 
     gc.collect()
+    gc.threshold(gc.mem_free() // 4 + gc.mem_alloc())
     print(f"\n[Start] RAM frei: {gc.mem_free()} bytes")
     print("Bereit.\n")
 
