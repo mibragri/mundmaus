@@ -96,6 +96,7 @@ class PuffSensor:
         self.baseline = 0
         self.max_range = 1
         self.last_puff_time = 0
+        self._puff_armed = True
         self.samples_buf = [0] * config.PUFF_SAMPLES
         self.sample_idx = 0
         time.sleep_ms(100)
@@ -139,9 +140,19 @@ class PuffSensor:
 
     def detect_puff(self):
         now = time.ticks_ms()
-        if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS: return False
-        if self.read_normalized() >= config.PUFF_THRESHOLD:
+        level = self.read_normalized()
+        # Re-arm after level drops below half threshold (hysteresis)
+        if not self._puff_armed:
+            if level < config.PUFF_THRESHOLD * 0.5:
+                self._puff_armed = True
+            return False
+        # Cooldown between puffs
+        if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS:
+            return False
+        # Rising edge: armed + above threshold = puff
+        if level >= config.PUFF_THRESHOLD:
             self.last_puff_time = now
+            self._puff_armed = False
             return True
         return False
 
