@@ -4,9 +4,7 @@
 - [ ] USB-HID Mouse Mode — ESP32-S3 Dynamic USB, Maussteuerung ohne WiFi (#high)
 - [ ] Sip-and-Puff — Differenzdrucksensor MPXV7002DP als Alternative zum Joystick (#medium)
 - [ ] Weitere Spiele — Snake, weitere Kartenspiele (#medium)
-- [ ] Settings Panel — Threshold/Deadzone über Browser-UI einstellen (#medium)
 - [ ] Input-Profile — Puff/Sip/Wangenluft konfigurierbar je Behinderungsgrad, Action-Mapping im Portal (#high)
-- [ ] Solitaire Ultrawide-Skalierung — vw-Einheiten vs Container-basiert (#low)
 - [ ] mDNS — `mundmaus.local` statt IP-Adresse (#medium)
 - [ ] Housing — Mikrofon-Schwenkarm-Halterung für Joystick (#low)
 - [ ] Raspberry Pi Kiosk — Auto-Start-Script für Kiosk-Modus (#low)
@@ -15,6 +13,24 @@
 
 ## Next
 - [ ] Input-Profile Design — Brainstorming + Spec für konfigurierbare Eingabe-Profile
+
+## Done (2026-04-02)
+- [x] Arduino C++ Firmware v3.2 — PlatformIO, ESPAsyncWebServer, FreeRTOS, 188KB free RAM
+- [x] Settings UI — Browser-Config für Joystick/Puff-Empfindlichkeit (Pfleger-Slider + Expert)
+- [x] ESP32 Robustheit — Smart WDT (30s), faster OTA (1 retry), RAM protection (503 <20KB)
+- [x] GC-Optimierung — gc.threshold() + post-HTTP collect (71KB steady statt 30KB)
+- [x] Gzip-Serving — Pre-komprimierte .html.gz, 4-5x schnellere Seitenauslieferung
+- [x] Upload-Tooling — upload-esp32.sh mit auto mpy-cross + minify + gzip
+- [x] HX710B Sensor-Fix — disable_irq + PULL_DOWN, Rauschen 300k→3.8k
+- [x] Puff-Detection — Adaptive Delta (Original mouthMouse), Cooldown auf Rebounds
+- [x] Non-blocking Sensor-Read — Joystick 50Hz ohne HX710B-Blockade
+- [x] Joystick-Navigation — Jitter-Hold 100ms, Initial-Delay 1.5x, TCP_NODELAY
+- [x] Portal-Fixes — Offline-Updates verborgen, .html.gz Scan, Settings-Link
+- [x] Ultrawide-Fix — --vw: min(1vw, 19.2px) auf allen Spielen
+- [x] Puff-Indicator — Im Header statt Footer, in allen Spielen
+- [x] Portal-Button — 🏠 in Win/Game-Over-Screens (Chess, Memo)
+- [x] README.md — Komplett neu mit Pin-Diagrammen, v3.1 Architektur
+- [x] 3x Code Review — Zero Defects auf MicroPython + Arduino
 
 ## Done (2026-03-30)
 - [x] OTA Auto-Update — Manifest auf mundmaus.de, atomare Installation, Rollback, Recovery-AP
