@@ -81,7 +81,7 @@ class CalibratedJoystick:
             self._nav_repeating = False
             return d
         # Same direction held — initial delay then repeat
-        delay = config.NAV_REPEAT_MS if self._nav_repeating else config.NAV_REPEAT_MS * 2
+        delay = config.NAV_REPEAT_MS if self._nav_repeating else int(config.NAV_REPEAT_MS * 1.5)
         if time.ticks_diff(now, self.last_nav_time) > delay:
             self.last_nav_time = now
             self._nav_repeating = True
