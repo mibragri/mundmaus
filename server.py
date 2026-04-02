@@ -412,6 +412,8 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
             client, _addr = self.ws_server.accept()
             if self._ws_handshake(client):
                 client.setblocking(False)
+                try: client.setsockopt(6, 1, 1)  # SOL_TCP=6, TCP_NODELAY=1
+                except: pass
                 self.ws_clients.append(client)
                 self.ws_send_one(client, {
                     'type': 'wifi_status',
