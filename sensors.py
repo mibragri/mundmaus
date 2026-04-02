@@ -24,6 +24,7 @@ class CalibratedJoystick:
         self.center_y = 2048
         self.last_dir = None
         self.last_nav_time = 0
+        self._nav_repeating = False
         self.sw_last = 1
         self.sw_debounce_time = 0
         self.calibrate()
@@ -66,9 +67,17 @@ class CalibratedJoystick:
         if d is None:
             self.last_dir = None
             return None
-        if d != self.last_dir or time.ticks_diff(now, self.last_nav_time) > config.NAV_REPEAT_MS:
+        if d != self.last_dir:
+            # New direction — fire immediately, start initial delay
             self.last_dir = d
             self.last_nav_time = now
+            self._nav_repeating = False
+            return d
+        # Same direction held — initial delay then repeat
+        delay = config.NAV_REPEAT_MS if self._nav_repeating else config.NAV_REPEAT_MS * 2
+        if time.ticks_diff(now, self.last_nav_time) > delay:
+            self.last_nav_time = now
+            self._nav_repeating = True
             return d
         return None
 
