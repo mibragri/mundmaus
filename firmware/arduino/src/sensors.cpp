@@ -145,7 +145,7 @@ PuffSensor::PuffSensor(int dataPin, int clkPin)
     , _maxRange(1)
     , _lastPuffTime(0)
     , _previousRaw(0)
-    , _rawThreshold(100000)
+    , _rawThreshold(Config::PUFF_RAW_THRESHOLD)
     , _lastRaw(0)
 {
     pinMode(_dataPin, INPUT_PULLDOWN);
@@ -254,7 +254,7 @@ bool PuffSensor::detectPuff() {
     _previousRaw = raw;  // ALWAYS update
 
     bool result = false;
-    if (abs(delta) > _rawThreshold) {
+    if (abs(delta) > Config::PUFF_RAW_THRESHOLD) {
         // Large change detected -- only fire if cooldown elapsed
         if ((now - _lastPuffTime) >= (unsigned long)Config::PUFF_COOLDOWN_MS) {
             result = true;

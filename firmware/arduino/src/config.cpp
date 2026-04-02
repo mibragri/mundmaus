@@ -12,8 +12,9 @@ namespace Config {
 int DEADZONE         = DEFAULT_DEADZONE;
 int NAV_THRESHOLD    = DEFAULT_NAV_THRESHOLD;
 int NAV_REPEAT_MS    = DEFAULT_NAV_REPEAT_MS;
-int PUFF_COOLDOWN_MS = DEFAULT_PUFF_COOLDOWN_MS;
-int SENSOR_POLL_MS   = DEFAULT_SENSOR_POLL_MS;
+int PUFF_COOLDOWN_MS  = DEFAULT_PUFF_COOLDOWN_MS;
+int PUFF_RAW_THRESHOLD = DEFAULT_PUFF_RAW_THRESHOLD;
+int SENSOR_POLL_MS    = DEFAULT_SENSOR_POLL_MS;
 
 // ============================================================
 // KEY TABLES
@@ -24,15 +25,17 @@ const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE] = {
     "NAV_THRESHOLD",
     "NAV_REPEAT_MS",
     "PUFF_COOLDOWN_MS",
+    "PUFF_RAW_THRESHOLD",
     "SENSOR_POLL_MS",
 };
 
 const Range RANGES[NUM_CONFIGURABLE] = {
-    {  10, 1000 },   // DEADZONE
-    { 100, 2000 },   // NAV_THRESHOLD
-    {  50, 2000 },   // NAV_REPEAT_MS
-    {  50, 5000 },   // PUFF_COOLDOWN_MS
-    {   5,  500 },   // SENSOR_POLL_MS
+    {  10,   1000 },   // DEADZONE
+    { 100,   2000 },   // NAV_THRESHOLD
+    {  50,   2000 },   // NAV_REPEAT_MS
+    {  50,   5000 },   // PUFF_COOLDOWN_MS
+    { 10000, 200000 }, // PUFF_RAW_THRESHOLD
+    {   5,    500 },   // SENSOR_POLL_MS
 };
 
 // ============================================================
@@ -46,7 +49,8 @@ static int* _globalPtr(int idx) {
         case 1: return &NAV_THRESHOLD;
         case 2: return &NAV_REPEAT_MS;
         case 3: return &PUFF_COOLDOWN_MS;
-        case 4: return &SENSOR_POLL_MS;
+        case 4: return &PUFF_RAW_THRESHOLD;
+        case 5: return &SENSOR_POLL_MS;
         default: return nullptr;
     }
 }
@@ -57,7 +61,8 @@ static int _defaultVal(int idx) {
         case 1: return DEFAULT_NAV_THRESHOLD;
         case 2: return DEFAULT_NAV_REPEAT_MS;
         case 3: return DEFAULT_PUFF_COOLDOWN_MS;
-        case 4: return DEFAULT_SENSOR_POLL_MS;
+        case 4: return DEFAULT_PUFF_RAW_THRESHOLD;
+        case 5: return DEFAULT_SENSOR_POLL_MS;
         default: return 0;
     }
 }

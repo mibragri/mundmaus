@@ -388,6 +388,19 @@
     <div class="slider-hint">1 = wenig empfindlich / low &nbsp; 10 = sehr empfindlich / high</div>
   </div>
 
+  <!-- Slider: Puff Sensitivity -->
+  <div class="slider-card">
+    <div class="slider-label">
+      <span class="de">Puste-Empfindlichkeit</span>
+      <span class="en">Puff sensitivity</span>
+    </div>
+    <div class="slider-row">
+      <input type="range" id="slider-puff" min="1" max="10" step="1" value="5">
+      <span class="slider-value" id="val-puff">5</span>
+    </div>
+    <div class="slider-hint">1 = stark pusten / strong &nbsp; 10 = leicht / sensitive</div>
+  </div>
+
   <!-- Slider: Speed -->
   <div class="slider-card">
     <div class="slider-label">
@@ -431,6 +444,11 @@
       <span class="unit">ms</span>
     </div>
     <div class="expert-row">
+      <label for="exp-PUFF_RAW_THRESHOLD">PUFF_RAW_THRESHOLD</label>
+      <input type="number" id="exp-PUFF_RAW_THRESHOLD" min="10000" max="200000" step="5000" value="75000">
+      <span class="unit"></span>
+    </div>
+    <div class="expert-row">
       <label for="exp-PUFF_COOLDOWN_MS">PUFF_COOLDOWN_MS</label>
       <input type="number" id="exp-PUFF_COOLDOWN_MS" min="100" max="1000" step="50" value="400">
       <span class="unit">ms</span>
@@ -461,8 +479,10 @@ const $expertToggle = document.getElementById('expert-toggle');
 const $expertPanel = document.getElementById('expert-panel');
 
 const $sliderJoy = document.getElementById('slider-joy');
+const $sliderPuff = document.getElementById('slider-puff');
 const $sliderSpeed = document.getElementById('slider-speed');
 const $valJoy = document.getElementById('val-joy');
+const $valPuff = document.getElementById('val-puff');
 const $valSpeed = document.getElementById('val-speed');
 
 // ── Config state ─────────────────────────────────────────
@@ -478,8 +498,9 @@ const EXPERT_FIELDS = {
   DEADZONE:        { min: 50,   max: 500,  step: 10,   unit: '' },
   NAV_THRESHOLD:   { min: 200,  max: 1500, step: 50,   unit: '' },
   NAV_REPEAT_MS:   { min: 50,   max: 800,  step: 10,   unit: 'ms' },
-  PUFF_COOLDOWN_MS:{ min: 100,  max: 1000, step: 50,   unit: 'ms' },
-  SENSOR_POLL_MS:  { min: 10,   max: 100,  step: 5,    unit: 'ms' }
+  PUFF_COOLDOWN_MS:   { min: 100,   max: 1000,   step: 50,   unit: 'ms' },
+  PUFF_RAW_THRESHOLD: { min: 10000, max: 200000, step: 5000, unit: '' },
+  SENSOR_POLL_MS:     { min: 10,    max: 100,    step: 5,    unit: 'ms' }
 };
 
 // ── Slider ↔ Config mapping (inverse) ────────────────────
@@ -493,6 +514,10 @@ function sliderToConfig(sliderId, sliderVal) {
       return {
         DEADZONE:      Math.round(300 - t * (300 - 50)),
         NAV_THRESHOLD: Math.round(1200 - t * (1200 - 400))
+      };
+    case 'slider-puff':
+      return {
+        PUFF_RAW_THRESHOLD: Math.round(150000 - t * (150000 - 20000))
       };
     case 'slider-speed':
       return {
@@ -512,6 +537,10 @@ function configToSlider(key, value) {
     case 'NAV_THRESHOLD': {
       const t = (1200 - value) / (1200 - 400);
       return { sliderId: 'slider-joy', sliderVal: Math.round(t * 9 + 1) };
+    }
+    case 'PUFF_RAW_THRESHOLD': {
+      const t = (150000 - value) / (150000 - 20000);
+      return { sliderId: 'slider-puff', sliderVal: Math.round(t * 9 + 1) };
     }
     case 'NAV_REPEAT_MS': {
       const t = (500 - value) / (500 - 100);
@@ -539,6 +568,13 @@ function updateSlidersFromConfig() {
     if (m) {
       $sliderJoy.value = clamp(m.sliderVal, 1, 10);
       $valJoy.textContent = $sliderJoy.value;
+    }
+  }
+  if (configCurrent.PUFF_RAW_THRESHOLD !== undefined) {
+    const m = configToSlider('PUFF_RAW_THRESHOLD', configCurrent.PUFF_RAW_THRESHOLD);
+    if (m) {
+      $sliderPuff.value = clamp(m.sliderVal, 1, 10);
+      $valPuff.textContent = $sliderPuff.value;
     }
   }
   if (configCurrent.NAV_REPEAT_MS !== undefined) {
@@ -595,6 +631,7 @@ function onSliderInput(sliderId) {
 }
 
 $sliderJoy.addEventListener('input', () => onSliderInput('slider-joy'));
+$sliderPuff.addEventListener('input', () => onSliderInput('slider-puff'));
 $sliderSpeed.addEventListener('input', () => onSliderInput('slider-speed'));
 
 // ── Expert field event handlers ──────────────────────────
@@ -759,6 +796,7 @@ async function loadSettings() {
       NAV_THRESHOLD: 800,
       NAV_REPEAT_MS: 300,
       PUFF_COOLDOWN_MS: 400,
+      PUFF_RAW_THRESHOLD: 75000,
       SENSOR_POLL_MS: 20
     });
   }

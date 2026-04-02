@@ -59,6 +59,7 @@ constexpr int DEFAULT_CALIBRATION_SAMPLES = 50;
 
 // Puff
 constexpr int DEFAULT_PUFF_COOLDOWN_MS  = 400;
+constexpr int DEFAULT_PUFF_RAW_THRESHOLD = 75000;
 
 // Timing
 constexpr int DEFAULT_RECAL_IDLE_MS         = 10000;
@@ -70,13 +71,14 @@ extern int DEADZONE;
 extern int NAV_THRESHOLD;
 extern int NAV_REPEAT_MS;
 extern int PUFF_COOLDOWN_MS;
+extern int PUFF_RAW_THRESHOLD;
 extern int SENSOR_POLL_MS;
 
 // ============================================================
 // CONFIGURABLE KEYS (for settings UI)
 // ============================================================
 
-constexpr int NUM_CONFIGURABLE = 5;
+constexpr int NUM_CONFIGURABLE = 6;
 
 extern const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE];
 
