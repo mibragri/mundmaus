@@ -3,6 +3,8 @@
 #include "web_server.h"
 #include "portal.h"
 #include "config.h"
+#include "sensors.h"
+#include "updater.h"
 #include <LittleFS.h>
 #include <WiFi.h>
 
@@ -18,6 +20,19 @@ MundMausServer::MundMausServer(WiFiManager& wifi)
     , _pendingReboot(0)
 {
     hwStatus = {false, false, false};
+}
+
+// ============================================================
+// SENSOR + OTA SETTERS
+// ============================================================
+
+void MundMausServer::setSensors(CalibratedJoystick* joy, PuffSensor* puff) {
+    _joystick = joy;
+    _puffSensor = puff;
+}
+
+void MundMausServer::setUpdateResult(const Updater::CheckResult& result) {
+    _updateResult = result;
 }
 
 // ============================================================
@@ -186,33 +201,72 @@ void MundMausServer::_setupHttpRoutes() {
         _pendingReboot = millis();
     });
 
-    // --- GET /api/updates --- (stub, offline)
-    _httpServer.on("/api/updates", HTTP_GET, [](AsyncWebServerRequest* req) {
+    // --- GET /api/updates ---
+    _httpServer.on("/api/updates", HTTP_GET, [this](AsyncWebServerRequest* req) {
         JsonDocument doc;
-        doc["available"] = JsonArray();
-        doc["offline"]   = true;
-        String buf;
-        serializeJson(doc, buf);
-        req->send(200, "application/json", buf);
+        _buildUpdateJson(doc);
+        _sendJson200(req, doc);
     });
 
-    // --- POST /api/updates/check --- (reboot)
+    // --- POST /api/updates/check --- re-check manifest
     _httpServer.on("/api/updates/check", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        _updateResult = Updater::checkManifest();
+
+        JsonDocument doc;
+        doc["ok"] = true;
+        _buildUpdateJson(doc);
+        _sendJson200(req, doc);
+
+        // Broadcast to WS clients
+        JsonDocument wsDoc;
+        wsDoc["type"] = "update_status";
+        _buildUpdateJson(wsDoc);
+        String buf;
+        serializeJson(wsDoc, buf);
+        _ws.textAll(buf);
+    });
+
+    // --- POST /api/update/start --- install game updates
+    _httpServer.on("/api/update/start", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (_updateResult.available.empty() || _updateResult.offline) {
+            JsonDocument doc;
+            doc["ok"]    = false;
+            doc["error"] = "Keine Updates verfuegbar";
+            _sendJson200(req, doc);
+            return;
+        }
+
+        // Send immediate response
         JsonDocument doc;
         doc["ok"]      = true;
-        doc["message"] = "Neustart...";
+        doc["message"] = "Update gestartet...";
         _sendJson200(req, doc);
-        _pendingReboot = millis();
-    });
 
-    // --- POST /api/update/start --- (stub)
-    _httpServer.on("/api/update/start", HTTP_POST, [](AsyncWebServerRequest* req) {
-        JsonDocument doc;
-        doc["ok"]    = false;
-        doc["error"] = "Keine Updates";
+        // Install game files (blocking -- runs on async HTTP task)
+        bool ok = Updater::installGameUpdates(_updateResult.available,
+            [this](const String& name, int cur, int total) {
+                JsonDocument prog;
+                prog["type"]    = "update_progress";
+                prog["file"]    = name;
+                prog["current"] = cur;
+                prog["total"]   = total;
+                String buf;
+                serializeJson(prog, buf);
+                _ws.textAll(buf);
+            });
+
+        // Re-check to clear installed items
+        _updateResult = Updater::checkManifest();
+
+        // Broadcast final status
+        JsonDocument wsDoc;
+        wsDoc["type"]    = "update_status";
+        wsDoc["ok"]      = ok;
+        wsDoc["message"] = ok ? "Update fertig" : "Einige Updates fehlgeschlagen";
+        _buildUpdateJson(wsDoc);
         String buf;
-        serializeJson(doc, buf);
-        req->send(200, "application/json", buf);
+        serializeJson(wsDoc, buf);
+        _ws.textAll(buf);
     });
 
     // --- Static files from LittleFS /www/ ---
@@ -262,11 +316,10 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
         serializeJson(wsDoc, buf);
         client->text(buf);
 
-        // Send update_status (offline stub)
+        // Send update_status
         JsonDocument updDoc;
-        updDoc["type"]      = "update_status";
-        updDoc["available"] = JsonArray();
-        updDoc["offline"]   = true;
+        updDoc["type"] = "update_status";
+        _buildUpdateJson(updDoc);
         String updBuf;
         serializeJson(updDoc, updBuf);
         client->text(updBuf);
@@ -356,9 +409,23 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         _ws.textAll(buf);
 
     } else if (strcmp(type, "calibrate") == 0) {
-        // Stub: sensors not yet implemented
+        // Calibrate joystick center + puff baseline
+        if (_joystick) {
+            _joystick->calibrate();
+        }
+        if (_puffSensor) {
+            _puffSensor->calibrateBaseline();
+        }
+
         JsonDocument resp;
         resp["type"] = "calibrate_done";
+        if (_joystick) {
+            resp["center_x"] = _joystick->centerX;
+            resp["center_y"] = _joystick->centerY;
+        }
+        if (_puffSensor) {
+            resp["baseline"] = _puffSensor->baseline;
+        }
         String buf;
         serializeJson(resp, buf);
         _ws.textAll(buf);
@@ -419,4 +486,25 @@ void MundMausServer::_sendJson(AsyncWebServerRequest* req, int status, JsonDocum
 
 void MundMausServer::_sendJson200(AsyncWebServerRequest* req, JsonDocument& doc) {
     _sendJson(req, 200, doc);
+}
+
+// ============================================================
+// OTA JSON BUILDER
+// ============================================================
+
+void MundMausServer::_buildUpdateJson(JsonDocument& doc) {
+    doc["offline"] = _updateResult.offline;
+    JsonArray arr = doc["available"].to<JsonArray>();
+    for (const auto& uf : _updateResult.available) {
+        JsonObject obj = arr.add<JsonObject>();
+        obj["file"]     = uf.name;
+        obj["from_ver"] = uf.localVer;
+        obj["to_ver"]   = uf.remoteVer;
+        if (uf.firmware) {
+            obj["firmware"] = true;
+        }
+        if (uf.deleteFile) {
+            obj["delete"] = true;
+        }
+    }
 }

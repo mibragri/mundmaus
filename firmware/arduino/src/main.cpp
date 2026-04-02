@@ -1,5 +1,5 @@
 // main.cpp -- MundMaus ESP32 Firmware v3.2 (Arduino)
-// Phase 2+3+4: Boot + WiFi + HTTP Server + WebSocket + Sensors
+// Phases 1-7: Boot + WiFi + HTTP/WS + Sensors + LittleFS + Config + OTA
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
@@ -8,6 +8,7 @@
 #include "wifi_manager.h"
 #include "web_server.h"
 #include "sensors.h"
+#include "updater.h"
 
 // Globals (must outlive setup)
 static WiFiManager wifi;
@@ -164,6 +165,7 @@ void setup() {
     server = new MundMausServer(wifi);
     server->hwStatus.joystick = joystickOk;
     server->hwStatus.puff     = puffOk;
+    server->setSensors(joystick, puffSensor);
     server->start();
 
     // Start sensor task on Core 1, priority 2, 4KB stack
@@ -181,6 +183,23 @@ void setup() {
 
     Serial.printf("\n[Start] Heap frei: %u bytes\n", ESP.getFreeHeap());
     Serial.println("Bereit.\n");
+
+    // Mark firmware boot as valid (cancel OTA rollback)
+    Updater::markBootOk();
+
+    // OTA check (only in station mode with internet)
+    if (wifiMode == "station") {
+        Serial.println("[OTA] Pruefe Updates...");
+        esp_task_wdt_reset();
+        Updater::CheckResult otaResult = Updater::checkManifest();
+        esp_task_wdt_reset();
+        server->setUpdateResult(otaResult);
+        if (!otaResult.offline) {
+            Serial.printf("[OTA] %d Updates verfuegbar\n", otaResult.available.size());
+        } else {
+            Serial.println("[OTA] Offline (Server nicht erreichbar)");
+        }
+    }
 }
 
 // ============================================================

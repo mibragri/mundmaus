@@ -3,8 +3,8 @@
 # don't declare cross-dependencies in their library.properties files.
 # This script:
 #   1. Adds internal library include paths globally (CPPPATH)
-#   2. Force-builds the "Network" library that WiFi depends on but PIO
-#      can't discover (dir name "Network" vs lib name "Networking")
+#   2. Force-builds internal libraries that PIO can't discover via LDF
+#      (e.g. "Network" dir vs "Networking" lib name)
 
 import os
 Import("env")
@@ -23,6 +23,7 @@ internal_libs = [
     "NetworkClientSecure",
     "DNSServer",
     "Ticker",
+    "HTTPClient",
 ]
 
 for lib in internal_libs:
@@ -30,11 +31,9 @@ for lib in internal_libs:
     if os.path.isdir(src_dir):
         env.Append(CPPPATH=[src_dir])
 
-# Force-build the Network library (PIO can't match "Network.h" to
-# the library named "Networking" in library.properties)
-network_src = os.path.join(libs_dir, "Network", "src")
-if os.path.isdir(network_src):
-    env.BuildSources(
-        os.path.join("$BUILD_DIR", "framework_Network"),
-        network_src,
-    )
+# NOTE: Network library used to be force-built here because PIO couldn't
+# discover it (dir "Network" vs library.properties name "Networking").
+# Since Phase 7 (OTA) added HTTPClient, PIO's deep+ LDF discovers Network
+# automatically through HTTPClient's dependency chain. Force-building it
+# here would cause duplicate symbols. The CPPPATH entry above still ensures
+# Network.h is findable during compilation.

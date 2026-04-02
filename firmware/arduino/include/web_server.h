@@ -5,6 +5,11 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include "wifi_manager.h"
+#include "updater.h"
+
+// Forward declarations (avoid pulling in full sensor headers)
+class CalibratedJoystick;
+class PuffSensor;
 
 class MundMausServer {
 public:
@@ -15,6 +20,12 @@ public:
 
     /// Check pending reboot timer, call from loop()
     void checkReboot();
+
+    // -- Sensors (set by main after sensor init) --
+    void setSensors(CalibratedJoystick* joy, PuffSensor* puff);
+
+    // -- OTA update result (set by main after check) --
+    void setUpdateResult(const Updater::CheckResult& result);
 
     // -- Outbound (called by sensor task later) --
     void sendNav(const char* direction);
@@ -35,6 +46,13 @@ private:
     WiFiManager&   _wifi;
     unsigned long  _pendingReboot;  // 0 = none, else millis() when requested
 
+    // Sensor pointers (owned by main, nullable)
+    CalibratedJoystick* _joystick = nullptr;
+    PuffSensor*         _puffSensor = nullptr;
+
+    // Cached OTA check result
+    Updater::CheckResult _updateResult;
+
     void _setupHttpRoutes();
     void _setupWsRoutes();
     void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
@@ -42,4 +60,7 @@ private:
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
     void _sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc);
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);
+
+    // Build JSON for update status (shared by HTTP + WS)
+    void _buildUpdateJson(JsonDocument& doc);
 };

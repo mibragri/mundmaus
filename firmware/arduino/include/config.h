@@ -45,6 +45,7 @@ constexpr const char* WWW_DIR = "/www";
 
 // OTA
 constexpr const char* OTA_BASE_URL = "https://mundmaus.de/ota";
+constexpr const char* OTA_AUTH     = "REDACTED_OTA_AUTH";
 
 // ============================================================
 // RUNTIME-ADJUSTABLE VALUES (defaults + extern globals)
