@@ -149,20 +149,22 @@ class PuffSensor:
         return min(1.0, delta / self.max_range)
 
     def detect_puff(self):
-        """Detect puff as sudden change from previous reading (adaptive baseline).
-        Based on original mouthMouse hx711.py — compares against previousREAD,
-        not fixed baseline. Only triggers on positive delta (pressure increase)
-        to avoid double-trigger from pressure release."""
+        """Detect puff/sip as sudden change from previous reading.
+        Exact port of original mouthMouse hx711.py air_flow() logic:
+        - Any large delta (puff or rebound) resets the cooldown timer
+        - Only fires if cooldown has fully elapsed (sensor stable)
+        - This prevents rebounds from triggering false events."""
         now = time.ticks_ms()
-        if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS:
-            return False
         raw = self._last_raw
         if raw == 0:
             return False
         delta = raw - self.previous_raw
         self.previous_raw = raw
-        # Only positive delta = puff (pressure increase), ignore release
-        if delta > self._raw_threshold:
+        result = False
+        if abs(delta) > self._raw_threshold:
+            # Large change detected — only fire if cooldown elapsed
+            if time.ticks_diff(now, self.last_puff_time) >= config.PUFF_COOLDOWN_MS:
+                result = True
+            # ALWAYS reset cooldown on any large delta (key to preventing rebounds)
             self.last_puff_time = now
-            return True
-        return False
+        return result
