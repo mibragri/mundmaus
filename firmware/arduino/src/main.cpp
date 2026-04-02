@@ -1,11 +1,16 @@
 // main.cpp -- MundMaus ESP32 Firmware v3.2 (Arduino)
-// Phase 1: Boot + WiFi (skeleton)
+// Phase 2+3: Boot + WiFi + HTTP Server + WebSocket
 
 #include <Arduino.h>
 #include <esp_task_wdt.h>
 
 #include "config.h"
 #include "wifi_manager.h"
+#include "web_server.h"
+
+// Globals (must outlive setup)
+static WiFiManager wifi;
+static MundMausServer* server = nullptr;
 
 // ============================================================
 // SETUP
@@ -36,7 +41,6 @@ void setup() {
 
     // WiFi
     Serial.println("\n[Netzwerk]");
-    WiFiManager wifi;
     auto [ip, wifiMode] = wifi.startup();
 
     Serial.println();
@@ -53,15 +57,27 @@ void setup() {
     // Feed WDT after WiFi (may have taken a few seconds)
     esp_task_wdt_reset();
 
+    // HTTP + WebSocket server
+    Serial.println("\n[Server]");
+    server = new MundMausServer(wifi);
+    // TODO: set hwStatus.joystick / .puff when sensors are initialized
+    server->start();
+
     Serial.printf("\n[Start] Heap frei: %u bytes\n", ESP.getFreeHeap());
     Serial.println("Bereit.\n");
 }
 
 // ============================================================
-// LOOP (Phase 1 -- idle, WDT feed only)
+// LOOP
 // ============================================================
 
 void loop() {
     esp_task_wdt_reset();
-    delay(1000);
+
+    // Check pending reboot
+    if (server) {
+        server->checkReboot();
+    }
+
+    delay(10);
 }
