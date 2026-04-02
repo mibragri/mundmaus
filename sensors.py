@@ -113,7 +113,7 @@ class PuffSensor:
         self.max_range = 1
         self.last_puff_time = 0
         self.previous_raw = 0
-        self._raw_threshold = 100000
+        self._raw_threshold = config.PUFF_RAW_THRESHOLD
         self._last_raw = 0
         time.sleep_ms(100)
         self.calibrate_baseline()
@@ -186,7 +186,7 @@ class PuffSensor:
         delta = raw - self.previous_raw
         self.previous_raw = raw
         result = False
-        if abs(delta) > self._raw_threshold:
+        if abs(delta) > config.PUFF_RAW_THRESHOLD:
             # Large change detected — only fire if cooldown elapsed
             if time.ticks_diff(now, self.last_puff_time) >= config.PUFF_COOLDOWN_MS:
                 result = True

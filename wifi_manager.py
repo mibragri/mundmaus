@@ -121,9 +121,9 @@ class WiFiManager:
             rssi = self.sta.status('rssi')
             if rssi >= -50:
                 return rssi, 'Perfekt'
-            elif rssi >= -65:
+            elif rssi >= -60:
                 return rssi, 'Gut'
-            elif rssi >= -80:
+            elif rssi >= -70:
                 return rssi, 'Schwach'
             else:
                 return rssi, 'Sehr schwach'
