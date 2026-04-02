@@ -22,6 +22,8 @@ CalibratedJoystick::CalibratedJoystick(int pinX, int pinY, int pinSW)
     , _swDebounceTime(0)
 {
     pinMode(_pinSW, INPUT_PULLUP);
+    analogSetPinAttenuation(_pinX, ADC_11db);
+    analogSetPinAttenuation(_pinY, ADC_11db);
     calibrate();
 }
 
