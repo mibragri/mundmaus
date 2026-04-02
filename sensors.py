@@ -102,13 +102,10 @@ class PuffSensor:
         time.sleep_ms(100)
         self.calibrate_baseline()
 
-    def _read_raw(self):
-        # Wait for DATA low (sensor ready), max ~10ms
-        timeout = 0
-        while self.data.value() == 1:
-            timeout += 1
-            if timeout > 10000: return 0
-            time.sleep_us(1)
+    def _read_raw_nonblocking(self):
+        """Read sensor only if data ready (DATA low). Returns 0 if not ready."""
+        if self.data.value() == 1:
+            return 0  # Not ready — don't wait
         # Disable interrupts during bit-bang (WiFi/asyncio can corrupt timing)
         irq_state = machine.disable_irq()
         value = 0
@@ -125,11 +122,20 @@ class PuffSensor:
             value -= 0x1000000
         return value
 
+    def _read_raw_blocking(self):
+        """Read sensor, waiting up to ~10ms for data ready. For calibration only."""
+        timeout = 0
+        while self.data.value() == 1:
+            timeout += 1
+            if timeout > 10000: return 0
+            time.sleep_us(1)
+        return self._read_raw_nonblocking()
+
     def calibrate_baseline(self, samples=30):
         print("  Drucksensor Kalibrierung...")
         readings = []
         for _ in range(samples):
-            r = self._read_raw()
+            r = self._read_raw_blocking()
             if r != 0: readings.append(r)
             time.sleep_ms(20)
         if readings:
@@ -139,8 +145,10 @@ class PuffSensor:
         print(f"  Baseline={self.baseline} range={self.max_range}")
 
     def poll(self):
-        """Read sensor once per loop. Call this before detect_puff()/get_level()."""
-        self._last_raw = self._read_raw()
+        """Non-blocking read. Skips if sensor not ready (DATA high)."""
+        raw = self._read_raw_nonblocking()
+        if raw != 0:
+            self._last_raw = raw
 
     def get_level(self):
         """Normalized level relative to fixed baseline (for puff level indicator)."""
