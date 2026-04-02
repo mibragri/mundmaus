@@ -91,9 +91,21 @@ KY-023 Joystick          ESP32-WROOM         HX710B Drucksensor
 
 Detaillierte Pin-Tabelle mit Display-Pins: siehe [MUNDMAUS-SETUP.md](MUNDMAUS-SETUP.md).
 
+## Firmware-Varianten
+
+Zwei Firmware-Optionen — gleiche Features, gleiche HTML-Spiele:
+
+| | MicroPython | Arduino C++ |
+|---|---|---|
+| Sprache | Python | C++ (PlatformIO) |
+| RAM frei | ~80 KB | ~188 KB |
+| Dev-Zyklus | 2-5s (mpremote) | 10-30s (compile+flash) |
+| OTA | Dateibasiert (.py/.html) | Dual-Partition + LittleFS |
+| Verzeichnis | `*.py` (Root) | `firmware/arduino/` |
+
 ## Setup
 
-### 1. MicroPython flashen
+### Option A: MicroPython flashen
 
 ```bash
 pip3 install esptool mpremote mpy-cross
@@ -121,6 +133,21 @@ mpremote connect /dev/ttyUSB0 cp games/solitaire.html :/www/
 mpremote connect /dev/ttyUSB0 cp games/chess.html :/www/
 mpremote connect /dev/ttyUSB0 cp games/memo.html :/www/
 ```
+
+### Option B: Arduino C++ flashen
+
+```bash
+cd firmware/arduino
+pip install platformio
+
+# Firmware kompilieren + flashen:
+pio run -e esp32 -t upload
+
+# Spieledateien (LittleFS) flashen:
+pio run -e esp32 -t uploadfs
+```
+
+Beim ersten Boot ohne WiFi: Credentials per Serial senden (`SSID:PASSWORD`) oder ueber den MundMaus-Hotspot konfigurieren.
 
 ### 3. Verbinden und spielen
 
@@ -154,6 +181,12 @@ mundmaus/
 │   ├── provision-esp32.sh # Erstinstallation (Flash + Upload)
 │   ├── deploy-ota.sh     # OTA-Dateien auf Server deployen
 │   └── test-esp32.sh     # Syntax-Check + Boot-Test + E2E
+├── firmware/
+│   └── arduino/          # Arduino C++ Firmware (PlatformIO)
+│       ├── platformio.ini
+│       ├── include/      # Header files
+│       ├── src/          # C++ Implementation
+│       └── data/www/     # LittleFS Game-Dateien
 ├── enclosure/            # 3D-Gehaeuse (CadQuery)
 ├── site/                 # mundmaus.de Website
 ├── MUNDMAUS.md           # Technische Dokumentation

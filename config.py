@@ -77,7 +77,12 @@ SENSOR_POLL_MS = 20
 
 # OTA
 OTA_BASE_URL = 'https://mundmaus.de/ota'
-OTA_AUTH = 'REDACTED_OTA_AUTH'
+OTA_AUTH = ''  # Base64 user:pass — set in ota_auth.py (gitignored)
+try:
+    from ota_auth import OTA_AUTH as _a
+    OTA_AUTH = _a
+except:
+    pass
 VERSIONS_FILE = 'versions.json'
 UPDATE_STATE_FILE = 'update_state.json'
 

@@ -45,7 +45,7 @@ constexpr const char* WWW_DIR = "/www";
 
 // OTA
 constexpr const char* OTA_BASE_URL = "https://mundmaus.de/ota";
-constexpr const char* OTA_AUTH     = "REDACTED_OTA_AUTH";
+constexpr const char* OTA_AUTH     = "";  // Base64 user:pass — override via build flag -DOTA_AUTH_B64=\"...\"
 
 // ============================================================
 // RUNTIME-ADJUSTABLE VALUES (defaults + extern globals)
