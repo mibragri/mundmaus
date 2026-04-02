@@ -90,31 +90,37 @@ class CalibratedJoystick:
 
 class PuffSensor:
     def __init__(self, data_pin, clk_pin):
-        self.data = machine.Pin(data_pin, machine.Pin.IN)
+        self.data = machine.Pin(data_pin, machine.Pin.IN, machine.Pin.PULL_DOWN)
         self.clk = machine.Pin(clk_pin, machine.Pin.OUT)
         self.clk.value(0)
         self.baseline = 0
         self.max_range = 1
         self.last_puff_time = 0
         self.previous_raw = 0
-        # Puff detection threshold in raw ADC units (from original mouthMouse)
         self._raw_threshold = 100000
         time.sleep_ms(100)
         self.calibrate_baseline()
 
     def _read_raw(self):
+        # Wait for DATA low (sensor ready)
         timeout = 0
         while self.data.value() == 1:
             timeout += 1
             if timeout > 100000: return 0
+        # Disable interrupts during bit-bang (WiFi/asyncio can corrupt timing)
+        irq_state = machine.disable_irq()
         value = 0
         for i in range(24):
-            self.clk.value(1); time.sleep_us(1)
+            self.clk.value(1)
+            self.clk.value(0)
             value = (value << 1) | self.data.value()
-            self.clk.value(0); time.sleep_us(1)
-        self.clk.value(1); time.sleep_us(1)
-        self.clk.value(0); time.sleep_us(1)
-        if value & 0x800000: value -= 0x1000000
+        # 25th pulse: select next conversion (gain 128)
+        self.clk.value(1)
+        self.clk.value(0)
+        machine.enable_irq(irq_state)
+        # Sign extension
+        if value > 0x7fffff:
+            value -= 0x1000000
         return value
 
     def calibrate_baseline(self, samples=30):
