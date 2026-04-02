@@ -240,7 +240,6 @@ class MundMausServer:
         self.http_server = None
         self._pending_reboot = 0  # 0 = no reboot, else = ticks_ms when requested
         self._update_info = None  # Set by updater after manifest check
-        self._portal_cache = None  # Cached portal HTML bytes
 
     def start(self):
         self.http_server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -326,10 +325,8 @@ class MundMausServer:
             else:
                 _send_404(client, path)
         elif 'GET / ' in fl or 'GET /index' in fl:
-            if not self._portal_cache:
-                p = _generate_portal(self.wifi, self.wifi.ip, getattr(self, 'hw_status', None))
-                self._portal_cache = p.encode('utf-8') if isinstance(p, str) else p
-            p_bytes = self._portal_cache
+            p = _generate_portal(self.wifi, self.wifi.ip, getattr(self, 'hw_status', None))
+            p_bytes = p.encode('utf-8') if isinstance(p, str) else p
             client.send(b'HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n')
             client.send(f'Content-Length: {len(p_bytes)}\r\nConnection: close\r\n\r\n'.encode())
             for i in range(0, len(p_bytes), 2048):
@@ -484,7 +481,9 @@ document.getElementById('st').textContent=d.message||'OK'}}catch(e){{document.ge
 
     def ws_send_one(self, client, message):
         try:
-            client.send(self._ws_frame(json.dumps(message).encode()))
+            frame = self._ws_frame(json.dumps(message).encode())
+            if not frame: return
+            client.send(frame)
         except:
             pass
 

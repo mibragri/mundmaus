@@ -107,9 +107,8 @@ def update(key, value):
         return
     if not isinstance(value, (int, float)):
         return
-    value = int(value) if isinstance(value, float) and value == int(value) else value
     lo, hi = _RANGES.get(key, (0, 100000))
-    globals()[key] = max(lo, min(hi, value))
+    globals()[key] = int(max(lo, min(hi, value)))
 
 def get_all():
     """Return dict of all configurable values."""
