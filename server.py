@@ -87,14 +87,23 @@ def _generate_portal(wifi, wifi_ip, hw_status=None):
     recovery_banner = '<div style="background:#8b0000;padding:12px;border-radius:8px;margin-bottom:1em;max-width:800px;width:100%;text-align:center;margin-top:1em">&#9888; Update failed / Update fehlgeschlagen</div>' if recovery else ''
 
     games = []
+    _skip = ('index', 'settings')
     try:
         for entry in os.listdir(WWW_DIR):
-            if entry.endswith('.html') and entry not in ('index.html', 'settings.html'):
-                _names = {'memo': 'Memo', 'solitaire': 'Solitaer'}
+            if entry.endswith('.html.gz'):
+                raw = entry[:-8]
+            elif entry.endswith('.html'):
                 raw = entry[:-5]
-                name = _names.get(raw, raw.replace('-', ' ').replace('_', ' '))
-                name = name[0].upper() + name[1:] if name else name
-                games.append((entry, name))
+            else:
+                continue
+            if raw in _skip:
+                continue
+            _names = {'memo': 'Memo', 'solitaire': 'Solitaer'}
+            name = _names.get(raw, raw.replace('-', ' ').replace('_', ' '))
+            name = name[0].upper() + name[1:] if name else name
+            html_name = raw + '.html'
+            if html_name not in [g[0] for g in games]:
+                games.append((html_name, name))
     except OSError:
         pass
 
@@ -310,7 +319,7 @@ class MundMausServer:
         elif f'GET /{WWW_DIR}/' in fl:
             path = fl.split(' ')[1].lstrip('/')
             accept_gz = 'gzip' in request.lower()
-            if '..' not in path and _file_exists(path):
+            if '..' not in path and (_file_exists(path) or (accept_gz and _file_exists(path + '.gz'))):
                 _serve_file(client, path, accept_gzip=accept_gz)
             else:
                 _send_404(client, path)
