@@ -6,7 +6,7 @@ Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten
 
 Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Kein Loeten noetig
 
-![Chess](screenshots/chess.png)
+![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png)
 
 ## So funktioniert es
 
@@ -40,12 +40,13 @@ Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback,
 | 1 | ESP32-WROOM-32 DevKit (mit Pins!) | ~8 EUR | AZ-Delivery ESP32 DevKitC V4 |
 | 2 | KY-023 Joystick Modul | ~3 EUR | AZ-Delivery KY-023 |
 | 3 | Drucksensor MPS20N0040D-S + HX710B | ~5 EUR | eBay/AliExpress "MPS20N0040D HX710B" |
-| 4 | Breadboard (830 Kontakte) | ~3 EUR | Beliebig |
-| 5 | DuPont Jumper-Kabel (M-M + M-F) | ~3 EUR | 40 Stueck Set |
-| 6 | Micro-USB Kabel (Daten, nicht nur Laden!) | ~3 EUR | Beliebig |
-| 7 | Silikonschlauch 4mm Innendurchmesser | ~3 EUR | Aquarium-Zubehoer |
+| 4 | DuPont Jumper-Kabel (M-M + M-F) | ~3 EUR | 40 Stueck Set |
+| 5 | Micro-USB Kabel (Daten, nicht nur Laden!) | ~3 EUR | Beliebig |
+| 6 | Silikonschlauch 4mm Innendurchmesser | ~3 EUR | Aquarium-Zubehoer |
 
-**Gesamtkosten: ~25-30 EUR** — kein Loeten, nur zusammenstecken.
+**Gesamtkosten: ~25 EUR** — kein Loeten, nur DuPont-Kabel zusammenstecken.
+
+> **Gehaeuse:** Ein 3D-druckbares Gehaeuse ist enthalten (`enclosure/`). Ohne 3D-Drucker: Komponenten einfach mit DuPont-Kabeln verbinden — fertig.
 
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
@@ -181,8 +182,9 @@ mundmaus/
 │   ├── memo.html         # Memory/Memo
 │   └── settings.html     # Einstellungen
 ├── firmware/arduino/     # Arduino C++ Firmware (Alternative)
-├── enclosure/            # 3D-Gehaeuse (CadQuery)
+├── enclosure/            # 3D-Gehaeuse (CadQuery, druckfertig)
 ├── tools/                # Deploy- und Build-Scripts
+├── website/              # mundmaus.de Webseite (separat)
 ├── MUNDMAUS.md           # Detaillierte technische Dokumentation
 └── MUNDMAUS-SETUP.md     # Hardware-Setup-Anleitung mit Pin-Tabellen
 ```
