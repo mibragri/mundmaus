@@ -136,8 +136,29 @@ void setup() {
     Serial.printf( "  Board: %s\n", BOARD_NAME);
     Serial.println("==========================================");
 
-    // WiFi
+    // WiFi — serial provisioning if no credentials saved
     Serial.println("\n[Netzwerk]");
+    if (!wifi.loadCredentials()) {
+        Serial.println("  Keine WLAN-Daten. Serial-Provisioning (5s):");
+        Serial.println("  Format: SSID:PASSWORD");
+        unsigned long deadline = millis() + 5000;
+        while (millis() < deadline) {
+            if (Serial.available()) {
+                String line = Serial.readStringUntil('\n');
+                line.trim();
+                int sep = line.indexOf(':');
+                if (sep > 0) {
+                    String ssid = line.substring(0, sep);
+                    String pass = line.substring(sep + 1);
+                    wifi.saveCredentials(ssid, pass);
+                    Serial.printf("  WiFi gespeichert: %s\n", ssid.c_str());
+                    break;
+                }
+            }
+            delay(50);
+            esp_task_wdt_reset();
+        }
+    }
     auto [ip, wifiMode] = wifi.startup();
 
     Serial.println();
