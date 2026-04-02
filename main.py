@@ -59,6 +59,7 @@ async def sensor_loop(joystick, puff, server):
                 idle_start = now
 
             if puff:
+                puff.poll()
                 if time.ticks_diff(now, last_puff_send) > PUFF_SEND_INTERVAL_MS:
                     level = puff.get_level()
                     if level > 0.02:

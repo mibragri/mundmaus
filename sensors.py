@@ -98,6 +98,7 @@ class PuffSensor:
         self.last_puff_time = 0
         self.previous_raw = 0
         self._raw_threshold = 100000
+        self._last_raw = 0
         time.sleep_ms(100)
         self.calibrate_baseline()
 
@@ -136,9 +137,13 @@ class PuffSensor:
             self.previous_raw = self.baseline
         print(f"  Baseline={self.baseline} range={self.max_range}")
 
-    def read_normalized(self):
+    def poll(self):
+        """Read sensor once per loop. Call this before detect_puff()/get_level()."""
+        self._last_raw = self._read_raw()
+
+    def get_level(self):
         """Normalized level relative to fixed baseline (for puff level indicator)."""
-        raw = self._read_raw()
+        raw = self._last_raw
         if raw == 0: return 0.0
         delta = abs(raw - self.baseline)
         return min(1.0, delta / self.max_range)
@@ -146,21 +151,18 @@ class PuffSensor:
     def detect_puff(self):
         """Detect puff as sudden change from previous reading (adaptive baseline).
         Based on original mouthMouse hx711.py — compares against previousREAD,
-        not fixed baseline. This handles sensor drift automatically."""
+        not fixed baseline. Only triggers on positive delta (pressure increase)
+        to avoid double-trigger from pressure release."""
         now = time.ticks_ms()
         if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS:
             return False
-        raw = self._read_raw()
+        raw = self._last_raw
         if raw == 0:
             return False
         delta = raw - self.previous_raw
-        # Always update previous (adaptive baseline — key insight from original)
         self.previous_raw = raw
-        # Detect significant change in either direction
-        if abs(delta) > self._raw_threshold:
+        # Only positive delta = puff (pressure increase), ignore release
+        if delta > self._raw_threshold:
             self.last_puff_time = now
             return True
         return False
-
-    def get_level(self):
-        return self.read_normalized()
