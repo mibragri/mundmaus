@@ -18,8 +18,11 @@ MundMausServer::MundMausServer(WiFiManager& wifi)
     , _ws("/")
     , _wifi(wifi)
     , _pendingReboot(0)
-    , _sensorQueue(xQueueCreate(20, sizeof(SensorEvent)))
+    , _sensorQueue(xQueueCreate(32, sizeof(SensorEvent)))  // M1: increased from 20 for OTA events
 {
+    if (!_sensorQueue) {
+        Serial.println("  ERROR: Failed to create sensor queue!");
+    }
     hwStatus = {false, false, false};
 }
 
@@ -97,6 +100,9 @@ void MundMausServer::_setupHttpRoutes() {
         // Body handler
         [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total) {
             // Accumulate body (single chunk for small JSON)
+            // M2: _tempObject leaks if client disconnects mid-upload.
+            // ESPAsyncWebServer does not call body handler on disconnect,
+            // so we cannot free it. Library limitation, not fixable here.
             if (index == 0) {
                 req->_tempObject = new String();
             }
@@ -149,7 +155,7 @@ void MundMausServer::_setupHttpRoutes() {
                 doc["message"] = msg;
                 _sendJson200(req, doc);
 
-                _pendingReboot = millis();
+                _pendingReboot = millis() | 1;  // I3: ensure nonzero
             }
         }
     );
@@ -199,7 +205,7 @@ void MundMausServer::_setupHttpRoutes() {
         JsonDocument doc;
         doc["ok"] = true;
         _sendJson200(req, doc);
-        _pendingReboot = millis();
+        _pendingReboot = millis() | 1;  // I3: ensure nonzero
     });
 
     // --- GET /api/updates ---
@@ -215,7 +221,7 @@ void MundMausServer::_setupHttpRoutes() {
         doc["ok"]      = true;
         doc["message"] = "Neustart fuer Update-Pruefung...";
         _sendJson200(req, doc);
-        _pendingReboot = millis();  // OTA check runs automatically on boot
+        _pendingReboot = millis() | 1;  // I3: ensure nonzero; OTA check runs automatically on boot
     });
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
@@ -331,7 +337,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
             serializeJson(resp, buf);
             _ws.textAll(buf);
 
-            _pendingReboot = millis();
+            _pendingReboot = millis() | 1;  // I3: ensure nonzero
         }
 
     } else if (strcmp(type, "wifi_scan") == 0) {
@@ -348,8 +354,13 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
 
     } else if (strcmp(type, "config_preview") == 0) {
         const char* key = msg["key"] | "";
-        if (strlen(key) > 0 && msg["value"].is<int>()) {
-            Config::update(key, msg["value"].as<int>());
+        if (strlen(key) > 0) {
+            // M3: Accept both int and float values (JS may send 1.0 for 1)
+            if (msg["value"].is<int>()) {
+                Config::update(key, msg["value"].as<int>());
+            } else if (msg["value"].is<float>()) {
+                Config::update(key, (int)msg["value"].as<float>());
+            }
         }
 
     } else if (strcmp(type, "config_save") == 0) {
@@ -442,17 +453,38 @@ void MundMausServer::processSensorQueue() {
         case SensorEvent::CALIBRATE_DONE: {
             // C1: Match MicroPython JSON keys exactly
             doc["type"] = "calibrate_done";
-            if (ev.intData[0] != 0 || ev.intData[1] != 0) {
+            if (ev.intVal != 0 || ev.intVal2 != 0) {
                 JsonArray jc = doc["joy_center"].to<JsonArray>();
-                jc.add(ev.intData[0]);
-                jc.add(ev.intData[1]);
+                jc.add(ev.intVal);
+                jc.add(ev.intVal2);
             }
-            if (ev.intData2 != 0) {
-                doc["puff_baseline"] = ev.intData2;
+            if (ev.intVal3 != 0) {
+                doc["puff_baseline"] = ev.intVal3;
             }
             break;
         }
+        case SensorEvent::UPDATE_PROGRESS:
+            doc["type"]    = "update_progress";
+            doc["current"] = ev.intVal;
+            doc["total"]   = ev.intVal2;
+            doc["file"]    = ev.data;
+            break;
+        case SensorEvent::UPDATE_COMPLETE:
+            doc["type"]    = "update_complete";
+            doc["message"] = ev.data;
+            break;
+        case SensorEvent::UPDATE_ERROR:
+            doc["type"]  = "update_error";
+            doc["file"]  = ev.data;
+            doc["error"] = ev.data;  // error detail in data field
+            break;
+        case SensorEvent::UPDATE_RESULT:
+            // Safe assignment on main core (fixes I1 data race)
+            _updateResult = Updater::checkManifest();
+            break;
         }
+        // UPDATE_RESULT is internal-only, no WS broadcast needed
+        if (ev.type == SensorEvent::UPDATE_RESULT) continue;
         String buf;
         serializeJson(doc, buf);
         _ws.textAll(buf);
@@ -511,15 +543,44 @@ void MundMausServer::_buildUpdateJson(JsonDocument& doc) {
 
 void MundMausServer::_updateTaskWrapper(void* param) {
     MundMausServer* self = static_cast<MundMausServer*>(param);
+    QueueHandle_t q = self->_sensorQueue;
 
     bool ok = Updater::installGameUpdates(self->_updateResult.available,
-        [](const String& name, int cur, int total) {
+        [q](const String& name, int cur, int total) {
             Serial.printf("  OTA: %s (%d/%d)\n", name.c_str(), cur, total);
+            // I2: Push progress through queue for WS broadcast
+            SensorEvent ev;
+            ev.type = SensorEvent::UPDATE_PROGRESS;
+            strncpy(ev.data, name.c_str(), sizeof(ev.data) - 1);
+            ev.data[sizeof(ev.data) - 1] = '\0';
+            ev.intVal  = cur;
+            ev.intVal2 = total;
+            xQueueSend(q, &ev, 0);
         });
 
-    // Re-check to clear installed items
-    self->_updateResult = Updater::checkManifest();
     Serial.printf("  OTA install %s\n", ok ? "OK" : "FAILED");
+
+    // I2: Push completion/error event through queue
+    {
+        SensorEvent ev;
+        if (ok) {
+            ev.type = SensorEvent::UPDATE_COMPLETE;
+            strncpy(ev.data, "Update abgeschlossen", sizeof(ev.data) - 1);
+        } else {
+            ev.type = SensorEvent::UPDATE_ERROR;
+            strncpy(ev.data, "Update fehlgeschlagen", sizeof(ev.data) - 1);
+        }
+        ev.data[sizeof(ev.data) - 1] = '\0';
+        xQueueSend(q, &ev, 0);
+    }
+
+    // I1: Push UPDATE_RESULT so main core re-checks manifest (no direct write)
+    {
+        SensorEvent ev;
+        ev.type = SensorEvent::UPDATE_RESULT;
+        ev.data[0] = '\0';
+        xQueueSend(q, &ev, 0);
+    }
 
     // Delete this one-shot task
     vTaskDelete(nullptr);

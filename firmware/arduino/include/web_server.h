@@ -14,11 +14,13 @@ class PuffSensor;
 
 // Thread-safe event for sensor->WS bridge (I1)
 struct SensorEvent {
-    enum Type { NAV, ACTION, PUFF_LEVEL, CALIBRATE_DONE } type;
-    char data[16];   // direction string or action kind
+    enum Type { NAV, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
+                UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT } type;
+    char data[64];   // direction string, action kind, or filename/message
     float value;     // for puff_level
-    int intData[2];  // for calibrate_done: centerX, centerY
-    int intData2;    // for calibrate_done: baseline
+    int intVal;      // for progress current/total, calibrate centerX
+    int intVal2;     // for progress total, calibrate centerY
+    int intVal3;     // for calibrate_done: baseline
 };
 
 class MundMausServer {

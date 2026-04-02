@@ -50,9 +50,9 @@ static void sensorTask(void* param) {
             SensorEvent ev;
             ev.type = SensorEvent::CALIBRATE_DONE;
             ev.value = 0;
-            ev.intData[0] = joystick ? joystick->centerX : 0;
-            ev.intData[1] = joystick ? joystick->centerY : 0;
-            ev.intData2   = puffSensor ? puffSensor->baseline : 0;
+            ev.intVal  = joystick ? joystick->centerX : 0;
+            ev.intVal2 = joystick ? joystick->centerY : 0;
+            ev.intVal3 = puffSensor ? puffSensor->baseline : 0;
             xQueueSend(server->sensorQueue(), &ev, 0);
         }
 
