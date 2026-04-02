@@ -13,6 +13,7 @@ wifi.json
 # IDE / tools
 .mypy_cache/
 .venv/
+.platformio/
 .playwright-mcp/
 result.json
 enclosure/result.json
