@@ -2,6 +2,7 @@
 // Phases 1-7: Boot + WiFi + HTTP/WS + Sensors + LittleFS + Config + OTA
 
 #include <Arduino.h>
+#include <WiFi.h>
 #include <esp_task_wdt.h>
 
 #include "config.h"
@@ -32,6 +33,28 @@ static void sensorTask(void* param) {
 
     for (;;) {
         unsigned long now = millis();
+
+        // -- I3: Handle calibrate request from WS handler (non-blocking) --
+        if (server->calibrateRequested) {
+            server->calibrateRequested = false;
+            Serial.println("  Calibrating (from WS request)...");
+
+            if (joystick) {
+                joystick->calibrate();
+            }
+            if (puffSensor) {
+                puffSensor->calibrateBaseline();
+            }
+
+            // C1: Send calibrate_done with correct JSON keys (match MicroPython)
+            SensorEvent ev;
+            ev.type = SensorEvent::CALIBRATE_DONE;
+            ev.value = 0;
+            ev.intData[0] = joystick ? joystick->centerX : 0;
+            ev.intData[1] = joystick ? joystick->centerY : 0;
+            ev.intData2   = puffSensor ? puffSensor->baseline : 0;
+            xQueueSend(server->sensorQueue(), &ev, 0);
+        }
 
         // -- Joystick navigation --
         const char* nav = joystick->pollNavigation();
@@ -168,12 +191,12 @@ void setup() {
     server->setSensors(joystick, puffSensor);
     server->start();
 
-    // Start sensor task on Core 1, priority 2, 4KB stack
+    // Start sensor task on Core 1, priority 2, 8KB stack (I7: increased from 4KB)
     sensorHeartbeat = millis();
     xTaskCreatePinnedToCore(
         sensorTask,
         "sensors",
-        4096,
+        8192,
         nullptr,
         2,              // priority (above loop's 1)
         nullptr,
@@ -207,11 +230,29 @@ void setup() {
 // ============================================================
 
 void loop() {
+    // N6: Only feed WDT if sensor task is alive
+    if (millis() - sensorHeartbeat > 30000) {
+        Serial.println("  WDT: sensor task hung, NOT feeding");
+        return;  // Let WDT reset the device
+    }
     esp_task_wdt_reset();
 
-    // Check pending reboot
     if (server) {
+        // I1: Process sensor events on main core (thread-safe WS broadcast)
+        server->processSensorQueue();
+
+        // Check pending reboot
         server->checkReboot();
+    }
+
+    // I6: WiFi reconnect (check every 30s)
+    static unsigned long lastWifiCheck = 0;
+    if (millis() - lastWifiCheck > 30000) {
+        lastWifiCheck = millis();
+        if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
+            Serial.println("  WiFi lost, reconnecting...");
+            wifi.connectStation(8000);
+        }
     }
 
     delay(10);

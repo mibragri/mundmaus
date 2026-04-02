@@ -4,12 +4,22 @@
 
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
+#include <freertos/queue.h>
 #include "wifi_manager.h"
 #include "updater.h"
 
 // Forward declarations (avoid pulling in full sensor headers)
 class CalibratedJoystick;
 class PuffSensor;
+
+// Thread-safe event for sensor->WS bridge (I1)
+struct SensorEvent {
+    enum Type { NAV, ACTION, PUFF_LEVEL, CALIBRATE_DONE } type;
+    char data[16];   // direction string or action kind
+    float value;     // for puff_level
+    int intData[2];  // for calibrate_done: centerX, centerY
+    int intData2;    // for calibrate_done: baseline
+};
 
 class MundMausServer {
 public:
@@ -27,10 +37,19 @@ public:
     // -- OTA update result (set by main after check) --
     void setUpdateResult(const Updater::CheckResult& result);
 
-    // -- Outbound (called by sensor task later) --
+    // -- Outbound (thread-safe: pushes to queue, safe from any core) --
     void sendNav(const char* direction);
     void sendAction(const char* kind);
     void sendPuffLevel(float value);
+
+    /// Drain sensor queue and broadcast via WS (call from loop(), main core)
+    void processSensorQueue();
+
+    /// Queue handle accessor (for sensor task calibrate_done)
+    QueueHandle_t sensorQueue() const { return _sensorQueue; }
+
+    /// Set by WS handler, checked by sensor task (I3: non-blocking calibrate)
+    volatile bool calibrateRequested = false;
 
     /// Hardware status (set by main before start)
     struct HwStatus {
@@ -44,7 +63,10 @@ private:
     AsyncWebServer _wsHttpServer;   // HTTP server on port 81 for WS upgrade
     AsyncWebSocket _ws;
     WiFiManager&   _wifi;
-    unsigned long  _pendingReboot;  // 0 = none, else millis() when requested
+    volatile unsigned long _pendingReboot;  // 0 = none, else millis() when requested (M5: volatile)
+
+    // Thread-safe sensor->WS queue (I1)
+    QueueHandle_t _sensorQueue;
 
     // Sensor pointers (owned by main, nullable)
     CalibratedJoystick* _joystick = nullptr;
@@ -63,4 +85,7 @@ private:
 
     // Build JSON for update status (shared by HTTP + WS)
     void _buildUpdateJson(JsonDocument& doc);
+
+    // I5: One-shot FreeRTOS task for blocking OTA downloads
+    static void _updateTaskWrapper(void* param);
 };

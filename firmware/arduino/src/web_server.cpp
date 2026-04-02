@@ -18,6 +18,7 @@ MundMausServer::MundMausServer(WiFiManager& wifi)
     , _ws("/")
     , _wifi(wifi)
     , _pendingReboot(0)
+    , _sensorQueue(xQueueCreate(20, sizeof(SensorEvent)))
 {
     hwStatus = {false, false, false};
 }
@@ -208,25 +209,16 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
     });
 
-    // --- POST /api/updates/check --- re-check manifest
+    // --- POST /api/updates/check --- I4: reboot to re-check (matches MicroPython)
     _httpServer.on("/api/updates/check", HTTP_POST, [this](AsyncWebServerRequest* req) {
-        _updateResult = Updater::checkManifest();
-
         JsonDocument doc;
-        doc["ok"] = true;
-        _buildUpdateJson(doc);
+        doc["ok"]      = true;
+        doc["message"] = "Neustart fuer Update-Pruefung...";
         _sendJson200(req, doc);
-
-        // Broadcast to WS clients
-        JsonDocument wsDoc;
-        wsDoc["type"] = "update_status";
-        _buildUpdateJson(wsDoc);
-        String buf;
-        serializeJson(wsDoc, buf);
-        _ws.textAll(buf);
+        _pendingReboot = millis();  // OTA check runs automatically on boot
     });
 
-    // --- POST /api/update/start --- install game updates
+    // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
     _httpServer.on("/api/update/start", HTTP_POST, [this](AsyncWebServerRequest* req) {
         if (_updateResult.available.empty() || _updateResult.offline) {
             JsonDocument doc;
@@ -242,32 +234,12 @@ void MundMausServer::_setupHttpRoutes() {
         doc["message"] = "Update gestartet...";
         _sendJson200(req, doc);
 
-        // Install game files (blocking -- runs on async HTTP task)
-        bool ok = Updater::installGameUpdates(_updateResult.available,
-            [this](const String& name, int cur, int total) {
-                JsonDocument prog;
-                prog["type"]    = "update_progress";
-                prog["file"]    = name;
-                prog["current"] = cur;
-                prog["total"]   = total;
-                String buf;
-                serializeJson(prog, buf);
-                _ws.textAll(buf);
-            });
-
-        // Re-check to clear installed items
-        _updateResult = Updater::checkManifest();
-
-        // Broadcast final status
-        JsonDocument wsDoc;
-        wsDoc["type"]    = "update_status";
-        wsDoc["ok"]      = ok;
-        wsDoc["message"] = ok ? "Update fertig" : "Einige Updates fehlgeschlagen";
-        _buildUpdateJson(wsDoc);
-        String buf;
-        serializeJson(wsDoc, buf);
-        _ws.textAll(buf);
+        // Spawn one-shot task for blocking HTTPS downloads
+        xTaskCreate(_updateTaskWrapper, "ota_install", 8192, this, 1, nullptr);
     });
+
+    // --- OTA update task wrapper (I5: runs blocking downloads off async context) ---
+    // (static method defined below, declared in header)
 
     // --- Static files from LittleFS /www/ ---
     _httpServer.serveStatic("/www/", LittleFS, "/www/")
@@ -409,26 +381,8 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         _ws.textAll(buf);
 
     } else if (strcmp(type, "calibrate") == 0) {
-        // Calibrate joystick center + puff baseline
-        if (_joystick) {
-            _joystick->calibrate();
-        }
-        if (_puffSensor) {
-            _puffSensor->calibrateBaseline();
-        }
-
-        JsonDocument resp;
-        resp["type"] = "calibrate_done";
-        if (_joystick) {
-            resp["center_x"] = _joystick->centerX;
-            resp["center_y"] = _joystick->centerY;
-        }
-        if (_puffSensor) {
-            resp["baseline"] = _puffSensor->baseline;
-        }
-        String buf;
-        serializeJson(resp, buf);
-        _ws.textAll(buf);
+        // I3: Don't block async handler -- set flag, sensor task handles it
+        calibrateRequested = true;
     }
 }
 
@@ -437,30 +391,72 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
 // ============================================================
 
 void MundMausServer::sendNav(const char* direction) {
-    JsonDocument doc;
-    doc["type"] = "nav";
-    doc["dir"]  = direction;
-    String buf;
-    serializeJson(doc, buf);
-    _ws.textAll(buf);
+    // I1: Push to queue -- processed on main core in processSensorQueue()
+    SensorEvent ev;
+    ev.type = SensorEvent::NAV;
+    strncpy(ev.data, direction, sizeof(ev.data) - 1);
+    ev.data[sizeof(ev.data) - 1] = '\0';
+    ev.value = 0;
+    xQueueSend(_sensorQueue, &ev, 0);  // non-blocking
 }
 
 void MundMausServer::sendAction(const char* kind) {
-    JsonDocument doc;
-    doc["type"] = "action";
-    doc["kind"] = kind;
-    String buf;
-    serializeJson(doc, buf);
-    _ws.textAll(buf);
+    SensorEvent ev;
+    ev.type = SensorEvent::ACTION;
+    strncpy(ev.data, kind, sizeof(ev.data) - 1);
+    ev.data[sizeof(ev.data) - 1] = '\0';
+    ev.value = 0;
+    xQueueSend(_sensorQueue, &ev, 0);
 }
 
 void MundMausServer::sendPuffLevel(float value) {
-    JsonDocument doc;
-    doc["type"]  = "puff_level";
-    doc["value"] = serialized(String(value, 3));
-    String buf;
-    serializeJson(doc, buf);
-    _ws.textAll(buf);
+    // N1: NaN/Inf safety + clamp
+    if (isnan(value) || isinf(value)) value = 0.0f;
+    value = constrain(value, 0.0f, 1.0f);
+
+    SensorEvent ev;
+    ev.type = SensorEvent::PUFF_LEVEL;
+    ev.data[0] = '\0';
+    ev.value = value;
+    xQueueSend(_sensorQueue, &ev, 0);
+}
+
+// I1: Drain queue and broadcast via WS (runs on main core, same as AsyncTCP)
+void MundMausServer::processSensorQueue() {
+    SensorEvent ev;
+    while (xQueueReceive(_sensorQueue, &ev, 0) == pdTRUE) {
+        JsonDocument doc;
+        switch (ev.type) {
+        case SensorEvent::NAV:
+            doc["type"] = "nav";
+            doc["dir"]  = ev.data;
+            break;
+        case SensorEvent::ACTION:
+            doc["type"] = "action";
+            doc["kind"] = ev.data;
+            break;
+        case SensorEvent::PUFF_LEVEL:
+            doc["type"]  = "puff_level";
+            doc["value"] = serialized(String(ev.value, 3));
+            break;
+        case SensorEvent::CALIBRATE_DONE: {
+            // C1: Match MicroPython JSON keys exactly
+            doc["type"] = "calibrate_done";
+            if (ev.intData[0] != 0 || ev.intData[1] != 0) {
+                JsonArray jc = doc["joy_center"].to<JsonArray>();
+                jc.add(ev.intData[0]);
+                jc.add(ev.intData[1]);
+            }
+            if (ev.intData2 != 0) {
+                doc["puff_baseline"] = ev.intData2;
+            }
+            break;
+        }
+        }
+        String buf;
+        serializeJson(doc, buf);
+        _ws.textAll(buf);
+    }
 }
 
 // ============================================================
@@ -507,4 +503,24 @@ void MundMausServer::_buildUpdateJson(JsonDocument& doc) {
             obj["delete"] = true;
         }
     }
+}
+
+// ============================================================
+// OTA UPDATE TASK (I5: one-shot FreeRTOS task for blocking downloads)
+// ============================================================
+
+void MundMausServer::_updateTaskWrapper(void* param) {
+    MundMausServer* self = static_cast<MundMausServer*>(param);
+
+    bool ok = Updater::installGameUpdates(self->_updateResult.available,
+        [](const String& name, int cur, int total) {
+            Serial.printf("  OTA: %s (%d/%d)\n", name.c_str(), cur, total);
+        });
+
+    // Re-check to clear installed items
+    self->_updateResult = Updater::checkManifest();
+    Serial.printf("  OTA install %s\n", ok ? "OK" : "FAILED");
+
+    // Delete this one-shot task
+    vTaskDelete(nullptr);
 }
