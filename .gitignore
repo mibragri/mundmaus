@@ -37,6 +37,10 @@ ota_auth.py
 # Project agent config (not for public)
 PROJECT.md
 CLAUDE.md
+TASKS.md
+project.toml
+pyproject.toml
+uv.lock
 
 # Brainstorm sessions
 .superpowers/
@@ -47,3 +51,5 @@ tests/e2e/test-results/
 
 # Downloaded firmware binary (re-downloaded on demand)
 tools/.micropython-firmware.bin
+docs/plans/
+docs/specs/
