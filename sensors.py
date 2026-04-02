@@ -96,9 +96,9 @@ class PuffSensor:
         self.baseline = 0
         self.max_range = 1
         self.last_puff_time = 0
-        self._puff_armed = True
-        self.samples_buf = [0] * config.PUFF_SAMPLES
-        self.sample_idx = 0
+        self.previous_raw = 0
+        # Puff detection threshold in raw ADC units (from original mouthMouse)
+        self._raw_threshold = 100000
         time.sleep_ms(100)
         self.calibrate_baseline()
 
@@ -127,32 +127,32 @@ class PuffSensor:
         if readings:
             self.baseline = sum(readings) // len(readings)
             self.max_range = abs(self.baseline) * 0.5 if self.baseline != 0 else 100000
+            self.previous_raw = self.baseline
         print(f"  Baseline={self.baseline} range={self.max_range}")
 
     def read_normalized(self):
+        """Normalized level relative to fixed baseline (for puff level indicator)."""
         raw = self._read_raw()
         if raw == 0: return 0.0
         delta = abs(raw - self.baseline)
-        n = min(1.0, delta / self.max_range)
-        self.samples_buf[self.sample_idx] = n
-        self.sample_idx = (self.sample_idx + 1) % config.PUFF_SAMPLES
-        return sum(self.samples_buf) / config.PUFF_SAMPLES
+        return min(1.0, delta / self.max_range)
 
     def detect_puff(self):
+        """Detect puff as sudden change from previous reading (adaptive baseline).
+        Based on original mouthMouse hx711.py — compares against previousREAD,
+        not fixed baseline. This handles sensor drift automatically."""
         now = time.ticks_ms()
-        level = self.read_normalized()
-        # Re-arm after level drops below half threshold (hysteresis)
-        if not self._puff_armed:
-            if level < config.PUFF_THRESHOLD * 0.5:
-                self._puff_armed = True
-            return False
-        # Cooldown between puffs
         if time.ticks_diff(now, self.last_puff_time) < config.PUFF_COOLDOWN_MS:
             return False
-        # Rising edge: armed + above threshold = puff
-        if level >= config.PUFF_THRESHOLD:
+        raw = self._read_raw()
+        if raw == 0:
+            return False
+        delta = raw - self.previous_raw
+        # Always update previous (adaptive baseline — key insight from original)
+        self.previous_raw = raw
+        # Detect significant change in either direction
+        if abs(delta) > self._raw_threshold:
             self.last_puff_time = now
-            self._puff_armed = False
             return True
         return False
 
