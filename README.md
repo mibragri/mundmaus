@@ -48,6 +48,12 @@ Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback,
 
 > **Gehaeuse:** Ein 3D-druckbares Gehaeuse ist enthalten (`enclosure/`). Ohne 3D-Drucker: Komponenten einfach mit DuPont-Kabeln verbinden — fertig.
 
+![Gehaeuse](enclosure/mundmaus_v55_assembly.png)
+
+### Halterung
+
+Der Joystick wird in einen handelsuebllichen **Mikrofon-Tischstaender** (Schwanenhals) eingespannt — so kann der Patient die Position bequem anpassen. Der Staender haelt das Gehaeuse stabil vor dem Mund, waehrend der Silikonschlauch seitlich zum Drucksensor fuehrt.
+
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
 ### Verkabelung
