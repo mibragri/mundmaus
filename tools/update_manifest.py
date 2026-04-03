@@ -22,25 +22,24 @@ def compute_hash(filepath):
 
 
 def scan_files(project_dir):
-    """Find all firmware (.py) and game (.html) files for manifest."""
+    """Find game .html files for manifest.
+
+    Manifest keys use .html.gz suffix (matching what the ESP32 stores
+    on LittleFS and what deploy-ota.sh uploads). The hash is computed
+    from the source .html file to detect content changes.
+
+    MicroPython .py files are NOT included — the active firmware is
+    Arduino C++ which does not use them.
+    """
     project_dir = Path(project_dir)
     files = []
 
-    # Firmware files (*.py in root, excluding non-firmware)
-    for p in project_dir.glob('*.py'):
-        if p.name not in FIRMWARE_EXCLUDES:
-            files.append({
-                'name': p.name,
-                'path': p,
-                'firmware': True,
-            })
-
-    # Game files (games/*.html → www/*.html on ESP32)
+    # Game files (games/*.html → www/*.html.gz on ESP32)
     games_dir = project_dir / GAME_DIR
     if games_dir.exists():
         for p in games_dir.glob('*.html'):
             files.append({
-                'name': f'www/{p.name}',
+                'name': f'www/{p.name}.gz',
                 'path': p,
                 'firmware': False,
             })
