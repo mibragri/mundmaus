@@ -1,19 +1,55 @@
 {
   "manifest_version": 1,
   "files": {
-    "config.py": { "version": 3, "firmware": true },
-    "display.py": { "version": 2, "firmware": true },
-    "main.py": { "version": 3, "firmware": true },
-    "sensors.py": { "version": 3, "firmware": true },
-    "server.py": { "version": 3, "firmware": true },
-    "updater.py": { "version": 2, "firmware": true },
-    "wifi_manager.py": { "version": 2, "firmware": true },
-    "firmware.bin": { "version": 303, "firmware": true },
-    "www/chess.html.gz": { "version": 3 },
-    "www/memo.html.gz": { "version": 3 },
-    "www/solitaire.html.gz": { "version": 3 },
-    "www/settings.html.gz": { "version": 1 },
-    "www/vier-gewinnt.html.gz": { "version": 1 },
-    "www/freecell.html.gz": { "version": 1 }
+    "config.py": {
+      "version": 4,
+      "firmware": true
+    },
+    "display.py": {
+      "version": 2,
+      "firmware": true
+    },
+    "main.py": {
+      "version": 4,
+      "firmware": true
+    },
+    "ota_auth.py": {
+      "version": 1,
+      "firmware": true
+    },
+    "sensors.py": {
+      "version": 4,
+      "firmware": true
+    },
+    "server.py": {
+      "version": 4,
+      "firmware": true
+    },
+    "updater.py": {
+      "version": 3,
+      "firmware": true
+    },
+    "wifi_manager.py": {
+      "version": 3,
+      "firmware": true
+    },
+    "www/chess.html.gz": {
+      "version": 4
+    },
+    "www/freecell.html.gz": {
+      "version": 2
+    },
+    "www/memo.html.gz": {
+      "version": 4
+    },
+    "www/settings.html.gz": {
+      "version": 2
+    },
+    "www/solitaire.html.gz": {
+      "version": 4
+    },
+    "www/vier-gewinnt.html.gz": {
+      "version": 2
+    }
   }
 }
