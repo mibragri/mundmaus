@@ -68,6 +68,8 @@ Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. 
 
 Das Gehaeuse wird in eine handelsueblliche **Mikrofonklemme** auf einem **Mikrofon-Bodenstaender** eingespannt (wie fuer Musiker). Der Staender steht neben dem Bett und positioniert den Joystick vor dem Mund des Patienten. Alternative: ein **Schwanenhals-Tischstaender** fuer kleinere Aufbauten.
 
+> **Mundstueck:** Das 3D-druckbare Mundstueck sitzt auf dem Joystick und hat einen seitlichen Schlauchanschluss fuer den Drucksensor. CAD-Modell: [OnShape](https://cad.onshape.com/documents/95d3a4d6faad26c25a2f7521/w/612dd5f1a9d3cf74ba406bb7/e/fc37b7a7abf844a33ef56714)
+
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
 ### Verkabelung
@@ -94,7 +96,7 @@ ESP32 DevKitC V4          KY-023 Joystick         HX710B + Drucksensor
 
 **Schlauch-Anschluss:** Silikonschlauch auf den Barb (Nippel) des Drucksensors stecken. Das andere Ende haelt der Patient im Mund. Leichtes Pusten = Klick.
 
-> Detaillierte Pin-Tabelle (inkl. ESP32-S3 und optionales Display): siehe [MUNDMAUS-SETUP.md](MUNDMAUS-SETUP.md)
+> Detaillierte Pin-Tabelle (inkl. ESP32-S3 und optionales Display): siehe [TECHNICAL.md](TECHNICAL.md)
 
 ## Firmware aufspielen
 
@@ -208,8 +210,7 @@ mundmaus/
 ├── enclosure/            # 3D-Gehaeuse (CadQuery, druckfertig)
 ├── tools/                # Deploy- und Build-Scripts
 ├── website/              # mundmaus.de Webseite (separat)
-├── MUNDMAUS.md           # Detaillierte technische Dokumentation
-└── MUNDMAUS-SETUP.md     # Hardware-Setup-Anleitung mit Pin-Tabellen
+└── TECHNICAL.md          # Hardware-Details, Protokolle, Raspberry Pi Setup
 ```
 
 ## FAQ
