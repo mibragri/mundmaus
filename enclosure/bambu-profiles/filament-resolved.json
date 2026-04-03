@@ -46,10 +46,10 @@
     "50"
   ],
   "eng_plate_temp": [
-    "70"
+    "80"
   ],
   "eng_plate_temp_initial_layer": [
-    "70"
+    "80"
   ],
   "fan_cooling_layer_time": [
     "30"
@@ -122,7 +122,7 @@
     "1.75"
   ],
   "filament_flow_ratio": [
-    "0.95"
+    "0.90"
   ],
   "filament_flush_temp": [
     "240",
@@ -279,10 +279,10 @@
     "0"
   ],
   "hot_plate_temp": [
-    "75"
+    "80"
   ],
   "hot_plate_temp_initial_layer": [
-    "75"
+    "80"
   ],
   "hole_coef_1": [
     "0"
@@ -313,12 +313,12 @@
     "270"
   ],
   "nozzle_temperature": [
-    "235",
-    "235"
+    "230",
+    "230"
   ],
   "nozzle_temperature_initial_layer": [
-    "240",
-    "240"
+    "235",
+    "235"
   ],
   "no_slow_down_for_cooling_on_outwalls": [
     "0"
@@ -343,10 +343,10 @@
     "0"
   ],
   "supertack_plate_temp": [
-    "70"
+    "80"
   ],
   "supertack_plate_temp_initial_layer": [
-    "70"
+    "80"
   ],
   "slow_down_for_layer_cooling": [
     "1"
@@ -361,10 +361,10 @@
     "70"
   ],
   "textured_plate_temp": [
-    "75"
+    "80"
   ],
   "textured_plate_temp_initial_layer": [
-    "75"
+    "80"
   ],
   "volumetric_speed_coefficients": [
     "0 0 0 0 0 0"
@@ -390,7 +390,7 @@
     "fdm_filament_template_direct_dual"
   ],
   "from": "system",
-  "name": "Generic PETG HF @BBL P2S 0.4 nozzle",
+  "name": "GratKit PETG @BBL P2S 0.4 nozzle",
   "setting_id": "GFG96",
   "instantiation": "true"
 }
