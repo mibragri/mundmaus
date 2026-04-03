@@ -12,7 +12,13 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 echo -e "${YELLOW}=== MundMaus OTA Deploy ===${NC}"
 
-# --- Pre-flight ---
+# --- Pre-flight: game completeness check ---
+echo -e "\n${YELLOW}--- Game completeness check ---${NC}"
+if ! bash "$SCRIPT_DIR/check-games.sh"; then
+    echo -e "${RED}Game check failed. Fix missing items before deploying.${NC}"
+    exit 1
+fi
+
 if [[ ! -f "$MANIFEST" ]]; then
     echo -e "${RED}ERROR: manifest.json not found. Run tools/update_manifest.py first.${NC}"
     exit 1
