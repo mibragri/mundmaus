@@ -131,6 +131,16 @@ CheckResult checkManifest() {
             localVer = it->second;
         }
 
+        // After fresh flash: file exists on LittleFS but NVS has no version.
+        // Seed version from manifest instead of offering a redundant re-download.
+        if (localVer == 0 && !isFirmware) {
+            String path = "/" + fname;
+            if (LittleFS.exists(path)) {
+                _versions[fname] = remoteVer;
+                localVer = remoteVer;
+            }
+        }
+
         if (remoteVer > localVer) {
             UpdateFile uf;
             uf.name      = fname;
@@ -154,6 +164,9 @@ CheckResult checkManifest() {
             result.available.push_back(uf);
         }
     }
+
+    // Persist any seeded versions from fresh-flash detection
+    saveVersions();
 
     Serial.printf("  OTA: %d updates available\n", result.available.size());
     return result;
