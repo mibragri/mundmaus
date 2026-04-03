@@ -1,38 +1,6 @@
 {
   "manifest_version": 1,
   "files": {
-    "config.py": {
-      "version": 4,
-      "firmware": true
-    },
-    "display.py": {
-      "version": 2,
-      "firmware": true
-    },
-    "main.py": {
-      "version": 4,
-      "firmware": true
-    },
-    "ota_auth.py": {
-      "version": 1,
-      "firmware": true
-    },
-    "sensors.py": {
-      "version": 4,
-      "firmware": true
-    },
-    "server.py": {
-      "version": 4,
-      "firmware": true
-    },
-    "updater.py": {
-      "version": 3,
-      "firmware": true
-    },
-    "wifi_manager.py": {
-      "version": 3,
-      "firmware": true
-    },
     "www/chess.html.gz": {
       "version": 4
     },
