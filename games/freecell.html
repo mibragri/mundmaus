@@ -7,7 +7,7 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>">
 <style>
   :root {
-    --bg: #1a1a2e;
+    --bg: #000000;
     --felt: #1a1a2e;
     --felt-dark: #131b2e;
     --card-white: #f5f0e8;
@@ -15,17 +15,17 @@
     --card-back-pattern: #3a6bb5;
     --red: #c02020;
     --black: #1a1a1a;
-    --highlight: #1565C0;
+    --highlight: #FFFFFF;
     --highlight-strong: #ffffff;
-    --highlight-glow: rgba(21, 101, 192, 0.5);
-    --highlight-border: #1565C0;
+    --highlight-glow: rgba(255, 255, 255, 0.6);
+    --highlight-border: #FFFFFF;
     --sel-color: #FF8F00;
     --sel-glow: rgba(255, 143, 0, 0.6);
     --sel-border: #E65100;
     --target: #ff66ff;
     --target-glow: rgba(255, 102, 255, 0.5);
     --target-border: #ff66ff;
-    --nav-color: #1565C0;
+    --nav-color: #FFFFFF;
     --success: #4caf50;
     --text: #e8e8e8;
     --text-dim: #b8c4d0;
@@ -94,7 +94,7 @@
     border-color: var(--nav-color);
     border-style: solid;
     border-width: 5px;
-    box-shadow: 0 0 16px rgba(21,101,192,0.4);
+    box-shadow: 0 0 16px rgba(255,255,255,0.4);
   }
 
   .pile-slot.selected-state {
@@ -159,10 +159,10 @@
   }
 
   .card.face-up.nav-cursor {
-    background: #BBDEFB !important;
-    outline: 5px solid #1565C0;
+    background: #E0E0E0 !important;
+    outline: 5px solid #FFFFFF;
     outline-offset: 1px;
-    box-shadow: 0 0 20px rgba(21,101,192,0.5), var(--card-shadow);
+    box-shadow: 0 0 20px rgba(255,255,255,0.5), var(--card-shadow);
     transform: scale(1.04);
     z-index: 899 !important;
   }
@@ -453,7 +453,7 @@
 
   .action-btn.active {
     color: var(--highlight);
-    border-color: rgba(21, 101, 192, 0.3);
+    border-color: rgba(255, 255, 255, 0.3);
   }
 
   /* Kiosk */
