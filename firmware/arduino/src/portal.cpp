@@ -110,7 +110,7 @@ else if(d.type==='action'&&_navItems.length){_navItems[_navIdx].click()}};}conne
 fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{});
 async function startUpdate(){document.getElementById('upd-info').textContent='\u2b07...';document.getElementById('upd-btn').style.display='none';try{await fetch('/api/update/start',{method:'POST'})}catch(e){document.getElementById('upd-info').textContent='Fehler: '+e}}
 let _navIdx=0;const _navItems=document.querySelectorAll('.g');
-function _navUpdate(){_navItems.forEach((el,i)=>{el.style.border=i===_navIdx?'2px solid #FFD700':'2px solid rgba(255,215,0,.3)';el.style.boxShadow=i===_navIdx?'0 0 20px rgba(255,215,0,.5)':'none'})}
+function _navUpdate(){_navItems.forEach((el,i)=>{el.style.border=i===_navIdx?'4px solid #00e5ff':'2px solid rgba(255,255,255,.15)';el.style.boxShadow=i===_navIdx?'0 0 24px rgba(0,229,255,.6)':'none'})}
 if(_navItems.length)_navUpdate();
 document.addEventListener('keydown',function(e){if(!_navItems.length)return;if(e.key==='ArrowRight'||e.key==='ArrowDown'){_navIdx=Math.min(_navItems.length-1,_navIdx+1);_navUpdate()}else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){_navIdx=Math.max(0,_navIdx-1);_navUpdate()}else if(e.key===' '||e.key==='Enter'){_navItems[_navIdx].click()}});
 </script>)==";
