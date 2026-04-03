@@ -10,8 +10,6 @@
 
   :root {
     --bg: #000000;
-    --felt: #000000;
-    --felt-dark: #000000;
     --card-white: #f5f0e8;
     --card-back: #2c5aa0;
     --card-back-pattern: #3a6bb5;
@@ -44,9 +42,9 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
   body {
-    background: var(--felt);
+    background: var(--bg);
     background-image:
-      radial-gradient(ellipse at 50% 0%, var(--felt) 0%, var(--felt-dark) 100%);
+      radial-gradient(ellipse at 50% 0%, var(--bg) 0%, var(--bg) 100%);
     font-family: 'Outfit', sans-serif;
     color: var(--text);
     overflow: hidden;
