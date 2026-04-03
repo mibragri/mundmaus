@@ -276,5 +276,30 @@ void loop() {
         }
     }
 
+    // Periodic OTA check (every 3 hours, non-blocking)
+    static unsigned long lastOtaCheck = 0;
+    static volatile bool otaCheckRunning = false;
+    if (wifi.mode == "station" && !otaCheckRunning &&
+        (millis() - lastOtaCheck > 3UL * 60 * 60 * 1000)) {
+        lastOtaCheck = millis();
+        otaCheckRunning = true;
+        xTaskCreate([](void* param) {
+            Serial.println("[OTA] Periodische Pruefung...");
+            Updater::CheckResult result = Updater::checkManifest();
+            if (!result.offline) {
+                Serial.printf("[OTA] %d Updates verfuegbar\n", result.available.size());
+            }
+            MundMausServer* srv = static_cast<MundMausServer*>(param);
+            srv->setUpdateResult(result);
+            // Push WS notification to connected clients
+            SensorEvent ev;
+            ev.type = SensorEvent::UPDATE_RESULT;
+            ev.data[0] = '\0';
+            xQueueSend(srv->sensorQueue(), &ev, 0);
+            otaCheckRunning = false;
+            vTaskDelete(nullptr);
+        }, "ota_check", 8192, server, 1, nullptr);
+    }
+
     delay(10);
 }

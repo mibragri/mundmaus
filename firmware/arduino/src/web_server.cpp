@@ -492,15 +492,18 @@ void MundMausServer::processSensorQueue() {
             doc["error"] = ev.data;  // error detail in data field
             break;
         case SensorEvent::UPDATE_RESULT:
-            // Clear available list locally instead of re-fetching from network.
-            // A blocking checkManifest() here would freeze joystick for up to 23s.
-            // Next boot does a fresh manifest check anyway.
-            _updateResult.available.clear();
-            _updateResult.offline = false;
-            break;
+            // Result was already set by the caller (OTA task or periodic check).
+            // Broadcast update_status to all WS clients so portal refreshes.
+            {
+                JsonDocument updDoc;
+                updDoc["type"] = "update_status";
+                _buildUpdateJson(updDoc);
+                String updBuf;
+                serializeJson(updDoc, updBuf);
+                _ws.textAll(updBuf);
+            }
+            continue;  // already broadcast, skip generic textAll below
         }
-        // UPDATE_RESULT is internal-only, no WS broadcast needed
-        if (ev.type == SensorEvent::UPDATE_RESULT) continue;
         String buf;
         serializeJson(doc, buf);
         _ws.textAll(buf);
