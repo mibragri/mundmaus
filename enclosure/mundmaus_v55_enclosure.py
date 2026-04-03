@@ -548,10 +548,12 @@ def make_lid() -> cq.Workplane:
     # Each gusset: 5mm along Y (out from wall), 5mm along Z (down from ceiling).
     gusset_h, gusset_d = 5.0, 5.0  # height (Z) and depth (Y)
     wall_top_z = LID_INNER_H  # ceiling in lid coords
+    wall_x_start = ESP_POS_X - wall_len / 2  # = 23.0 (ESP32 area, must be +X)
+    assert wall_x_start > 0, f"wall_x_start={wall_x_start} must be positive (+X = ESP32 side)"
     for side in [-1, 1]:
         gy = ESP_POS_Y + side * wall_t / 2  # wall surface Y
         gusset = (cq.Workplane("YZ")
-                  .workplane(offset=ESP_POS_X - wall_len / 2)
+                  .workplane(offset=wall_x_start)
                   .moveTo(gy, wall_top_z)
                   .lineTo(gy + side * gusset_d, wall_top_z)
                   .lineTo(gy, wall_top_z - gusset_h)
