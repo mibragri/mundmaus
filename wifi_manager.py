@@ -80,6 +80,7 @@ class WiFiManager:
         self.ip = self.sta.ifconfig()[0]
         self.mode = 'station'
         print(f"  Verbunden: {self.ip}")
+        self._start_mdns()
         return self.ip
 
     def start_ap(self):
@@ -91,7 +92,16 @@ class WiFiManager:
             time.sleep_ms(100)
         self.ip = self.ap.ifconfig()[0]
         self.mode = 'ap'
+        self._start_mdns()
         return self.ip
+
+    def _start_mdns(self):
+        try:
+            import network
+            network.hostname('mundmaus')
+            print("  mDNS: mundmaus.local")
+        except Exception as e:
+            print(f"  mDNS: {e}")
 
     def scan_networks(self):
         try:

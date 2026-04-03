@@ -3,6 +3,7 @@
 #include "wifi_manager.h"
 #include "config.h"
 #include <WiFi.h>
+#include <ESPmDNS.h>
 #include <Preferences.h>
 #include <algorithm>
 
@@ -85,6 +86,13 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     ip   = WiFi.localIP().toString();
     mode = "station";
     Serial.printf("  Verbunden: %s\n", ip.c_str());
+
+    // mDNS: mundmaus.local
+    if (MDNS.begin("mundmaus")) {
+        MDNS.addService("http", "tcp", Config::HTTP_PORT);
+        Serial.println("  mDNS: mundmaus.local");
+    }
+
     return ip;
 }
 
@@ -107,6 +115,12 @@ String WiFiManager::startAP() {
 
     ip   = WiFi.softAPIP().toString();
     mode = "ap";
+
+    // mDNS: mundmaus.local (also in AP mode)
+    if (MDNS.begin("mundmaus")) {
+        MDNS.addService("http", "tcp", Config::HTTP_PORT);
+        Serial.println("  mDNS: mundmaus.local");
+    }
     return ip;
 }
 
