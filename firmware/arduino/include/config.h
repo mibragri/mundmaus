@@ -57,7 +57,7 @@ constexpr const char* OTA_AUTH     = "";
 
 // Joystick
 constexpr int DEFAULT_DEADZONE          = 150;
-constexpr int DEFAULT_NAV_THRESHOLD     = 800;
+constexpr int DEFAULT_NAV_THRESHOLD     = 450;
 constexpr int DEFAULT_NAV_REPEAT_MS     = 400;
 constexpr int DEFAULT_CALIBRATION_SAMPLES = 50;
 
