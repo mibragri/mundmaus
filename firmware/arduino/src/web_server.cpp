@@ -267,8 +267,7 @@ void MundMausServer::_setupHttpRoutes() {
 
     // --- Default handler --- 404
     _httpServer.onNotFound([](AsyncWebServerRequest* req) {
-        req->send(404, "text/html",
-                  "<html><body><h1>404</h1><p>" + req->url() + "</p></body></html>");
+        req->send(404, "text/plain", "404 Not Found");
     });
 
     // CORS headers for all responses
@@ -493,8 +492,11 @@ void MundMausServer::processSensorQueue() {
             doc["error"] = ev.data;  // error detail in data field
             break;
         case SensorEvent::UPDATE_RESULT:
-            // Safe assignment on main core (fixes I1 data race)
-            _updateResult = Updater::checkManifest();
+            // Clear available list locally instead of re-fetching from network.
+            // A blocking checkManifest() here would freeze joystick for up to 23s.
+            // Next boot does a fresh manifest check anyway.
+            _updateResult.available.clear();
+            _updateResult.offline = false;
             break;
         }
         // UPDATE_RESULT is internal-only, no WS broadcast needed
