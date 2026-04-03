@@ -7,7 +7,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BAMBU_PRINT="/home/ai/claude/tools/bambu-print.py"
+BAMBU_PRINT="/home/ai/claude/projects/bambu-p2s/bambu-print.py"
 PROFILE_DIR="${SCRIPT_DIR}/bambu-profiles"
 OUTPUT_DIR="${SCRIPT_DIR}/output"
 AMS_SLOT=4  # Grau PETG
