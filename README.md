@@ -6,7 +6,7 @@ Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten
 
 Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet werden
 
-![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png)
+![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png) ![Vier Gewinnt](screenshots/vier-gewinnt.png)
 
 ![Portal](screenshots/portal.png) ![Settings](screenshots/settings.png)
 
@@ -20,7 +20,7 @@ Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet we
 ```
    Joystick ──┐
                ├── ESP32 ──── WiFi ──── Browser (TV/Monitor)
-Drucksensor ──┘                          Solitaire / Schach / Memo
+Drucksensor ──┘                          Solitaire / Schach / Memo / ...
 ```
 
 ## Spiele
@@ -185,7 +185,7 @@ Aenderungen wirken sofort (Live-Preview). "Save" speichert dauerhaft, "Cancel" v
 │  Joystick ───┤  ┌────────────────────────┐   │              │
 │  Puff-Sensor─┤  │ Portal (/)             │──►│  Solitaire   │
 │  WiFiManager │  │ Games (/www/*.html.gz) │   │  Schach      │
-│  WS-Server   │  │ Settings (/www/settings│   │  Memo        │
+│  WS-Server   │  │ Settings (/www/settings│   │  Memo / ...  │
 │  OTA Updater │  │ REST API (/api/*)      │   │  Settings    │
 └──────────────┘  └────────────────────────┘   └──────────────┘
 ```
