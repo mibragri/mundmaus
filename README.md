@@ -6,7 +6,7 @@ Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten
 
 Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet werden
 
-![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png) ![Vier Gewinnt](screenshots/vier-gewinnt.png)
+![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png) ![Vier Gewinnt](screenshots/vier-gewinnt.png) ![Freecell](screenshots/freecell.png)
 
 ![Portal](screenshots/portal.png) ![Settings](screenshots/settings.png)
 
