@@ -4,7 +4,7 @@
 v5.5 removes the asymmetric adapter bay and rearranges components:
   Mount(-X) → ESP32 → Joystick → Sensor(+X)
 Enclosure shrinks from 168 x 50 to 136 x 50 mm (symmetric).
-USB cable enters through a notch in the -Y wall; the lid provides strain relief.
+USB cable enters through a notch in the +Y wall (joystick side); the lid provides strain relief.
 """
 from __future__ import annotations
 
@@ -70,7 +70,7 @@ PRES_HOLDER_T, PRES_HOLDER_DEPTH = 2.0, 7.0
 PRES_BARB_HOLE_D, PRES_BARB_CHAMFER_D = 3.0, 5.0
 CABLE_NOTCH_W, CABLE_NOTCH_H = 8.0, 4.0
 
-# ── USB cable exit notch (-Y wall, at lid seam) ────────────────────
+# ── USB cable exit notch (+Y wall, at lid seam) ────────────────────
 USB_NOTCH_W, USB_NOTCH_H = 8.0, 5.0
 USB_NOTCH_X = ESP_POS_X - ESP_L / 2  # USB faces -X (center), cable routes left
 
@@ -86,7 +86,7 @@ GROOVE_D = 0.55      # groove depth (into cavity wall) — was 0.35
 GROOVE_W = 1.0       # groove width (along Z) — slightly wider than ridge for tolerance
 
 # ── 3/8"-16 UNC mic stand mount (-X wall) ──────────────────────────
-MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 14.29, 5.56
+MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 16.9, 5.56  # SW measured 16.8-16.9mm
 MIC_NUT_TOL, MIC_NUT_POCKET_D, MIC_COLLAR_D = 0.205, 7.9, 24.0
 MIC_POS_Y = 0.0
 # MIC_POS_Z is derived below (collar sits on floor, top clears lip)
@@ -384,13 +384,12 @@ def _cut_pressure_barb_port(base: cq.Workplane) -> cq.Workplane:
 
 
 def _cut_usb_cable_notch(base: cq.Workplane) -> cq.Workplane:
-    """Cut a notch in the -Y wall at seam height for USB cable exit."""
-    # XZ normal is -Y: offset=+V places plane at Y=-V
-    # To reach -Y outer wall (Y=-25): offset = OUTER_POS_Y + eps
-    # Extrude negative to go through wall toward +Y (into cavity)
-    notch = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
+    """Cut a notch in the +Y wall at seam height for USB cable exit."""
+    # +Y wall: offset=-OUTER_POS_Y places plane at Y=+25 (outer +Y surface)
+    # Extrude positive to cut through wall toward -Y (into cavity)
+    notch = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
         USB_NOTCH_X, EXT_H_BASE - USB_NOTCH_H / 2
-    ).rect(USB_NOTCH_W, USB_NOTCH_H).extrude(-(WALL + 0.02))
+    ).rect(USB_NOTCH_W, USB_NOTCH_H).extrude(WALL + 0.02)
     return base.cut(notch)
 
 
@@ -532,10 +531,10 @@ def make_lid() -> cq.Workplane:
                    .extrude(RIDGE_W))
         lid = lid.union(pad)
     # Hold-down stubs/pads removed — base standoffs + guide rails retain components
-    # USB cable relief — notch in lid lip on -Y side matching base notch
-    cable_relief = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
+    # USB cable relief — notch in lid lip on +Y side matching base notch
+    cable_relief = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
         USB_NOTCH_X, -LIP_H / 2
-    ).rect(USB_NOTCH_W, LIP_H + 0.02).extrude(-(WALL + LIP_GAP + LIP_T + 0.02))
+    ).rect(USB_NOTCH_W, LIP_H + 0.02).extrude(WALL + LIP_GAP + LIP_T + 0.02)
     lid = lid.cut(cable_relief)
     # No lid vents — WROOM floor cutout provides ventilation
     return lid
