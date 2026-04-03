@@ -62,7 +62,7 @@ Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. 
 
 > **Gehaeuse:** Ein 3D-druckbares Gehaeuse ist enthalten (`enclosure/`). Ohne 3D-Drucker: Komponenten einfach mit DuPont-Kabeln verbinden — fertig.
 
-![Gehaeuse](enclosure/mundmaus_v55_assembly.png)
+![Gehaeuse](enclosure/output/assembly_iso.png)
 
 ### Mundstueck
 
