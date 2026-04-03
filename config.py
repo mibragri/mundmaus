@@ -39,7 +39,7 @@ else:
 # CONFIGURATION
 # ============================================================
 
-VERSION = '3.1'
+VERSION = '3.3'
 
 WS_PORT = 81
 HTTP_PORT = 80
