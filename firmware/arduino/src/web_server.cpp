@@ -226,6 +226,13 @@ void MundMausServer::_setupHttpRoutes() {
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
     _httpServer.on("/api/update/start", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (_updateRunning) {
+            JsonDocument doc;
+            doc["ok"]    = false;
+            doc["error"] = "Update laeuft bereits";
+            _sendJson200(req, doc);
+            return;
+        }
         if (_updateResult.available.empty() || _updateResult.offline) {
             JsonDocument doc;
             doc["ok"]    = false;
@@ -234,14 +241,16 @@ void MundMausServer::_setupHttpRoutes() {
             return;
         }
 
+        _updateRunning = true;
+
         // Send immediate response
         JsonDocument doc;
         doc["ok"]      = true;
         doc["message"] = "Update gestartet...";
         _sendJson200(req, doc);
 
-        // Spawn one-shot task for blocking HTTPS downloads
-        xTaskCreate(_updateTaskWrapper, "ota_install", 8192, this, 1, nullptr);
+        // Spawn one-shot task for blocking HTTPS downloads (16KB stack for TLS+JSON+buffer)
+        xTaskCreate(_updateTaskWrapper, "ota_install", 16384, this, 1, nullptr);
     });
 
     // --- OTA update task wrapper (I5: runs blocking downloads off async context) ---
@@ -281,6 +290,9 @@ void MundMausServer::_setupWsRoutes() {
 void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                                  AwsEventType type, void* arg, uint8_t* data, size_t len) {
     if (type == WS_EVT_CONNECT) {
+        // Drop messages instead of disconnecting when queue full.
+        // Prevents patient losing joystick control during WiFi hiccups.
+        client->setCloseClientOnQueueFull(false);
         Serial.printf("  WS client #%u connected\n", client->id());
 
         // Send wifi_status
@@ -434,6 +446,8 @@ void MundMausServer::sendPuffLevel(float value) {
 
 // I1: Drain queue and broadcast via WS (runs on main core, same as AsyncTCP)
 void MundMausServer::processSensorQueue() {
+    _ws.cleanupClients();  // prune stale/disconnected WebSocket clients
+
     SensorEvent ev;
     while (xQueueReceive(_sensorQueue, &ev, 0) == pdTRUE) {
         JsonDocument doc;
@@ -617,6 +631,8 @@ void MundMausServer::_updateTaskWrapper(void* param) {
         ev.data[0] = '\0';
         xQueueSend(q, &ev, 0);
     }
+
+    self->_updateRunning = false;
 
     // Delete this one-shot task
     vTaskDelete(nullptr);

@@ -232,12 +232,18 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         WiFiClient* tcpStream = http.getStreamPtr();
         uint8_t buf[1024];
         int written = 0;
+        unsigned long lastData = millis();
         while (http.connected() && (contentLen > 0 || contentLen < 0)) {
             int avail = tcpStream->available();
             if (avail <= 0) {
+                if (millis() - lastData > 30000) {
+                    Serial.printf("  OTA: download stalled: %s\n", uf->name.c_str());
+                    break;
+                }
                 delay(1);
                 continue;
             }
+            lastData = millis();
             int toRead = (avail < (int)sizeof(buf)) ? avail : (int)sizeof(buf);
             int n = tcpStream->readBytes(buf, toRead);
             if (n <= 0) break;
@@ -326,13 +332,21 @@ bool installFirmwareUpdate(const UpdateFile& fw,
     WiFiClient* stream = http.getStreamPtr();
     uint8_t buf[4096];
     int written = 0;
+    unsigned long lastData = millis();
 
     while (written < contentLen) {
         int avail = stream->available();
         if (avail <= 0) {
+            if (millis() - lastData > 30000) {
+                Serial.println("  OTA: firmware download stalled");
+                Update.abort();
+                http.end();
+                return false;
+            }
             delay(1);
             continue;
         }
+        lastData = millis();
         int toRead = min(avail, (int)sizeof(buf));
         toRead = min(toRead, contentLen - written);
         int n = stream->readBytes(buf, toRead);

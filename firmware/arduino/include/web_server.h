@@ -90,4 +90,5 @@ private:
 
     // I5: One-shot FreeRTOS task for blocking OTA downloads
     static void _updateTaskWrapper(void* param);
+    volatile bool _updateRunning = false;
 };
