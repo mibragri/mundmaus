@@ -166,4 +166,29 @@ void getSaved(JsonDocument& doc) {
     prefs.end();
 }
 
+int applyRemote(const JsonDocument& remote) {
+    // Only apply keys that are NOT locally customized (not in NVS)
+    Preferences prefs;
+    prefs.begin("settings", true);  // read-only
+
+    int applied = 0;
+    for (JsonPairConst kv : remote.as<JsonObjectConst>()) {
+        const char* key = kv.key().c_str();
+        int idx = _findKey(key);
+        if (idx < 0) continue;
+
+        // Skip if locally customized
+        if (prefs.isKey(key)) continue;
+
+        int value = kv.value().as<int>();
+        if (update(key, value)) {
+            applied++;
+            Serial.printf("  Remote setting: %s=%d\n", key, value);
+        }
+    }
+
+    prefs.end();
+    return applied;
+}
+
 }  // namespace Config

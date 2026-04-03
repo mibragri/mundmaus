@@ -243,6 +243,14 @@ void setup() {
         } else {
             Serial.println("[OTA] Offline (Server nicht erreichbar)");
         }
+
+        // Fetch remote settings (non-locally-overridden values applied immediately)
+        esp_task_wdt_reset();
+        int applied = Updater::fetchRemoteSettings();
+        esp_task_wdt_reset();
+        if (applied > 0) {
+            Serial.printf("[OTA] %d Remote-Settings angewendet\n", applied);
+        }
     }
 }
 
@@ -288,6 +296,10 @@ void loop() {
             Updater::CheckResult result = Updater::checkManifest();
             if (!result.offline) {
                 Serial.printf("[OTA] %d Updates verfuegbar\n", result.available.size());
+            }
+            int applied = Updater::fetchRemoteSettings();
+            if (applied > 0) {
+                Serial.printf("[OTA] %d Remote-Settings angewendet\n", applied);
             }
             MundMausServer* srv = static_cast<MundMausServer*>(param);
             srv->setUpdateResult(result);

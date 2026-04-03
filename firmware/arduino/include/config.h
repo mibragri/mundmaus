@@ -120,4 +120,8 @@ void getDefaults(JsonDocument& doc);
 /// Populate JsonDocument with only NVS-persisted (non-default) values
 void getSaved(JsonDocument& doc);
 
+/// Apply remote settings: only keys NOT locally saved in NVS are updated.
+/// Returns number of keys applied.
+int applyRemote(const JsonDocument& remote);
+
 }  // namespace Config

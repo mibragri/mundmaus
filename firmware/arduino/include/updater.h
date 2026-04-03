@@ -53,6 +53,10 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 /// Call after successful boot in setup().
 void markBootOk();
 
+/// Fetch remote settings from OTA server and apply (non-locally-overridden).
+/// Returns number of settings applied, or -1 on fetch error.
+int fetchRemoteSettings();
+
 /// Load local version tracking from NVS (Preferences "ota_ver").
 void loadVersions();
 

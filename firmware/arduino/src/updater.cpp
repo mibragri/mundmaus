@@ -394,6 +394,39 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 }
 
 // ============================================================
+// REMOTE SETTINGS
+// ============================================================
+
+int fetchRemoteSettings() {
+    String url = String(Config::OTA_BASE_URL) + "/settings.json";
+
+    HTTPClient http;
+    if (!_beginHttps(http, url)) return -1;
+
+    int code = http.GET();
+    if (code != 200) {
+        // 404 = no remote settings file, not an error
+        if (code != 404) {
+            Serial.printf("  OTA: settings HTTP %d\n", code);
+        }
+        http.end();
+        return -1;
+    }
+
+    String body = http.getString();
+    http.end();
+
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, body);
+    if (err) {
+        Serial.printf("  OTA: settings JSON error: %s\n", err.c_str());
+        return -1;
+    }
+
+    return Config::applyRemote(doc);
+}
+
+// ============================================================
 // BOOT VALIDATION
 // ============================================================
 
