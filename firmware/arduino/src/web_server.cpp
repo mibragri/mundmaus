@@ -540,7 +540,8 @@ void MundMausServer::_buildUpdateJson(JsonDocument& doc) {
     doc["offline"] = _updateResult.offline;
     JsonArray arr = doc["available"].to<JsonArray>();
     for (const auto& uf : _updateResult.available) {
-        if (uf.firmware) continue;  // Don't show firmware updates in portal (Arduino can't install .py)
+        // Skip .py firmware entries (MicroPython-only), but show .bin firmware updates
+        if (uf.firmware && !uf.name.endsWith(".bin")) continue;
         JsonObject obj = arr.add<JsonObject>();
         obj["file"]     = uf.name;
         obj["from_ver"] = uf.localVer;
