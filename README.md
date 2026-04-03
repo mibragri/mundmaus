@@ -64,11 +64,15 @@ Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. 
 
 ![Gehaeuse](enclosure/mundmaus_v55_assembly.png)
 
+### Mundstueck
+
+Das 3D-druckbare Mundstueck sitzt auf dem Joystick-Stift. Ein Silikonschlauch geht seitlich ab und fuehrt zum Drucksensor — leichtes Pusten = Klick.
+
+CAD-Modell (OnShape): [Mundstueck oeffnen](https://cad.onshape.com/documents/95d3a4d6faad26c25a2f7521/w/612dd5f1a9d3cf74ba406bb7/e/fc37b7a7abf844a33ef56714)
+
 ### Halterung
 
 Das Gehaeuse wird in eine handelsueblliche **Mikrofonklemme** auf einem **Mikrofon-Bodenstaender** eingespannt (wie fuer Musiker). Der Staender steht neben dem Bett und positioniert den Joystick vor dem Mund des Patienten. Alternative: ein **Schwanenhals-Tischstaender** fuer kleinere Aufbauten.
-
-> **Mundstueck:** Das 3D-druckbare Mundstueck sitzt auf dem Joystick und hat einen seitlichen Schlauchanschluss fuer den Drucksensor. CAD-Modell: [OnShape](https://cad.onshape.com/documents/95d3a4d6faad26c25a2f7521/w/612dd5f1a9d3cf74ba406bb7/e/fc37b7a7abf844a33ef56714)
 
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
