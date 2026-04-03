@@ -21,8 +21,8 @@
     --card-back-pattern: #1a4a7a;
     --text: #e8e8e8;
     --text-dim: #aaa;
-    --cursor-color: #FFD700;       /* Gold – hoher Kontrast auf dunklem Hintergrund */
-    --selected-color: #e040fb;     /* Magenta – max. Kontrast zu Cyan */
+    --cursor-color: #1565C0;       /* Blau – hoher Kontrast, CVD-safe */
+    --selected-color: #FF8F00;     /* Orange – max. Kontrast zu Blau, CVD-safe */
     --match-color: #2e8b00;        /* Dunkles Grün für Treffer (AA on white) */
     --match-glow: rgba(46, 139, 0, 0.4);
     --error-color: #ff5252;
@@ -159,9 +159,9 @@
   }
 
   .action-btn.cursor {
-    background: rgba(255, 215, 0, 0.25);
-    border: 2px solid #FFD700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    background: rgba(21, 101, 192, 0.25);
+    border: 2px solid #1565C0;
+    box-shadow: 0 0 8px rgba(21, 101, 192, 0.4);
     color: #fff;
   }
 
@@ -242,25 +242,25 @@
 
   /* ── Cursor (aktive Karte) ──────────────────── */
   .card.cursor .card-inner {
-    border: 3px solid #FFD700;
-    background: rgba(255, 215, 0, 0.25);
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    border: 4px solid #1565C0;
+    background: rgba(21, 101, 192, 0.2);
+    box-shadow: 0 0 12px rgba(21, 101, 192, 0.4);
     border-radius: 1.2vmin;
   }
 
   .card.cursor .card-back {
-    border-color: #FFD700;
+    border-color: #1565C0;
   }
 
-  /* Cursor on flipped white cards: gold border + background */
+  /* Cursor on flipped white cards: blue border + tinted background */
   .card.cursor.flipped .card-inner {
-    border: 3px solid #FFD700;
-    background: rgba(255, 215, 0, 0.25);
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    border: 4px solid #1565C0;
+    background: rgba(21, 101, 192, 0.2);
+    box-shadow: 0 0 12px rgba(21, 101, 192, 0.4);
   }
 
   .card.cursor.flipped .card-front {
-    background: rgba(255, 248, 220, 0.95);
+    background: rgba(187, 222, 251, 0.95);
   }
 
   /* Cursor-Badge */
@@ -272,7 +272,7 @@
     transform: translateX(-50%);
     font-size: 2vmin;
     color: var(--cursor-color);
-    filter: drop-shadow(0 0 4px rgba(255, 215, 0, 0.6));
+    filter: drop-shadow(0 0 4px rgba(21, 101, 192, 0.6));
     animation: cursor-bob 1s ease-in-out infinite;
     z-index: 5;
   }
@@ -286,17 +286,17 @@
   .card.selected .card-inner {
     box-shadow:
       0 0 0 0.4vmin var(--selected-color),
-      0 0 20px rgba(224, 64, 251, 0.5);
+      0 0 20px rgba(255, 143, 0, 0.5);
   }
 
   .card.selected::after {
-    content: '✦';
+    content: '\2726';
     position: absolute;
     top: -2.5vmin;
     right: -1vmin;
     font-size: 2.2vmin;
     color: var(--selected-color);
-    filter: drop-shadow(0 0 4px rgba(224, 64, 251, 0.6));
+    filter: drop-shadow(0 0 4px rgba(255, 143, 0, 0.6));
     animation: pulse-star 1.2s ease-in-out infinite;
     z-index: 5;
   }
@@ -424,7 +424,7 @@
 
   .diff-option.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(21, 101, 192, 0.3);
     transform: scale(1.05);
   }
 
@@ -490,7 +490,7 @@
 
   .win-btn.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(21, 101, 192, 0.3);
   }
 
   /* ── Kiosk-Modus ────────────────────────────── */

@@ -21,20 +21,23 @@
        Designed for protanopia, deuteranopia, tritanopia, achromatopsia.
        Uses CYAN vs MAGENTA - maximally distinct for ALL CVD types.
        Both have high luminance contrast against dark felt background. */
-    --highlight: #FFD700;
+    --highlight: #1565C0;
     --highlight-strong: #ffffff;
-    --highlight-glow: rgba(255, 215, 0, 0.6);
-    --highlight-border: #FFD700;
+    --highlight-glow: rgba(21, 101, 192, 0.5);
+    --highlight-border: #1565C0;
+    --sel-color: #FF8F00;
+    --sel-glow: rgba(255, 143, 0, 0.6);
+    --sel-border: #E65100;
     --target: #ff66ff;
     --target-glow: rgba(255, 102, 255, 0.5);
     --target-border: #ff66ff;
-    --nav-color: #FFD700;
+    --nav-color: #1565C0;
     --success: #4caf50;
     --text: #e8e8e8;
     --text-dim: #b8c4d0;
     --card-shadow: 0 2px 8px rgba(0,0,0,0.4);
     --card-radius: 10px;
-    --sel-border: 4px;
+    --sel-border-w: 5px;
     --vw: min(1vw, 19.2px);
   }
 
@@ -93,21 +96,21 @@
     transition: border-color 0.2s, box-shadow 0.2s;
   }
 
-  /* Navigation: solid white border */
+  /* Navigation: solid blue border */
   .pile-slot.nav-active {
     border-color: var(--nav-color);
     border-style: solid;
-    border-width: 3px;
-    box-shadow: 0 0 12px rgba(255,255,255,0.3);
+    border-width: 5px;
+    box-shadow: 0 0 16px rgba(21,101,192,0.4);
   }
 
-  /* Selected pile slot: gold background */
+  /* Selected pile slot: orange background */
   .pile-slot.selected-state {
-    border-color: var(--highlight-border) !important;
+    border-color: var(--sel-border) !important;
     border-style: solid !important;
-    border-width: var(--sel-border) !important;
-    background: rgba(255, 215, 0, 0.2) !important;
-    box-shadow: 0 0 24px var(--highlight-glow), inset 0 0 18px var(--highlight-glow) !important;
+    border-width: var(--sel-border-w) !important;
+    background: rgba(255, 143, 0, 0.25) !important;
+    box-shadow: 0 0 24px var(--sel-glow), inset 0 0 18px var(--sel-glow) !important;
     animation: selPulse 1.2s ease-in-out infinite;
   }
 
@@ -115,15 +118,15 @@
   .pile-slot.target {
     border-color: var(--target-border) !important;
     border-style: dashed !important;
-    border-width: var(--sel-border) !important;
+    border-width: var(--sel-border-w) !important;
     background: rgba(255, 102, 255, 0.15) !important;
     box-shadow: 0 0 20px var(--target-glow), inset 0 0 15px var(--target-glow) !important;
     animation: tgtPulse 0.8s ease-in-out infinite;
   }
 
   @keyframes selPulse {
-    0%, 100% { box-shadow: 0 0 24px rgba(255,215,0,0.6), inset 0 0 18px rgba(255,215,0,0.6); }
-    50% { box-shadow: 0 0 40px rgba(255,215,0,0.6), inset 0 0 28px rgba(255,215,0,0.8); }
+    0%, 100% { box-shadow: 0 0 24px rgba(255,143,0,0.6), inset 0 0 18px rgba(255,143,0,0.6); }
+    50% { box-shadow: 0 0 40px rgba(255,143,0,0.6), inset 0 0 28px rgba(255,143,0,0.8); }
   }
 
   @keyframes tgtPulse {
@@ -164,39 +167,39 @@
     outline-offset: -1px;
   }
 
-  /* Nav cursor: card turns LIGHT GOLD - unmistakable on any background */
+  /* Nav cursor: card turns LIGHT BLUE - clearly visible on white cards */
   .card.face-up.nav-cursor {
-    background: #fff8dc !important;
-    outline: 3px solid var(--highlight);
+    background: #BBDEFB !important;
+    outline: 5px solid #1565C0;
     outline-offset: 1px;
-    box-shadow: 0 0 20px var(--highlight-glow), var(--card-shadow);
+    box-shadow: 0 0 20px rgba(21,101,192,0.5), var(--card-shadow);
     transform: scale(1.04);
     z-index: 899 !important;
   }
 
-  /* SELECTED card: turns BRIGHT GOLD - impossible to miss */
+  /* SELECTED card: turns BRIGHT ORANGE - impossible to miss, clearly different from blue cursor */
   .card.face-up.selected-state {
-    background: #FFD700 !important;
+    background: #FFB300 !important;
     color: #000 !important;
-    outline: 3px solid #b8960a;
+    outline: 5px solid #E65100;
     outline-offset: 1px;
-    box-shadow: 0 0 35px var(--highlight-glow), 0 0 70px rgba(255,215,0,0.3), var(--card-shadow);
+    box-shadow: 0 0 35px rgba(255,143,0,0.6), 0 0 70px rgba(255,143,0,0.3), var(--card-shadow);
     transform: scale(1.06);
     z-index: 900 !important;
     animation: cardSelPulse 1.2s ease-in-out infinite;
   }
-  /* Keep red suit text readable on gold */
+  /* Keep red suit text readable on orange */
   .card.face-up.red.selected-state { color: #8b0000 !important; }
 
   @keyframes cardSelPulse {
-    0%, 100% { background: #FFD700; }
-    50% { background: #ffe44d; }
+    0%, 100% { background: #FFB300; }
+    50% { background: #FFCA28; }
   }
 
-  /* TARGET card: turns LIGHT MAGENTA - clearly distinct from cyan selection */
+  /* TARGET card: turns LIGHT MAGENTA - clearly distinct from blue/orange */
   .card.face-up.target-hint {
     background: #ffe0ff !important;
-    outline: 3px dashed var(--target-border);
+    outline: 5px dashed var(--target-border);
     outline-offset: 1px;
     box-shadow: 0 0 25px var(--target-glow), var(--card-shadow);
     animation: tgtBgPulse 0.8s ease-in-out infinite;
@@ -473,7 +476,7 @@
 
   .action-btn.active {
     color: var(--highlight);
-    border-color: rgba(255, 215, 0, 0.3);
+    border-color: rgba(21, 101, 192, 0.3);
   }
 
   /* ===== KIOSK MODE ===== */

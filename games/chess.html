@@ -27,12 +27,12 @@
     --sq-dark-text: #d8e8d0;
 
     /* Cursor: Gold */
-    --cursor-color: #FFD700;
-    --cursor-glow: rgba(255, 215, 0, 0.4);
+    --cursor-color: #1565C0;
+    --cursor-glow: rgba(21, 101, 192, 0.4);
 
     /* Selektion: Magenta */
-    --selected-color: #e040fb;
-    --selected-glow: rgba(224, 64, 251, 0.4);
+    --selected-color: #FF8F00;
+    --selected-glow: rgba(255, 143, 0, 0.4);
 
     /* Mögliche Züge: Orange dots */
     --move-color: rgba(255, 152, 0, 0.7);
@@ -221,18 +221,18 @@
 
   /* ── Cursor ─────────────────────────────────── */
   .sq.cursor {
-    background: rgba(255, 215, 0, 0.25) !important;
-    outline: 2px solid #FFD700;
-    outline-offset: -2px;
+    background: rgba(21, 101, 192, 0.3) !important;
+    outline: 3px solid #1565C0;
+    outline-offset: -3px;
     box-shadow: inset 0 0 12px var(--cursor-glow), 0 0 12px var(--cursor-glow);
     z-index: 2;
   }
 
   /* ── Selektiert ─────────────────────────────── */
   .sq.selected {
-    background: rgba(224, 64, 251, 0.3) !important;
-    outline: 2px solid var(--selected-color);
-    outline-offset: -2px;
+    background: rgba(255, 143, 0, 0.35) !important;
+    outline: 3px solid #E65100;
+    outline-offset: -3px;
     box-shadow: inset 0 0 15px var(--selected-glow);
     z-index: 2;
   }
@@ -502,7 +502,7 @@
     width: 0.8vh;
     height: 0.8vh;
     border-radius: 50%;
-    background: #FFD700;
+    background: var(--cursor-color);
     animation: dot-pulse 1.2s ease-in-out infinite;
     margin: 0 calc(0.15 * var(--vw));
   }
@@ -541,9 +541,9 @@
   }
 
   .action-btn.cursor {
-    background: rgba(255, 215, 0, 0.25);
-    border: 2px solid #FFD700;
-    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+    background: rgba(21, 101, 192, 0.25);
+    border: 2px solid #1565C0;
+    box-shadow: 0 0 8px rgba(21, 101, 192, 0.4);
     color: #fff;
   }
 
