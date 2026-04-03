@@ -153,16 +153,26 @@ CheckResult checkManifest() {
     }
 
     // Check for deleted files (in local but not in manifest)
+    // Only consider www/ files — ignore stale .py entries from old manifests
+    std::vector<String> staleKeys;
     for (const auto& kv : _versions) {
         if (!files.containsKey(kv.first)) {
-            UpdateFile uf;
-            uf.name       = kv.first;
-            uf.localVer   = kv.second;
-            uf.remoteVer  = 0;
-            uf.firmware   = false;
-            uf.deleteFile = true;
-            result.available.push_back(uf);
+            if (kv.first.startsWith("www/")) {
+                UpdateFile uf;
+                uf.name       = kv.first;
+                uf.localVer   = kv.second;
+                uf.remoteVer  = 0;
+                uf.firmware   = false;
+                uf.deleteFile = true;
+                result.available.push_back(uf);
+            } else {
+                staleKeys.push_back(kv.first);
+            }
         }
+    }
+    // Clean stale non-www entries from NVS
+    for (const auto& key : staleKeys) {
+        _versions.erase(key);
     }
 
     // Persist any seeded versions from fresh-flash detection

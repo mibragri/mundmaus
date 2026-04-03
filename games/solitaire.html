@@ -19,17 +19,17 @@
        Designed for protanopia, deuteranopia, tritanopia, achromatopsia.
        Uses CYAN vs MAGENTA - maximally distinct for ALL CVD types.
        Both have high luminance contrast against dark felt background. */
-    --highlight: #FFFFFF;
+    --highlight: #76FF03;
     --highlight-strong: #ffffff;
-    --highlight-glow: rgba(255, 255, 255, 0.6);
-    --highlight-border: #FFFFFF;
+    --highlight-glow: rgba(118, 255, 3, 0.6);
+    --highlight-border: #76FF03;
     --sel-color: #FF8F00;
     --sel-glow: rgba(255, 143, 0, 0.6);
     --sel-border: #E65100;
     --target: #ff66ff;
     --target-glow: rgba(255, 102, 255, 0.5);
     --target-border: #ff66ff;
-    --nav-color: #FFFFFF;
+    --nav-color: #76FF03;
     --success: #4caf50;
     --text: #e8e8e8;
     --text-dim: #b8c4d0;
@@ -99,7 +99,7 @@
     border-color: var(--nav-color);
     border-style: solid;
     border-width: 5px;
-    box-shadow: 0 0 16px rgba(255,255,255,0.4);
+    box-shadow: 0 0 16px rgba(118,255,3,0.4);
   }
 
   /* Selected pile slot: orange background */
@@ -167,10 +167,10 @@
 
   /* Nav cursor: card turns LIGHT BLUE - clearly visible on white cards */
   .card.face-up.nav-cursor {
-    background: #E0E0E0 !important;
-    outline: 5px solid #FFFFFF;
+    background: #A5F5A0 !important;
+    outline: 5px solid #76FF03;
     outline-offset: 1px;
-    box-shadow: 0 0 20px rgba(255,255,255,0.5), var(--card-shadow);
+    box-shadow: 0 0 20px rgba(118,255,3,0.5), var(--card-shadow);
     transform: scale(1.04);
     z-index: 899 !important;
   }
@@ -424,7 +424,7 @@
     width: calc(10.2 * var(--vw));
     background: var(--nav-color);
     border-radius: 4px;
-    box-shadow: 0 0 10px rgba(255,255,255,0.5);
+    box-shadow: 0 0 10px rgba(118,255,3,0.5);
     opacity: 0;
     transition: opacity 0.2s, left 0.15s ease;
     pointer-events: none;
@@ -474,7 +474,7 @@
 
   .action-btn.active {
     color: var(--highlight);
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: rgba(118, 255, 3, 0.3);
   }
 
   /* ===== KIOSK MODE ===== */
