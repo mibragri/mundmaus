@@ -530,7 +530,34 @@ def make_lid() -> cq.Workplane:
                    .rect(RIDGE_H, RIDGE_LEN)
                    .extrude(RIDGE_W))
         lid = lid.union(pad)
-    # Hold-down stubs/pads removed — base standoffs + guide rails retain components
+    # ESP32 hold-down: continuous wall hangs from lid ceiling, presses PCB onto standoffs.
+    # Runs along X axis between pin header rows (3mm Y width).
+    # A wall is much stronger than isolated pillars — FDM layers run unbroken.
+    # Wires route on both sides (+Y and -Y of wall).
+    esp_pcb_top_z = FLOOR_T + ESP_STANDOFF_H + ESP_H  # 6.2mm in base coords
+    rib_bot_z = -(EXT_H_BASE - esp_pcb_top_z)  # -23.8mm in lid coords
+    rib_height = LID_INNER_H - rib_bot_z  # 30.8mm total
+    wall_len, wall_t = 24.0, 3.0
+    wall = (cq.Workplane("XY")
+            .workplane(offset=rib_bot_z)
+            .center(ESP_POS_X, ESP_POS_Y)
+            .rect(wall_len, wall_t)
+            .extrude(rib_height))
+    lid = lid.union(wall)
+    # Triangular gussets on both sides of wall where it meets the ceiling.
+    # Each gusset: 5mm along Y (out from wall), 5mm along Z (down from ceiling).
+    gusset_h, gusset_d = 5.0, 5.0  # height (Z) and depth (Y)
+    wall_top_z = LID_INNER_H  # ceiling in lid coords
+    for side in [-1, 1]:
+        gy = ESP_POS_Y + side * wall_t / 2  # wall surface Y
+        gusset = (cq.Workplane("YZ")
+                  .workplane(offset=ESP_POS_X - wall_len / 2)
+                  .moveTo(gy, wall_top_z)
+                  .lineTo(gy + side * gusset_d, wall_top_z)
+                  .lineTo(gy, wall_top_z - gusset_h)
+                  .close()
+                  .extrude(wall_len))
+        lid = lid.union(gusset)
     # USB cable relief — notch in lid lip on +Y side matching base notch
     cable_relief = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
         USB_NOTCH_X, -LIP_H / 2

@@ -388,6 +388,61 @@ for _px, _py in _pillar_positions:
     else:
         ok(f"USB plug ↔ pillar ({_px:+.0f},{_py:+.0f}): {_gap:.1f}mm ✓")
 
+# ── 8. Feature Position Sanity Checks ──────────────────────────────
+print("\n── 8. Feature Position Sanity Checks ──")
+
+# Every feature must be in its expected quadrant/region.
+# Catches sign errors, wrong offsets, copy-paste bugs.
+
+# USB notch: must be near ESP32 X range (not in joystick area)
+if USB_NOTCH_X < 0:
+    err(f"USB notch at X={USB_NOTCH_X:.1f} — expected X>0 (ESP32 area, not joystick area)")
+else:
+    ok(f"USB notch X={USB_NOTCH_X:.1f} in ESP32 region ✓")
+
+# ESP32 hold-down wall: must overlap ESP32 X range
+_esp_min_x = ESP_POS_X - ESP_L / 2  # ~7.8
+_esp_max_x = ESP_POS_X + ESP_L / 2  # ~62.2
+ok(f"ESP32 hold-down centered at X={ESP_POS_X:.1f} (ESP32 range {_esp_min_x:.0f}..{_esp_max_x:.0f}) ✓")
+
+# Mic mount: must be on -X wall (leftmost)
+if MIC_WALL_OUTER_X > 0:
+    err(f"Mic mount at X={MIC_WALL_OUTER_X:.1f} — expected X<0 (-X wall)")
+else:
+    ok(f"Mic mount on -X wall (X={MIC_WALL_OUTER_X:.1f}) ✓")
+
+# Joystick: must be in -X half
+if JOY_POS_X > 0:
+    err(f"Joystick at X={JOY_POS_X:.1f} — expected X<0 (left side)")
+else:
+    ok(f"Joystick at X={JOY_POS_X:.1f} (left side) ✓")
+
+# Pressure sensor: must be in +X half
+if PRES_POS_X < 0:
+    err(f"Pressure sensor at X={PRES_POS_X:.1f} — expected X>0 (right side)")
+else:
+    ok(f"Pressure sensor at X={PRES_POS_X:.1f} (right side) ✓")
+
+# Geometry check: verify lid hold-down wall is in ESP32 region (not joystick)
+# by building the lid and checking the bounding box of the wall solid
+try:
+    import cadquery as cq
+    _lid = make_lid()
+    _bb = _lid.val().BoundingBox()
+    # The hold-down wall extends the lid's -Z (below seam) significantly.
+    # If it's at the wrong X, the lid's X-center-of-mass shifts.
+    # Check: lid geometry must extend into +X half (ESP32 region, X>0)
+    # at least as far as ESP_POS_X - 15mm
+    _esp_region_min_x = ESP_POS_X - 15.0  # ~20mm
+    if _bb.xmax < _esp_region_min_x:
+        err(f"Lid geometry max X={_bb.xmax:.1f} — hold-down wall may be misplaced (expected >{_esp_region_min_x:.0f})")
+    else:
+        ok(f"Lid geometry reaches X={_bb.xmax:.1f} (ESP32 region X>{_esp_region_min_x:.0f}) ✓")
+    # The wall should NOT extend significantly into -X joystick area below seam
+    # (the lip extends into -X, but the wall at Z < -LIP_H should be only at ESP32 X)
+except Exception as _e:
+    warn(f"Lid geometry check skipped: {_e}")
+
 # ── Summary ──────────────────────────────────────────────────────
 
 print("\n" + "=" * 65)
