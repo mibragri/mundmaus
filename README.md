@@ -30,6 +30,8 @@ Drucksensor ──┘                          Solitaire / Schach / Memo
 | **Solitaire** | Klondike mit Undo, Auto-Solve, 3 Schwierigkeitsstufen |
 | **Schach** | Gegen Computer, 4 Schwierigkeitsstufen |
 | **Memo** | Memory-Spiel, 4 Feldgroessen |
+| **Vier Gewinnt** | Connect Four gegen KI, 3 Schwierigkeitsstufen |
+| **Freecell** | Freecell Solitaire mit Supermove und Auto-Complete |
 
 Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback, Kiosk-Modus fuer den Patienten, Keyboard-Fallback fuer Pfleger.
 
@@ -102,6 +104,7 @@ Zwei Firmware-Optionen — gleiche Features, gleiche Spiele:
 |---|---|---|
 | Fuer wen | Einsteiger, schnelles Testen | Fortgeschrittene, mehr Performance |
 | RAM frei | ~80 KB | ~188 KB |
+| OTA-Rollback | .bak-Dateien + Recovery-AP | Dual-Partition (automatisch) |
 | Verzeichnis | `*.py` (Root) | `firmware/arduino/` |
 
 ### Option A: MicroPython (empfohlen fuer Einsteiger)
@@ -135,7 +138,7 @@ Oder manuell:
 mpremote connect /dev/ttyUSB0 cp boot.py main.py config.py :/
 mpremote connect /dev/ttyUSB0 cp sensors.py server.py updater.py wifi_manager.py display.py :/
 mpremote connect /dev/ttyUSB0 mkdir :www
-mpremote connect /dev/ttyUSB0 cp games/solitaire.html games/chess.html games/memo.html games/settings.html :/www/
+mpremote connect /dev/ttyUSB0 cp games/solitaire.html games/chess.html games/memo.html games/settings.html games/vier-gewinnt.html games/freecell.html :/www/
 ```
 
 ### Option B: Arduino C++ (mehr RAM, schneller)
@@ -198,6 +201,8 @@ mundmaus/
 │   ├── solitaire.html   # Klondike Solitaire
 │   ├── chess.html        # Schach
 │   ├── memo.html         # Memory/Memo
+│   ├── vier-gewinnt.html # Vier Gewinnt (Connect Four)
+│   ├── freecell.html     # Freecell Solitaire
 │   └── settings.html     # Einstellungen
 ├── firmware/arduino/     # Arduino C++ Firmware (Alternative)
 ├── enclosure/            # 3D-Gehaeuse (CadQuery, druckfertig)
