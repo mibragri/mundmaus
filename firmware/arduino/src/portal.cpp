@@ -16,28 +16,28 @@ static const char PORTAL_HEAD[] PROGMEM = R"==(<!DOCTYPE html><html lang="de"><h
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>MundMaus</title><link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%23FFD700'>M</text></svg>"><style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:system-ui,sans-serif;background:#0a1628;color:#e0e0e0;
+body{font-family:system-ui,sans-serif;background:#000000;color:#e0e0e0;
 min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2em}
-h1{font-size:clamp(2em,5vw,3.5em);color:#FFD700;margin-bottom:.2em}
+h1{font-size:clamp(2em,5vw,3.5em);color:#76FF03;margin-bottom:.2em}
 .sub{color:#78909c;margin-bottom:1.5em}
 .gs{display:flex;flex-wrap:wrap;gap:1.5em;justify-content:center;max-width:800px}
 .g{display:flex;align-items:center;justify-content:center;width:220px;height:120px;
-background:linear-gradient(135deg,#1a3a5c,#0d2240);border:2px solid rgba(255,215,0,.3);border-radius:16px;
-color:#FFD700;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}
-.g:hover{border-color:#FFD700;transform:scale(1.05);box-shadow:0 0 20px rgba(255,215,0,.3)}
+background:linear-gradient(135deg,#1a1a1a,#111111);border:2px solid rgba(118,255,3,.3);border-radius:16px;
+color:#76FF03;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}
+.g:hover{border-color:#76FF03;transform:scale(1.05);box-shadow:0 0 20px rgba(118,255,3,.3)}
 .wf{background:rgba(255,255,255,.04);border:1px solid #333;border-radius:12px;padding:1.2em;
 margin-top:2em;max-width:500px;width:100%}
-.wf h2{font-size:1.1em;color:#FFD700;margin-bottom:.8em;display:flex;align-items:center;gap:.5em}
+.wf h2{font-size:1.1em;color:#76FF03;margin-bottom:.8em;display:flex;align-items:center;gap:.5em}
 .wf label{font-size:.85em;color:#aaa;display:block;margin-bottom:.3em}
-.wf select,.wf input{width:100%;padding:8px;margin-bottom:.8em;background:#1a2a3a;
+.wf select,.wf input{width:100%;padding:8px;margin-bottom:.8em;background:#1a1a1a;
 border:1px solid #444;border-radius:6px;color:#fff;font-size:15px}
-.wf select:focus,.wf input:focus{border-color:#FFD700;outline:none}
+.wf select:focus,.wf input:focus{border-color:#76FF03;outline:none}
 .wf button{padding:10px 16px;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}
-.wb{background:#FFD700;color:#000;width:100%}
-.wb:hover{background:#ffe44d}
+.wb{background:#76FF03;color:#000;width:100%}
+.wb:hover{background:#a0ff50}
 .wsc{background:#333;color:#ccc;margin-bottom:.8em;width:100%}
 .wsc:hover{background:#444}
-.wm{font-size:.85em;color:#FFD700;margin-top:.5em;min-height:1.2em}
+.wm{font-size:.85em;color:#76FF03;margin-top:.5em;min-height:1.2em}
 .rb{background:#8b0000;color:#fff;padding:8px 20px;border:none;border-radius:6px;
 font-size:.9em;cursor:pointer;margin-top:1.5em}
 .rb:hover{background:#a00}

@@ -80,6 +80,8 @@
     gap: calc(1.2 * var(--vw));
     margin-bottom: 2vh;
     align-items: flex-start;
+    height: calc(13.3 * var(--vw) + 6px);
+    flex-shrink: 0;
   }
 
   .pile-slot {
@@ -169,9 +171,8 @@
   .card.face-up.nav-cursor {
     background: #A5F5A0 !important;
     outline: 5px solid #76FF03;
-    outline-offset: 1px;
+    outline-offset: -5px;
     box-shadow: 0 0 20px rgba(118,255,3,0.5), var(--card-shadow);
-    transform: scale(1.04);
     z-index: 899 !important;
   }
 
@@ -180,9 +181,8 @@
     background: #FFB300 !important;
     color: #000 !important;
     outline: 5px solid #E65100;
-    outline-offset: 1px;
+    outline-offset: -5px;
     box-shadow: 0 0 35px rgba(255,143,0,0.6), 0 0 70px rgba(255,143,0,0.3), var(--card-shadow);
-    transform: scale(1.06);
     z-index: 900 !important;
     animation: cardSelPulse 1.2s ease-in-out infinite;
   }
@@ -198,7 +198,7 @@
   .card.face-up.target-hint {
     background: #ffe0ff !important;
     outline: 5px dashed var(--target-border);
-    outline-offset: 1px;
+    outline-offset: -5px;
     box-shadow: 0 0 25px var(--target-glow), var(--card-shadow);
     animation: tgtBgPulse 0.8s ease-in-out infinite;
   }
