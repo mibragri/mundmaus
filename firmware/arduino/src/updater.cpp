@@ -59,7 +59,16 @@ void saveVersions() {
 // HTTPS HELPERS
 // ============================================================
 
-/// Configure HTTPClient for OTA server with Basic Auth and TLS.
+/// Get chip ID as hex string (last 3 bytes of MAC).
+static String _chipId() {
+    uint64_t mac = ESP.getEfuseMac();
+    char buf[7];
+    snprintf(buf, sizeof(buf), "%02X%02X%02X",
+             (uint8_t)(mac >> 24), (uint8_t)(mac >> 32), (uint8_t)(mac >> 40));
+    return String(buf);
+}
+
+/// Configure HTTPClient for OTA server with device identification.
 static bool _beginHttps(HTTPClient& http, const String& url) {
     http.setConnectTimeout(8000);
     http.setTimeout(15000);
@@ -70,10 +79,15 @@ static bool _beginHttps(HTTPClient& http, const String& url) {
         return false;
     }
 
-    // Add Basic Auth header (pre-encoded base64)
-    String auth = "Basic ";
-    auth += Config::OTA_AUTH;
-    http.addHeader("Authorization", auth);
+    // Device identification via User-Agent
+    http.setUserAgent("MundMaus/" MUNDMAUS_VERSION " (ESP32; " + _chipId() + ")");
+
+    // Basic Auth (transition period — server accepts both auth and no-auth)
+    if (strlen(Config::OTA_AUTH) > 0) {
+        String auth = "Basic ";
+        auth += Config::OTA_AUTH;
+        http.addHeader("Authorization", auth);
+    }
 
     return true;
 }
