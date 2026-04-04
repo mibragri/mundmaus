@@ -21,7 +21,7 @@
     --card-back-pattern: #1a4a7a;
     --text: #e8e8e8;
     --text-dim: #aaa;
-    --cursor-color: #FFFFFF;       /* Blau – hoher Kontrast, CVD-safe */
+    --cursor-color: #42A5F5;       /* Blau – hoher Kontrast, CVD-safe */
     --selected-color: #FF8F00;     /* Orange – max. Kontrast zu Blau, CVD-safe */
     --match-color: #2e8b00;        /* Dunkles Grün für Treffer (AA on white) */
     --match-glow: rgba(46, 139, 0, 0.4);
@@ -159,9 +159,9 @@
   }
 
   .action-btn.cursor {
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid #FFFFFF;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+    background: rgba(66, 165, 245, 0.2);
+    border: 2px solid #42A5F5;
+    box-shadow: 0 0 8px rgba(66, 165, 245, 0.4);
     color: #fff;
   }
 
@@ -243,8 +243,8 @@
   /* ── Cursor (aktive Karte) ──────────────────── */
   .card.cursor .card-inner {
     border: 4px solid #FFFFFF;
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+    background: rgba(66, 165, 245, 0.2);
+    box-shadow: 0 0 12px rgba(66, 165, 245, 0.4);
     border-radius: 1.2vmin;
   }
 
@@ -255,8 +255,8 @@
   /* Cursor on flipped white cards: blue border + tinted background */
   .card.cursor.flipped .card-inner {
     border: 4px solid #FFFFFF;
-    background: rgba(255, 255, 255, 0.2);
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+    background: rgba(66, 165, 245, 0.2);
+    box-shadow: 0 0 12px rgba(66, 165, 245, 0.4);
   }
 
   .card.cursor.flipped .card-front {
@@ -424,7 +424,7 @@
 
   .diff-option.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(66, 165, 245, 0.3);
     transform: scale(1.05);
   }
 
@@ -490,7 +490,7 @@
 
   .win-btn.cursor {
     border-color: var(--cursor-color);
-    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(255, 255, 255, 0.3);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 20px rgba(66, 165, 245, 0.3);
   }
 
   /* ── Kiosk-Modus ────────────────────────────── */
@@ -664,7 +664,18 @@ function beep(freq, dur, type = 'square') {
 function sndNav()     { beep(600, 60); }
 function sndFlip()    { beep(800, 100); beep(1000, 80); }
 function sndMatch()   { beep(1000, 100); setTimeout(() => beep(1200, 100), 120); setTimeout(() => beep(1400, 150), 250); }
-function sndNoMatch() { beep(200, 250, 'sawtooth'); }
+function sndNoMatch() { beep(200, 250, 'sawtooth'); flashError(); }
+function flashError() {
+  const g = document.getElementById('game');
+  g.style.transition = 'none';
+  g.style.boxShadow = 'inset 0 0 120px rgba(255,0,0,0.7)';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      g.style.transition = 'box-shadow 0.6s ease-out';
+      g.style.boxShadow = 'none';
+    });
+  });
+}
 function sndWin() {
   const notes = [523, 659, 784, 1047];
   notes.forEach((f, i) => setTimeout(() => beep(f, 200, 'sine'), i * 180));

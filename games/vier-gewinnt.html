@@ -28,8 +28,8 @@
     --ai-color: #FFD700;
     --ai-glow: rgba(255, 215, 0, 0.5);
 
-    --cursor-color: #FFFFFF;
-    --cursor-glow: rgba(255, 255, 255, 0.4);
+    --cursor-color: #42A5F5;
+    --cursor-glow: rgba(66, 165, 245, 0.4);
 
     --selected-color: #FF8F00;
     --selected-glow: rgba(224, 64, 251, 0.4);
@@ -336,9 +336,9 @@
   }
 
   .action-btn.cursor {
-    background: rgba(255, 255, 255, 0.2);
-    border: 2px solid #FFFFFF;
-    box-shadow: 0 0 8px rgba(255, 255, 255, 0.4);
+    background: rgba(66, 165, 245, 0.2);
+    border: 2px solid #42A5F5;
+    box-shadow: 0 0 8px rgba(66, 165, 245, 0.4);
     color: #fff;
   }
 
@@ -582,7 +582,18 @@ function beep(f, d, t = 'square') {
 }
 function sndNav()     { beep(600, 50); }
 function sndDrop()    { beep(500, 80); setTimeout(()=>beep(700, 80), 80); }
-function sndError()   { beep(200, 200, 'sawtooth'); }
+function sndError()   { beep(200, 200, 'sawtooth'); flashError(); }
+function flashError() {
+  const g = document.getElementById('game');
+  g.style.transition = 'none';
+  g.style.boxShadow = 'inset 0 0 120px rgba(255,0,0,0.7)';
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      g.style.transition = 'box-shadow 0.6s ease-out';
+      g.style.boxShadow = 'none';
+    });
+  });
+}
 function sndWin() {
   [523,659,784,1047].forEach((f,i) => setTimeout(()=>beep(f,200,'sine'), i*180));
 }
