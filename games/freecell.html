@@ -13,17 +13,17 @@
     --card-back-pattern: #3a6bb5;
     --red: #c02020;
     --black: #1a1a1a;
-    --highlight: #42A5F5;
+    --highlight: #76FF03;
     --highlight-strong: #ffffff;
-    --highlight-glow: rgba(66, 165, 245, 0.6);
-    --highlight-border: #42A5F5;
+    --highlight-glow: rgba(118, 255, 3, 0.6);
+    --highlight-border: #76FF03;
     --sel-color: #FF8F00;
     --sel-glow: rgba(255, 143, 0, 0.6);
     --sel-border: #E65100;
     --target: #ff66ff;
     --target-glow: rgba(255, 102, 255, 0.5);
     --target-border: #ff66ff;
-    --nav-color: #42A5F5;
+    --nav-color: #76FF03;
     --success: #4caf50;
     --text: #e8e8e8;
     --text-dim: #b8c4d0;
@@ -92,7 +92,7 @@
     border-color: var(--nav-color);
     border-style: solid;
     border-width: 5px;
-    box-shadow: 0 0 16px rgba(66,165,245,0.4);
+    box-shadow: 0 0 16px rgba(118,255,3,0.4);
   }
 
   .pile-slot.selected-state {
@@ -157,11 +157,10 @@
   }
 
   .card.face-up.nav-cursor {
-    background: #BBDEFB !important;
-    outline: 5px solid #42A5F5;
-    outline-offset: 1px;
-    box-shadow: 0 0 20px rgba(66,165,245,0.5), var(--card-shadow);
-    transform: scale(1.04);
+    background: #A5F5A0 !important;
+    outline: 5px solid #76FF03;
+    outline-offset: -5px;
+    box-shadow: 0 0 20px rgba(118,255,3,0.5), var(--card-shadow);
     z-index: 899 !important;
   }
 
@@ -169,7 +168,7 @@
     background: #FFB300 !important;
     color: #000 !important;
     outline: 5px solid #E65100;
-    outline-offset: 1px;
+    outline-offset: -5px;
     box-shadow: 0 0 35px rgba(255,143,0,0.6), 0 0 70px rgba(255,143,0,0.3), var(--card-shadow);
     transform: scale(1.06);
     z-index: 900 !important;
@@ -185,7 +184,7 @@
   .card.face-up.target-hint {
     background: #ffe0ff !important;
     outline: 5px dashed var(--target-border);
-    outline-offset: 1px;
+    outline-offset: -5px;
     box-shadow: 0 0 25px var(--target-glow), var(--card-shadow);
     animation: tgtBgPulse 0.8s ease-in-out infinite;
   }
@@ -401,7 +400,7 @@
     width: calc(10.2 * var(--vw));
     background: var(--nav-color);
     border-radius: 4px;
-    box-shadow: 0 0 10px rgba(66,165,245,0.5);
+    box-shadow: 0 0 10px rgba(118,255,3,0.5);
     opacity: 0;
     transition: opacity 0.2s, left 0.15s ease;
     pointer-events: none;
@@ -451,7 +450,7 @@
 
   .action-btn.active {
     color: var(--highlight);
-    border-color: rgba(66, 165, 245, 0.3);
+    border-color: rgba(118, 255, 3, 0.3);
   }
 
   /* Kiosk */
