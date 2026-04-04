@@ -666,14 +666,16 @@ function sndFlip()    { beep(800, 100); beep(1000, 80); }
 function sndMatch()   { beep(1000, 100); setTimeout(() => beep(1200, 100), 120); setTimeout(() => beep(1400, 150), 250); }
 function sndNoMatch() { beep(200, 250, 'sawtooth'); flashError(); }
 function flashError() {
-  const g = document.getElementById('game');
-  g.style.transition = 'none';
-  g.style.boxShadow = 'inset 0 0 120px rgba(255,0,0,0.7)';
+  let o = document.getElementById("error-flash");
+  if (!o) {
+    o = document.createElement("div");
+    o.id = "error-flash";
+    o.style.cssText = "position:fixed;inset:0;background:rgba(255,0,0,0.5);pointer-events:none;z-index:9999;opacity:1;transition:opacity 0.5s";
+    document.body.appendChild(o);
+  }
+  o.style.opacity = "1";
   requestAnimationFrame(() => {
-    requestAnimationFrame(() => {
-      g.style.transition = 'box-shadow 0.6s ease-out';
-      g.style.boxShadow = 'none';
-    });
+    requestAnimationFrame(() => { o.style.opacity = "0"; });
   });
 }
 function sndWin() {
