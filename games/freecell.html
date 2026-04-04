@@ -590,13 +590,14 @@ function flashError() {
   if (!o) {
     o = document.createElement("div");
     o.id = "error-flash";
-    o.style.cssText = "position:fixed;inset:0;background:rgba(255,0,0,0.5);pointer-events:none;z-index:9999;opacity:1;transition:opacity 0.5s";
+    o.style.cssText = "position:fixed;inset:0;background:rgba(255,0,0,0.5);pointer-events:none;z-index:9999;opacity:0";
     document.body.appendChild(o);
   }
+  o.style.transition = "none";
   o.style.opacity = "1";
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => { o.style.opacity = "0"; });
-  });
+  o.offsetHeight;
+  o.style.transition = "opacity 0.5s";
+  o.style.opacity = "0";
 }
 function sndUndo() { beep(400,0.1); }
 function sndWin() { [523,659,784,1047].forEach((f,i) => setTimeout(()=>beep(f,0.3,0.2), i*200)); }
