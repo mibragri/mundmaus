@@ -75,18 +75,29 @@ static void sensorTask(void* param) {
         if (joystick) {
             static bool wasNavigating = false;
             static unsigned long lastHoldSend = 0;
+            static unsigned long releaseStart = 0;
             float intensity;
             const char* state = joystick->getState(intensity);
             if (state) {
+                releaseStart = 0;  // cancel any pending release
                 // Throttle nav_hold to ~10Hz (every 100ms)
                 if ((now - lastHoldSend) >= 100) {
                     server->sendNavHold(state, intensity);
                     lastHoldSend = now;
                 }
                 wasNavigating = true;
+                idleStart = now;  // CRITICAL: reset idle timer so auto-recal
+                                  // doesn't fire while joystick is held
             } else if (wasNavigating) {
-                server->sendNavRelease();
-                wasNavigating = false;
+                // 100ms release debounce -- prevents brief deadzone crossings
+                // (joystick jitter) from firing premature nav_release events
+                if (releaseStart == 0) {
+                    releaseStart = now;
+                } else if ((now - releaseStart) > 100) {
+                    server->sendNavRelease();
+                    wasNavigating = false;
+                    releaseStart = 0;
+                }
             }
         }
 
@@ -303,7 +314,7 @@ void loop() {
         lastWifiCheck = millis();
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
             Serial.println("  WiFi lost, reconnecting...");
-            wifi.connectStation(8000);
+            wifi.connectStation();  // default 15s + retries
         }
     }
 

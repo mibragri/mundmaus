@@ -60,17 +60,33 @@ void CalibratedJoystick::_readCentered(int& dx, int& dy) {
     if (abs(dy) < Config::DEADZONE) dy = 0;
 }
 
+// Axis hysteresis: once an axis becomes dominant, it must stay dominant
+// by at least HYSTERESIS_FACTOR (1.4x) to give up dominance. This prevents
+// rapid X/Y flipping on diagonal joystick holds due to ADC noise.
+static constexpr float HYSTERESIS_FACTOR = 1.4f;
+
 const char* CalibratedJoystick::_getDirection() {
     int dx, dy;
     _readCentered(dx, dy);
 
-    if (abs(dx) > abs(dy)) {
-        if (dx < -Config::NAV_THRESHOLD) return "left";
-        if (dx >  Config::NAV_THRESHOLD) return "right";
+    // Apply hysteresis to dominant axis selection
+    bool xDominant;
+    if (_lastAxis == 'x') {
+        xDominant = abs(dx) * HYSTERESIS_FACTOR >= abs(dy);
+    } else if (_lastAxis == 'y') {
+        xDominant = abs(dx) >= abs(dy) * HYSTERESIS_FACTOR;
     } else {
-        if (dy < -Config::NAV_THRESHOLD) return "up";
-        if (dy >  Config::NAV_THRESHOLD) return "down";
+        xDominant = abs(dx) > abs(dy);
     }
+
+    if (xDominant) {
+        if (dx < -Config::NAV_THRESHOLD) { _lastAxis = 'x'; return "left"; }
+        if (dx >  Config::NAV_THRESHOLD) { _lastAxis = 'x'; return "right"; }
+    } else {
+        if (dy < -Config::NAV_THRESHOLD) { _lastAxis = 'y'; return "up"; }
+        if (dy >  Config::NAV_THRESHOLD) { _lastAxis = 'y'; return "down"; }
+    }
+    if (abs(dx) == 0 && abs(dy) == 0) _lastAxis = 0;
     return nullptr;
 }
 
@@ -78,15 +94,25 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
     int dx, dy;
     _readCentered(dx, dy);
 
+    // Apply same hysteresis as _getDirection
+    bool xDominant;
+    if (_lastAxis == 'x') {
+        xDominant = abs(dx) * HYSTERESIS_FACTOR >= abs(dy);
+    } else if (_lastAxis == 'y') {
+        xDominant = abs(dx) >= abs(dy) * HYSTERESIS_FACTOR;
+    } else {
+        xDominant = abs(dx) > abs(dy);
+    }
+
     const char* dir = nullptr;
     int dominant = 0;
 
-    if (abs(dx) > abs(dy)) {
-        if (dx < -Config::NAV_THRESHOLD) { dir = "left";  dominant = dx; }
-        else if (dx > Config::NAV_THRESHOLD) { dir = "right"; dominant = dx; }
+    if (xDominant) {
+        if (dx < -Config::NAV_THRESHOLD) { dir = "left";  dominant = dx; _lastAxis = 'x'; }
+        else if (dx > Config::NAV_THRESHOLD) { dir = "right"; dominant = dx; _lastAxis = 'x'; }
     } else {
-        if (dy < -Config::NAV_THRESHOLD) { dir = "up";    dominant = dy; }
-        else if (dy > Config::NAV_THRESHOLD) { dir = "down";  dominant = dy; }
+        if (dy < -Config::NAV_THRESHOLD) { dir = "up";    dominant = dy; _lastAxis = 'y'; }
+        else if (dy > Config::NAV_THRESHOLD) { dir = "down";  dominant = dy; _lastAxis = 'y'; }
     }
 
     if (dir) {
@@ -97,6 +123,7 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
         return dir;
     }
 
+    if (abs(dx) == 0 && abs(dy) == 0) _lastAxis = 0;
     _lastIntensity = 0;
     outIntensity = 0;
     return nullptr;
@@ -157,9 +184,12 @@ bool CalibratedJoystick::pollButton() {
 }
 
 bool CalibratedJoystick::isIdle() {
-    int dx, dy;
-    _readCentered(dx, dy);
-    return abs(dx) < Config::DEADZONE * 2 && abs(dy) < Config::DEADZONE * 2;
+    // Use raw (pre-deadzone) values so we can check strictly within deadzone.
+    // Previously used DEADZONE*2 which created a gap between "idle" and "active"
+    // where held joystick could trigger auto-recalibration while being used.
+    int rawDx = analogRead(_pinX) - centerX;
+    int rawDy = analogRead(_pinY) - centerY;
+    return abs(rawDx) < Config::DEADZONE && abs(rawDy) < Config::DEADZONE;
 }
 
 // ============================================================

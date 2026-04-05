@@ -29,6 +29,7 @@ public:
 private:
     int _pinX, _pinY, _pinSW;
     const char* _lastDir;
+    char _lastAxis = 0;  // 'x', 'y', or 0 (for hysteresis in axis selection)
     float _lastIntensity = 0.0f;
     unsigned long _lastNavTime;
     bool _navRepeating;

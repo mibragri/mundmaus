@@ -20,7 +20,7 @@ public:
     void deleteCredentials();
 
     /// Try connecting to saved SSID. Returns IP or empty string on failure.
-    String connectStation(unsigned long timeoutMs = 8000);
+    String connectStation(unsigned long timeoutMs = 15000);
 
     /// Start AP mode. Returns AP IP address.
     String startAP();

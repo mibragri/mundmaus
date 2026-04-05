@@ -91,7 +91,12 @@ void load() {
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
         int* ptr = _globalPtr(i);
         if (ptr) {
-            *ptr = prefs.getInt(CONFIGURABLE_KEYS[i], _defaultVal(i));
+            // P2-1: Clamp to the valid range. Corrupt or legacy NVS values
+            // (e.g. a PUFF_RAW_THRESHOLD of 0 from an older firmware schema)
+            // could leave the device in a broken state that the patient
+            // cannot recover from without keyboard access.
+            int val = prefs.getInt(CONFIGURABLE_KEYS[i], _defaultVal(i));
+            *ptr = constrain(val, RANGES[i].min, RANGES[i].max);
         }
     }
 

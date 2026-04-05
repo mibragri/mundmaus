@@ -746,6 +746,10 @@ let game = {
 };
 
 function newGameState() {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  aiInProgress = false;
+  if (typeof cancelCharge === 'function') cancelCharge();
+  if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   game.board = new Array(24).fill(null);
   game.phase = 'setz';
   game.turn = W;
@@ -1133,6 +1137,7 @@ let hintsEnabled = false;
 let kioskMode = false;
 let idleTimeout = null;
 let aiInProgress = false;
+let aiTimer = null;
 
 let ui = {
   phase: 'menu',     // menu | playing | gameover
@@ -1504,7 +1509,14 @@ function scheduleAI() {
   renderBoard();
   updateStatus();
 
-  setTimeout(() => {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  aiTimer = setTimeout(() => {
+    aiTimer = null;
+    // Re-check guards in case the game was reset while we were waiting
+    if (ui.phase !== 'playing' || !aiInProgress) { aiInProgress = false; $thinking.classList.add('hidden'); return; }
+    if (multiplayerMode) { aiInProgress = false; $thinking.classList.add('hidden'); return; }
+    const aiShouldMove = (game.pendingRemover === B_) || (!game.pendingRemover && game.turn === B_);
+    if (!aiShouldMove) { aiInProgress = false; $thinking.classList.add('hidden'); return; }
     // AI removal step
     if (game.pendingRemover === B_) {
       const rp = aiPickRemoval();
@@ -1710,6 +1722,10 @@ function undo() {
 
 // ── Menu ─────────────────────────────────────────────────
 function showMenu() {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  aiInProgress = false;
+  if (typeof cancelCharge === 'function') cancelCharge();
+  if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   ui.phase = 'menu';
   ui.menuCursor = Math.min(aiDifficulty - 1, 2);
   $gameOver.classList.add('hidden');
@@ -1813,6 +1829,7 @@ function findNeighborInDirection(fromPos, dir) {
 
 // ── Navigate ─────────────────────────────────────────────
 function navigate(dir) {
+  if (typeof cancelCharge === 'function' && charge.active) cancelCharge();
   const now = Date.now();
   if (now - lastNavTime < 120) return;
   lastNavTime = now;
@@ -2038,7 +2055,7 @@ function completeCharge() {
 }
 
 function chargeLoop(ts) {
-  if (!charge.active) { cancelCharge(); return; }
+  if (!charge.active || ui.phase !== 'playing' || aiInProgress) { cancelCharge(); return; }
   const elapsed = ts - charge.startTime;
   if (elapsed > 5000) { cancelCharge(); return; }
   const ei = Math.max(charge.intensity, 0.3);

@@ -68,9 +68,17 @@ void saveVersions() {
     prefs.putString("json", json);
     prefs.end();
 
-    // Write marker so next boot knows NVS versions are valid
+    // Write marker so next boot knows NVS versions are valid.
+    // P2-2: Log on failure — a missing marker silently triggers a full
+    // version-tracking reset on the next boot, making OTA offer every file
+    // as an update. That is confusing and wastes bandwidth.
     File f = LittleFS.open(OTA_MARKER, "w");
-    if (f) { f.print("1"); f.close(); }
+    if (f) {
+        f.print("1");
+        f.close();
+    } else {
+        Serial.println("  OTA: WARNING could not create .ota_marker (LittleFS full?)");
+    }
 }
 
 // ============================================================
@@ -171,6 +179,14 @@ CheckResult checkManifest() {
                 _versions[fname] = remoteVer;
                 localVer = remoteVer;
             }
+        }
+
+        // After fresh flash: firmware.bin has no NVS entry. The running
+        // firmware knows its own version (MUNDMAUS_FW_VERSION build flag),
+        // so use that instead of offering a spurious "update to self".
+        if (localVer == 0 && isFirmware) {
+            localVer = MUNDMAUS_FW_VERSION;
+            _versions[fname] = localVer;
         }
 
         if (remoteVer > localVer) {
@@ -293,8 +309,13 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             allOk = false;
             continue;
         }
+        // P1-1: Track the original Content-Length so we can verify the full
+        // payload was received. The download loop decrements contentLen as
+        // bytes arrive, so we need a separate copy to compare against.
+        const int expectedLen = contentLen;  // <0 means chunked/unknown
         uint8_t buf[1024];
         int written = 0;
+        bool writeFailed = false;
         unsigned long lastData = millis();
         while (http.connected() && (contentLen > 0 || contentLen < 0)) {
             int avail = tcpStream->available();
@@ -310,7 +331,14 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             int toRead = (avail < (int)sizeof(buf)) ? avail : (int)sizeof(buf);
             int n = tcpStream->readBytes(buf, toRead);
             if (n <= 0) break;
-            outFile.write(buf, n);
+            // P1-1: Check write return value — LittleFS can fail when full.
+            // A short write means the file is corrupt; we must abort so we
+            // don't atomic-rename a truncated file over the good one.
+            if (outFile.write(buf, n) != (size_t)n) {
+                Serial.printf("  OTA: %s write failed (LittleFS full?)\n", uf->name.c_str());
+                writeFailed = true;
+                break;
+            }
             written += n;
             if (contentLen > 0) {
                 contentLen -= n;
@@ -320,9 +348,24 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         outFile.close();
         http.end();
 
-        // Verify non-empty
-        if (written == 0) {
+        // P1-1: Verify completeness before atomic rename.
+        // A truncated file silently installed is catastrophic for the patient
+        // (broken game, blank page, no recovery). Fail loud, keep the old file.
+        bool downloadOk = true;
+        if (writeFailed) {
+            downloadOk = false;
+        } else if (written == 0) {
             Serial.printf("  OTA: %s empty download\n", uf->name.c_str());
+            downloadOk = false;
+        } else if (expectedLen > 0 && written != expectedLen) {
+            // Known Content-Length: must match exactly
+            Serial.printf("  OTA: %s truncated: got %d/%d bytes\n",
+                          uf->name.c_str(), written, expectedLen);
+            downloadOk = false;
+        }
+        // expectedLen < 0 (chunked/unknown): accept any non-zero length
+
+        if (!downloadOk) {
             LittleFS.remove(tmpPath);
             allOk = false;
             continue;
@@ -430,14 +473,32 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 
     http.end();
 
+    // P2-3: Explicit truncation check. The loop above can exit via `break`
+    // on read error (n <= 0) with written < contentLen. Without this check,
+    // Update.end() may succeed on a partial image and brick the device.
+    if (written != contentLen) {
+        Serial.printf("  OTA: firmware size mismatch: %d/%d\n", written, contentLen);
+        Update.abort();
+        return false;
+    }
+
     if (!Update.end(true)) {
         Serial.printf("  OTA: end failed: %s\n", Update.errorString());
         return false;
     }
 
-    // Update firmware version tracking
-    _versions[fw.name] = fw.remoteVer;
-    saveVersions();
+    // P1-5: Firmware version is NOT updated here anymore. Storing it now means
+    // a rollback (bootloader reverts due to crash) leaves NVS claiming the new
+    // version is installed — the manifest check will not re-offer the update,
+    // stranding the device on broken firmware. Instead we stash the pending
+    // version in a separate NVS key; markBootOk() promotes it to _versions
+    // only after the new firmware successfully completes boot.
+    {
+        Preferences prefs;
+        prefs.begin("ota_ver", false);
+        prefs.putInt("pending_fw", fw.remoteVer);
+        prefs.end();
+    }
 
     Serial.printf("  OTA: firmware installed (%d bytes)\n", written);
     return true;
@@ -481,9 +542,61 @@ int fetchRemoteSettings() {
 // ============================================================
 
 void markBootOk() {
+    // P1-5: Capture the OTA image state BEFORE marking the partition valid.
+    // esp_ota_mark_app_valid_cancel_rollback() transitions the state from
+    // PENDING_VERIFY to VALID, so we must snapshot it first to know whether
+    // this boot is a "first boot of a freshly flashed image" (which means
+    // the pending_fw version should be promoted to installed) or just a
+    // regular reboot (which must NOT promote pending_fw — otherwise a
+    // rollback-then-reboot cycle would falsely claim the new version is
+    // running when the old firmware is actually active).
+    bool isFirstBootAfterOta = false;
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    if (running != nullptr) {
+        esp_ota_img_states_t state;
+        if (esp_ota_get_state_partition(running, &state) == ESP_OK) {
+            isFirstBootAfterOta = (state == ESP_OTA_IMG_PENDING_VERIFY ||
+                                   state == ESP_OTA_IMG_NEW);
+        }
+    }
+
     // Mark current OTA partition as valid, cancelling any pending rollback.
     // Safe to call even on factory partition (no-op).
     esp_ota_mark_app_valid_cancel_rollback();
+
+    // Promote pending firmware version only after a confirmed first boot of
+    // a new image. If bootloader rolled back, the OLD firmware is running
+    // and its partition is already VALID, so isFirstBootAfterOta == false
+    // and pending_fw stays untouched — the next manifest check correctly
+    // re-offers the update.
+    if (!isFirstBootAfterOta) {
+        return;
+    }
+
+    int pending = 0;
+    {
+        Preferences prefs;
+        prefs.begin("ota_ver", true);  // read-only
+        pending = prefs.getInt("pending_fw", 0);
+        prefs.end();
+    }
+
+    if (pending > 0) {
+        // loadVersions() reopens the prefs handle; call it only after we
+        // closed our own read-only handle above. loadVersions() may itself
+        // clear the namespace if OTA_MARKER is missing, but in that case
+        // `pending_fw` is irrelevant anyway (fresh flash).
+        loadVersions();
+        _versions["firmware.bin"] = pending;
+        saveVersions();  // rewrites the "json" blob with the promoted version
+
+        // Clear the pending marker so we don't re-promote on the next boot.
+        Preferences prefs;
+        prefs.begin("ota_ver", false);
+        prefs.remove("pending_fw");
+        prefs.end();
+        Serial.printf("  OTA: firmware v%d promoted to installed\n", pending);
+    }
 }
 
 }  // namespace Updater

@@ -84,11 +84,12 @@ static const char PORTAL_KEYBOARD_HINT[] PROGMEM =
     R"==(</div>)==";
 
 static const char PORTAL_SCRIPT[] PROGMEM = R"==(<script>
-async function sc(){document.getElementById('wm').textContent='\ud83d\udd0d...';try{const r=await fetch('/api/scan'),d=await r.json(),s=document.getElementById('sl');
-s.innerHTML='<option>-- select --</option>';
-d.networks.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)});
-s.style.display='block';document.getElementById('wm').textContent='\u2713 '+d.networks.length}
+// P1-4: /api/scan is now async — it kicks off a background scan and the
+// result arrives via WebSocket as a 'wifi_networks' message. We trigger the
+// scan here and rely on the ws.onmessage handler below to populate the list.
+async function sc(){document.getElementById('wm').textContent='\ud83d\udd0d...';try{await fetch('/api/scan')}
 catch(e){document.getElementById('wm').textContent='\u2717 Scan'}}
+function _fillNetworks(list){const s=document.getElementById('sl');if(!s)return;s.innerHTML='<option>-- select --</option>';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)});s.style.display='block';document.getElementById('wm').textContent='\u2713 '+list.length}
 async function sv(){const s=document.getElementById('si').value,p=document.getElementById('pw').value;
 if(!s)return(document.getElementById('wm').textContent='SSID!');
 document.getElementById('wm').textContent='...';
@@ -101,7 +102,8 @@ document.getElementById('wm').textContent='Neustart...'}}
 function showUpd(d){const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');if(d.offline){el.style.display='none';return}el.style.display='block';if(d.available&&d.available.length>0){info.innerHTML='\u2b07 '+d.available.length+' update'+(d.available.length>1?'s':'');btn.textContent='\u2b07 Install';btn.onclick=startUpdate;btn.style.display='block'}else{info.innerHTML='\u2713 Up to date';btn.style.display='none'}}
 let _wsLost=0;
 function connectWS(){const ws=new WebSocket('ws://'+location.hostname+':81');ws.onopen=function(){if(_wsLost&&(Date.now()-_wsLost)>5000)location.reload();_wsLost=0;const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip');if(d)d.style.background='#4caf50';if(c){c.style.background='rgba(76,175,80,.15)';c.style.borderColor='#4caf50'};const t=document.getElementById('ws-text');if(t)t.textContent='\u2713';fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{})};ws.onclose=function(){if(!_wsLost)_wsLost=Date.now();const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip'),t=document.getElementById('ws-text');if(d)d.style.background='#d42a2a';if(c){c.style.background='rgba(212,42,42,.15)';c.style.borderColor='#d42a2a'};if(t)t.textContent='\u2717';setTimeout(connectWS,3000)};ws.onmessage=function(e){const d=JSON.parse(e.data);
-if(d.type==='update_status'){showUpd(d)}
+if(d.type==='wifi_networks'){_fillNetworks(d.networks||[])}
+else if(d.type==='update_status'){showUpd(d)}
 else if(d.type==='update_progress'){document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}
 else if(d.type==='update_complete'){document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none';fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{})}
 else if(d.type==='update_error'){document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}

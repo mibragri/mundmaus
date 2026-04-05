@@ -70,17 +70,34 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
         return ip;
     }
 
-    Serial.printf("  Verbinde mit '%s'...\n", ssid.c_str());
-    WiFi.begin(ssid.c_str(), password.c_str());
+    // Retry up to 3 times with exponential-ish backoff.
+    // After firmware updates, router may need a moment to accept the new connection.
+    // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
+    // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
+    for (int attempt = 1; attempt <= 3; attempt++) {
+        Serial.printf("  Verbinde mit '%s' (Versuch %d/3)...\n", ssid.c_str(), attempt);
+        WiFi.begin(ssid.c_str(), password.c_str());
 
-    unsigned long start = millis();
-    while (!WiFi.isConnected()) {
-        if (millis() - start > timeoutMs) {
-            Serial.printf("  Timeout (%lums)\n", timeoutMs);
-            WiFi.disconnect(true);
-            return "";
+        unsigned long start = millis();
+        while (!WiFi.isConnected()) {
+            if (millis() - start > timeoutMs) {
+                Serial.printf("  Timeout (%lums)\n", timeoutMs);
+                WiFi.disconnect(false);  // keep credentials in ESP32 internal storage
+                break;
+            }
+            delay(250);
         }
-        delay(250);
+
+        if (WiFi.isConnected()) break;
+
+        if (attempt < 3) {
+            Serial.printf("  Warte %ds vor naechstem Versuch...\n", attempt * 2);
+            delay(attempt * 2000);
+        }
+    }
+
+    if (!WiFi.isConnected()) {
+        return "";
     }
 
     ip   = WiFi.localIP().toString();

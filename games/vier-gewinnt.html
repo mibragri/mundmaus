@@ -676,27 +676,35 @@ function checkWinAt(col, row) {
   ];
 
   for (const [dc, dr] of directions) {
-    const line = [{col, row}];
-
-    // Check positive direction
-    for (let i = 1; i < 4; i++) {
-      const nc = col + dc * i;
-      const nr = row + dr * i;
-      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
-      if (board[nc][nr] !== player) break;
-      line.push({col: nc, row: nr});
-    }
-
-    // Check negative direction
+    // Collect cells in the negative direction (farthest first → closest to center)
+    const neg = [];
     for (let i = 1; i < 4; i++) {
       const nc = col - dc * i;
       const nr = row - dr * i;
       if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
       if (board[nc][nr] !== player) break;
-      line.push({col: nc, row: nr});
+      neg.push({col: nc, row: nr});
     }
-
-    if (line.length >= 4) return line.slice(0, 4);
+    // Collect cells in the positive direction
+    const pos = [];
+    for (let i = 1; i < 4; i++) {
+      const nc = col + dc * i;
+      const nr = row + dr * i;
+      if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) break;
+      if (board[nc][nr] !== player) break;
+      pos.push({col: nc, row: nr});
+    }
+    // Build a spatially-ordered line: farthest neg … closest neg … center … closest pos … farthest pos
+    const line = [...neg.slice().reverse(), {col, row}, ...pos];
+    if (line.length >= 4) {
+      // Return any contiguous 4-window that contains the center.
+      // The center sits at index `neg.length`. Pick the first window that includes it.
+      const centerIdx = neg.length;
+      for (let i = 0; i + 4 <= line.length; i++) {
+        if (i <= centerIdx && centerIdx < i + 4) return line.slice(i, i + 4);
+      }
+      return line.slice(0, 4);
+    }
   }
   return null;
 }
@@ -1086,6 +1094,7 @@ function renderBoard() {
 
 let lastNavTime = 0, navCooldown = 1200, kbSimMode = false;
 let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
+let aiTimer = null;
 fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 
 // ── Charge Navigation (hold-to-move) ─────────────────────
@@ -1273,6 +1282,7 @@ function updateKbMode() {
 
 // ── Navigation ──────────────────────────────────────────
 function navigate(dir) {
+  if (typeof cancelCharge === 'function' && charge.active) cancelCharge();
   const now = Date.now(); if (now - lastNavTime < 120) return; lastNavTime = now;
   resetIdle();
   if (ui.phase === 'menu') return navMenu(dir);
@@ -1441,7 +1451,15 @@ function scheduleAI() {
   $thinking.classList.remove('hidden');
   renderBoard();
 
-  setTimeout(() => {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  aiTimer = setTimeout(() => {
+    aiTimer = null;
+    // Re-check guards: game may have been reset or mode toggled
+    if (ui.phase !== 'playing' || !gameActive || currentPlayer !== AI) {
+      $thinking.classList.add('hidden');
+      ui.aiThinking = false;
+      return;
+    }
     // Mode may have been toggled to multiplayer while we were "thinking"
     if (multiplayerMode) {
       $thinking.classList.add('hidden');
@@ -1545,6 +1563,10 @@ function showGameOver(title, info) {
 
 // ── Menu ────────────────────────────────────────────────
 function showDiffMenu() {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  if (typeof cancelCharge === 'function') cancelCharge();
+  if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
+  if (typeof ui !== 'undefined') ui.aiThinking = false;
   ui.phase = 'menu';
   ui.menuCursor = Math.min(aiDifficulty - 1, 2);
   $diffMenu.classList.remove('hidden');
@@ -1553,6 +1575,9 @@ function showDiffMenu() {
 }
 
 function startGame() {
+  if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  if (typeof cancelCharge === 'function') cancelCharge();
+  if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   createBoard();
   buildBoardDOM();
   gameActive = true;

@@ -1,26 +1,30 @@
 {
   "manifest_version": 1,
   "files": {
+    "firmware.bin": {
+      "version": 37,
+      "firmware": true
+    },
     "www/chess.html.gz": {
-      "version": 11
+      "version": 13
     },
     "www/freecell.html.gz": {
-      "version": 11
+      "version": 13
     },
     "www/memo.html.gz": {
-      "version": 11
+      "version": 13
     },
     "www/muehle.html.gz": {
-      "version": 1
-    },
-    "www/settings.html.gz": {
       "version": 3
     },
+    "www/settings.html.gz": {
+      "version": 4
+    },
     "www/solitaire.html.gz": {
-      "version": 15
+      "version": 20
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 10
+      "version": 12
     }
   }
 }

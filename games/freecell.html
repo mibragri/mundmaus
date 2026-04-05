@@ -655,6 +655,7 @@ const ACTION_COUNT = 5;
 // ============================================================
 
 function initGame(seed) {
+  if (typeof cancelCharge === 'function') cancelCharge();
   if (seed === undefined) {
     dealNumber = Math.floor(Math.random() * 1000000) + 1;
   } else {
@@ -1504,6 +1505,7 @@ function updateKbMode() {
 // ============================================================
 
 function navigate(dir) {
+  if (typeof cancelCharge === 'function' && charge.active) cancelCharge();
   const now = Date.now(); if (now - lastNavTime < 120) return; lastNavTime = now;
   if (gameWon) return;
   resetIdleTimer();

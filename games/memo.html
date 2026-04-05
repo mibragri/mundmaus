@@ -711,6 +711,7 @@ let state = {
   winCursor: 0,
   kiosk: false,
   idleTimeout: null,
+  gen: 0, // increments on each new board/reset to invalidate pending setTimeouts
 };
 
 // ── DOM ──────────────────────────────────────────────────
@@ -741,6 +742,8 @@ function shuffle(arr) {
 
 // ── Board erstellen ──────────────────────────────────────
 function createBoard(levelIdx) {
+  state.gen++; // invalidate any pending match/no-match setTimeouts
+  if (typeof cancelCharge === 'function') cancelCharge();
   const level = LEVELS[levelIdx];
   state.level = levelIdx;
   state.cols = level.cols;
@@ -1020,6 +1023,7 @@ function updateKbMode() {
 
 // ── Navigation ───────────────────────────────────────────
 function navigate(dir) {
+  if (typeof cancelCharge === 'function' && charge.active) cancelCharge();
   const now = Date.now(); if (now - lastNavTime < 120) return; lastNavTime = now;
   resetIdle();
   if (state.phase === 'menu') return navigateMenu(dir);
@@ -1150,10 +1154,12 @@ function action() {
 
     const firstCard = state.cards[state.first];
     const secondCard = state.cards[state.second];
+    const myGen = state.gen;
 
     if (firstCard.symbol.label === secondCard.symbol.label) {
       // Treffer!
       setTimeout(() => {
+        if (state.gen !== myGen) return; // board was reset — abort stale callback
         firstCard.matched = true;
         secondCard.matched = true;
         state.matched++;
@@ -1173,17 +1179,21 @@ function action() {
     } else {
       // Kein Treffer
       const cards = $board.querySelectorAll('.card');
+      const firstIdx = state.first;
+      const secondIdx = state.second;
       setTimeout(() => {
-        cards[state.first].classList.add('wrong');
-        cards[state.second].classList.add('wrong');
+        if (state.gen !== myGen) return; // aborted
+        if (cards[firstIdx]) cards[firstIdx].classList.add('wrong');
+        if (cards[secondIdx]) cards[secondIdx].classList.add('wrong');
         sndNoMatch();
       }, 400);
 
       setTimeout(() => {
+        if (state.gen !== myGen) return; // aborted
         firstCard.flipped = false;
         secondCard.flipped = false;
-        cards[state.first].classList.remove('wrong');
-        cards[state.second].classList.remove('wrong');
+        if (cards[firstIdx]) cards[firstIdx].classList.remove('wrong');
+        if (cards[secondIdx]) cards[secondIdx].classList.remove('wrong');
         state.first = null;
         state.second = null;
         state.phase = 'playing';
@@ -1227,6 +1237,8 @@ function winGame() {
 
 // ── Menü ─────────────────────────────────────────────────
 function showMenu() {
+  state.gen++; // invalidate any pending match/no-match setTimeouts
+  if (typeof cancelCharge === 'function') cancelCharge();
   state.phase = 'menu';
   state.menuCursor = state.level || 1;
   if (state.timerInterval) clearInterval(state.timerInterval);

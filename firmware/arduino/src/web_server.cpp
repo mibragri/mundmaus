@@ -23,6 +23,13 @@ MundMausServer::MundMausServer(WiFiManager& wifi)
     if (!_sensorQueue) {
         Serial.println("  ERROR: Failed to create sensor queue!");
     }
+    // P1-2: Mutex protects _updateResult against concurrent access from
+    // AsyncTCP handlers (Core 0), the OTA install task, and the periodic
+    // check task. Created before start() so it is ready for any first access.
+    _updateResultMutex = xSemaphoreCreateMutex();
+    if (!_updateResultMutex) {
+        Serial.println("  ERROR: Failed to create update result mutex!");
+    }
     hwStatus = {false, false, false};
 }
 
@@ -36,7 +43,13 @@ void MundMausServer::setSensors(CalibratedJoystick* joy, PuffSensor* puff) {
 }
 
 void MundMausServer::setUpdateResult(const Updater::CheckResult& result) {
-    _updateResult = result;
+    // P1-2: Take the mutex so callers (main.cpp periodic check, OTA task)
+    // can write without manual locking. 100ms is plenty — every holder of
+    // this mutex does a short copy, never blocking I/O.
+    if (_updateResultMutex && xSemaphoreTake(_updateResultMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        _updateResult = result;
+        xSemaphoreGive(_updateResultMutex);
+    }
 }
 
 // ============================================================
@@ -163,13 +176,18 @@ void MundMausServer::_setupHttpRoutes() {
     );
 
     // --- GET /api/scan ---
+    // P1-4: WiFi.scanNetworks() blocks the caller for 2-5 seconds. If we run
+    // it inline here we stall the AsyncTCP task on Core 0 — that starves WS
+    // sensor traffic for the patient and may drop in-flight HTTP requests.
+    // Spawn a one-shot task that performs the blocking scan off-thread, then
+    // broadcasts results via WS so both the portal and any WS clients see
+    // them. The HTTP caller gets an immediate "scan_started" acknowledgment.
     _httpServer.on("/api/scan", HTTP_GET, [this](AsyncWebServerRequest* req) {
-        std::vector<String> networks = _wifi.scanNetworks();
+        _startAsyncScan();
         JsonDocument doc;
-        JsonArray arr = doc["networks"].to<JsonArray>();
-        for (const auto& n : networks) {
-            arr.add(n);
-        }
+        doc["ok"]      = true;
+        doc["status"]  = "scan_started";
+        doc["message"] = "Scan laeuft, Ergebnis per WebSocket";
         _sendJson200(req, doc);
     });
 
@@ -235,7 +253,15 @@ void MundMausServer::_setupHttpRoutes() {
             _sendJson200(req, doc);
             return;
         }
-        if (_updateResult.available.empty() || _updateResult.offline) {
+        // P1-2: Snapshot _updateResult under the mutex so we decide based on
+        // a consistent view. Reading .available.empty() and .offline without
+        // the mutex races with the periodic check task's writer.
+        bool hasUpdates = false;
+        if (_updateResultMutex && xSemaphoreTake(_updateResultMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+            hasUpdates = !_updateResult.available.empty() && !_updateResult.offline;
+            xSemaphoreGive(_updateResultMutex);
+        }
+        if (!hasUpdates) {
             JsonDocument doc;
             doc["ok"]    = false;
             doc["error"] = "Keine Updates verfuegbar";
@@ -354,16 +380,17 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         }
 
     } else if (strcmp(type, "wifi_scan") == 0) {
-        std::vector<String> networks = _wifi.scanNetworks();
+        // P1-4: Never call WiFi.scanNetworks() from this handler — it runs on
+        // the AsyncTCP task (Core 0) and would block WS traffic for the
+        // patient for 2-5 seconds. Dispatch to a worker task; results arrive
+        // later as a wifi_networks broadcast.
+        _startAsyncScan();
         JsonDocument resp;
-        resp["type"] = "wifi_networks";
-        JsonArray arr = resp["networks"].to<JsonArray>();
-        for (const auto& n : networks) {
-            arr.add(n);
-        }
+        resp["type"]    = "wifi_scan_started";
+        resp["message"] = "Scan laeuft";
         String buf;
         serializeJson(resp, buf);
-        _ws.textAll(buf);
+        client->text(buf);
 
     } else if (strcmp(type, "config_preview") == 0) {
         const char* key = msg["key"] | "";
@@ -460,7 +487,21 @@ void MundMausServer::sendPuffLevel(float value) {
     xQueueSend(_sensorQueue, &ev, 0);
 }
 
-// I1: Drain queue and broadcast via WS (runs on main core, same as AsyncTCP)
+// I1: Drain queue and broadcast via WS (runs on loop() task, Core 1).
+//
+// P1-3 (known limitation, not fixed): _ws.textAll() and _ws.cleanupClients()
+// iterate AsyncWebSocket::_clients (std::list) without holding any library
+// mutex. AsyncTCP runs on Core 0 (CONFIG_ASYNC_TCP_RUNNING_CORE=0) and can
+// emplace_back a new client in _clients concurrently with our iteration.
+// std::list::emplace_back does not invalidate existing iterators, but the
+// write to the list's tail pointer races with our iteration — this is
+// technically undefined behavior. In practice the race window is tiny (only
+// during a new WS client connecting while we broadcast a sensor frame at
+// 10Hz), and a library fix would require adding a lock to every _clients
+// access in ESPAsyncWebServer 3.6.0. A mutex-marshalling shim on our side
+// cannot protect against the library's own emplace path without modifying
+// the library. Accepted as known limitation; revisit if ESPAsyncWebServer
+// gains an _asyncMutex on _clients in a future version.
 void MundMausServer::processSensorQueue() {
     _ws.cleanupClients();  // prune stale/disconnected WebSocket clients
 
@@ -565,18 +606,30 @@ void MundMausServer::_sendJson200(AsyncWebServerRequest* req, JsonDocument& doc)
 // ============================================================
 
 void MundMausServer::_buildUpdateJson(JsonDocument& doc) {
-    doc["offline"] = _updateResult.offline;
-    JsonArray arr = doc["available"].to<JsonArray>();
-    for (const auto& uf : _updateResult.available) {
-        // Skip .py firmware entries (MicroPython-only), but show .bin firmware updates
-        if (uf.firmware && !uf.name.endsWith(".bin")) continue;
-        JsonObject obj = arr.add<JsonObject>();
-        obj["file"]     = uf.name;
-        obj["from_ver"] = uf.localVer;
-        obj["to_ver"]   = uf.remoteVer;
-        if (uf.deleteFile) {
-            obj["delete"] = true;
+    // P1-2: Hold the mutex during the entire iteration. This runs on the
+    // AsyncTCP task (Core 0) whenever a client queries /api/updates or we
+    // broadcast an update_status message, and concurrently the periodic
+    // check task (Core 1) may rewrite _updateResult via setUpdateResult().
+    // Without this lock std::vector::iterator can observe moved-from state.
+    if (_updateResultMutex && xSemaphoreTake(_updateResultMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        doc["offline"] = _updateResult.offline;
+        JsonArray arr = doc["available"].to<JsonArray>();
+        for (const auto& uf : _updateResult.available) {
+            // Skip .py firmware entries (MicroPython-only), but show .bin firmware updates
+            if (uf.firmware && !uf.name.endsWith(".bin")) continue;
+            JsonObject obj = arr.add<JsonObject>();
+            obj["file"]     = uf.name;
+            obj["from_ver"] = uf.localVer;
+            obj["to_ver"]   = uf.remoteVer;
+            if (uf.deleteFile) {
+                obj["delete"] = true;
+            }
         }
+        xSemaphoreGive(_updateResultMutex);
+    } else {
+        // Mutex timeout — report offline rather than exposing stale state
+        doc["offline"] = true;
+        doc["available"].to<JsonArray>();
     }
 }
 
@@ -588,8 +641,18 @@ void MundMausServer::_updateTaskWrapper(void* param) {
     MundMausServer* self = static_cast<MundMausServer*>(param);
     QueueHandle_t q = self->_sensorQueue;
 
+    // P1-2: Copy the update list into a local vector under the mutex, then
+    // release. Downloads take tens of seconds and must not hold the mutex —
+    // AsyncTCP handlers would stall waiting for _buildUpdateJson otherwise.
+    std::vector<Updater::UpdateFile> availableCopy;
+    if (self->_updateResultMutex &&
+        xSemaphoreTake(self->_updateResultMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        availableCopy = self->_updateResult.available;
+        xSemaphoreGive(self->_updateResultMutex);
+    }
+
     // Install game files first
-    bool ok = Updater::installGameUpdates(self->_updateResult.available,
+    bool ok = Updater::installGameUpdates(availableCopy,
         [q](const String& name, int cur, int total) {
             Serial.printf("  OTA: %s (%d/%d)\n", name.c_str(), cur, total);
             SensorEvent ev;
@@ -603,7 +666,7 @@ void MundMausServer::_updateTaskWrapper(void* param) {
 
     // Install firmware update if available
     bool needsReboot = false;
-    for (const auto& uf : self->_updateResult.available) {
+    for (const auto& uf : availableCopy) {
         if (uf.firmware && !uf.deleteFile && uf.name.endsWith(".bin")) {
             Serial.printf("  OTA: firmware update %s\n", uf.name.c_str());
             {
@@ -666,5 +729,42 @@ void MundMausServer::_updateTaskWrapper(void* param) {
     self->_updateRunning = false;
 
     // Delete this one-shot task
+    vTaskDelete(nullptr);
+}
+
+// ============================================================
+// WIFI SCAN TASK (P1-4: off-thread blocking scan)
+// ============================================================
+
+void MundMausServer::_startAsyncScan() {
+    // Prevent overlapping scans — a single scan is enough, extra ones would
+    // thrash the radio and delay results for all callers.
+    if (_wifiScanRunning) {
+        return;
+    }
+    _wifiScanRunning = true;
+    // 4KB stack is enough for scanNetworks + a small JSON serialize.
+    xTaskCreate(_wifiScanTaskWrapper, "wifi_scan", 4096, this, 1, nullptr);
+}
+
+void MundMausServer::_wifiScanTaskWrapper(void* param) {
+    MundMausServer* self = static_cast<MundMausServer*>(param);
+
+    // Blocking call happens on this worker task, NOT on AsyncTCP.
+    std::vector<String> networks = self->_wifi.scanNetworks();
+
+    // Broadcast result as WS message so the portal updates regardless of
+    // which transport (HTTP or WS) triggered the scan.
+    JsonDocument resp;
+    resp["type"] = "wifi_networks";
+    JsonArray arr = resp["networks"].to<JsonArray>();
+    for (const auto& n : networks) {
+        arr.add(n);
+    }
+    String buf;
+    serializeJson(resp, buf);
+    self->_ws.textAll(buf);
+
+    self->_wifiScanRunning = false;
     vTaskDelete(nullptr);
 }

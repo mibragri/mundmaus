@@ -5,6 +5,7 @@
 #include <ESPAsyncWebServer.h>
 #include <ArduinoJson.h>
 #include <freertos/queue.h>
+#include <freertos/semphr.h>
 #include "wifi_manager.h"
 #include "updater.h"
 
@@ -76,8 +77,12 @@ private:
     CalibratedJoystick* _joystick = nullptr;
     PuffSensor*         _puffSensor = nullptr;
 
-    // Cached OTA check result
+    // Cached OTA check result.
+    // P1-2: Written by the periodic check task (Core 1) and the OTA install
+    // task, read by AsyncTCP handlers on Core 0. Every access MUST hold
+    // _updateResultMutex. External writers should use setUpdateResult().
     Updater::CheckResult _updateResult;
+    SemaphoreHandle_t _updateResultMutex = nullptr;
 
     void _setupHttpRoutes();
     void _setupWsRoutes();
@@ -93,4 +98,10 @@ private:
     // I5: One-shot FreeRTOS task for blocking OTA downloads
     static void _updateTaskWrapper(void* param);
     volatile bool _updateRunning = false;
+
+    // P1-4: Async WiFi scan — scanNetworks() blocks 2-5s, so we run it in
+    // a short-lived task and broadcast the result via WS when finished.
+    void _startAsyncScan();
+    static void _wifiScanTaskWrapper(void* param);
+    volatile bool _wifiScanRunning = false;
 };

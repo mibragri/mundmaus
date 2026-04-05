@@ -80,13 +80,13 @@
     gap: calc(1.2 * var(--vw));
     margin-bottom: 2vh;
     align-items: flex-start;
-    height: calc(13.3 * var(--vw) + 6px);
+    height: calc(14.5 * var(--vw) + 6px);
     flex-shrink: 0;
   }
 
   .pile-slot {
     width: calc(10.2 * var(--vw));
-    min-height: calc(13.3 * var(--vw));
+    min-height: calc(14.5 * var(--vw));
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: var(--card-radius);
     position: relative;
@@ -158,7 +158,7 @@
   /* CARDS */
   .card {
     width: calc(10.2 * var(--vw));
-    height: calc(13.3 * var(--vw));
+    height: calc(14.5 * var(--vw));
     border-radius: var(--card-radius);
     position: absolute;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -247,7 +247,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: calc(4.5 * var(--vw));
+    font-size: calc(3.5 * var(--vw));
+    line-height: 1;
+    padding: calc(0.8 * var(--vw)) 0;
   }
 
   .card .card-bottom {
@@ -645,6 +647,7 @@ let hintsEnabled = localStorage.getItem('solitaire-hints') === 'true'; // defaul
 const IDLE_TIMEOUT = 120000;
 
 function initGame() {
+  if(typeof cancelCharge==='function')cancelCharge();
   const deck = shuffle(makeDeck());
   stock=[]; waste=[]; foundations=[[],[],[],[]]; tableau=[[],[],[],[],[],[],[]];
   moves=0; score=0; undoStack=[]; selectedCard=null; gameWon=false;
@@ -805,7 +808,7 @@ function getSelCards() {
 
 function renderTableau() {
   const cont=document.getElementById('tableau');cont.innerHTML='';
-  const CARD_H=13.3,FDO=1.0,FUO=2.6;
+  const CARD_H=14.5,FDO=1.0,FUO=2.6;
   let maxBottom=CARD_H; // minimum: one card height (empty slot)
   for(let ci=0;ci<7;ci++){
     const cd=document.createElement('div');cd.className='tableau-col';
@@ -813,7 +816,7 @@ function renderTableau() {
     const col=tableau[ci];
 
     if(!col.length){
-      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:calc(13.3 * var(--vw));';
+      const slot=mkSlot();slot.style.cssText='position:relative;width:100%;min-height:calc(14.5 * var(--vw));';
       if(navZone==='tableau'&&navCol===ci)slot.classList.add('nav-active');
       if(hintsEnabled&&selectedCard){const cards=getSelCards();if(cards&&cards.length&&cards[0].rank==='K'){slot.classList.add('target');addBadge(slot,'target-mark');}}
       const l=document.createElement('div');l.className='empty-label';l.textContent='K';slot.appendChild(l);cd.appendChild(slot);
@@ -1051,6 +1054,7 @@ function chargeLoop(ts) {
 }
 
 function navigate(dir) {
+  if(typeof cancelCharge==='function'&&charge.active)cancelCharge();
   if(gameWon)return; const now=Date.now();if(now-lastNavTime<120)return;lastNavTime=now; resetIdleTimer();
   if(dir==='left'||dir==='right'){
     const d=dir==='left'?-1:1;
@@ -1169,6 +1173,7 @@ function updateKbMode(){
 
 let ws=null;
 let wsBackoff=3000;
+let wsReconnectTimer=null;
 
 function connectWebSocket() {
   const host=location.hostname===''||location.hostname==='localhost'?'localhost':location.hostname;
@@ -1179,6 +1184,7 @@ function connectWebSocket() {
       console.log('ESP32 connected');
       updateWs(true);
       wsBackoff=3000;
+      charge.wsSupported=false; // re-detect on reconnect
     };
     ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
       if(m.type==='nav_hold'){
@@ -1191,7 +1197,13 @@ function connectWebSocket() {
       else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':doPuff();break;case'press':doUndo();render();updateStatus();break;case'new_game':initGame();break;}}
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
-    ws.onclose=()=>{console.log('WS disconnected');updateWs(false);setTimeout(connectWebSocket,wsBackoff);wsBackoff=Math.min(wsBackoff*2,30000);};
+    ws.onclose=()=>{
+      console.log('WS disconnected');
+      updateWs(false);
+      if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
+      wsReconnectTimer=setTimeout(()=>{wsReconnectTimer=null;connectWebSocket();},wsBackoff);
+      wsBackoff=Math.min(wsBackoff*2,30000);
+    };
     ws.onerror=()=>ws.close();
   }catch(e){console.log('WS not available');updateWs(false);}
 }
