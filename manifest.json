@@ -2,22 +2,25 @@
   "manifest_version": 1,
   "files": {
     "www/chess.html.gz": {
-      "version": 10
+      "version": 11
     },
     "www/freecell.html.gz": {
-      "version": 10
+      "version": 11
     },
     "www/memo.html.gz": {
-      "version": 10
+      "version": 11
+    },
+    "www/muehle.html.gz": {
+      "version": 1
     },
     "www/settings.html.gz": {
-      "version": 2
+      "version": 3
     },
     "www/solitaire.html.gz": {
-      "version": 13
+      "version": 15
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 8
+      "version": 10
     }
   }
 }

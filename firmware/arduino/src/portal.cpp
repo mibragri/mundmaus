@@ -124,7 +124,7 @@ struct GameEntry {
     String label;     // e.g. "Chess"
 };
 
-static void _discoverGames(std::vector<GameEntry>& out) {
+static void discoverGames(std::vector<GameEntry>& out) {
     File root = LittleFS.open(Config::WWW_DIR);
     if (!root || !root.isDirectory()) return;
 
@@ -187,7 +187,7 @@ static void _discoverGames(std::vector<GameEntry>& out) {
 // HW STATUS CHIP HELPER
 // ============================================================
 
-static void _appendHwChip(String& html, const char* label, bool ok) {
+static void appendHwChip(String& html, const char* label, bool ok) {
     const char* bgColor   = ok ? "rgba(76,175,80,.15)"  : "rgba(212,42,42,.15)";
     const char* borderClr = ok ? "#4caf50" : "#d42a2a";
     const char* dotClr    = ok ? "#4caf50" : "#d42a2a";
@@ -230,7 +230,7 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
 
     // Discover games from LittleFS
     std::vector<GameEntry> games;
-    _discoverGames(games);
+    discoverGames(games);
 
     // Build game buttons
     String btns;
@@ -296,8 +296,8 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     html += String(heapKB);
     html += F("KB ");
 
-    _appendHwChip(html, "Joystick", hw.joystick);
-    _appendHwChip(html, "Puff", hw.puff);
+    appendHwChip(html, "Joystick", hw.joystick);
+    appendHwChip(html, "Puff", hw.puff);
 
     // WS connectivity chip (starts disconnected, JS updates it)
     html += F("<span id=\"ws-chip\" title=\"Geraet erreichbar\" style=\"display:inline-flex;align-items:center;gap:4px;"

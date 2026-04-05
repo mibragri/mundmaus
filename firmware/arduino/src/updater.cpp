@@ -22,8 +22,22 @@ namespace Updater {
 // filename -> version number, persisted in Preferences namespace "ota_ver"
 static std::map<String, int> _versions;
 
+static const char* OTA_MARKER = "/.ota_marker";
+
 void loadVersions() {
     _versions.clear();
+
+    // If marker is missing, LittleFS was overwritten by USB flash.
+    // Clear NVS so fresh-flash seeding can re-detect installed versions.
+    if (!LittleFS.exists(OTA_MARKER)) {
+        Preferences prefs;
+        prefs.begin("ota_ver", false);
+        prefs.clear();
+        prefs.end();
+        Serial.println("  OTA: fresh flash detected, cleared version tracking");
+        return;
+    }
+
     Preferences prefs;
     prefs.begin("ota_ver", true);  // read-only
 
@@ -53,6 +67,10 @@ void saveVersions() {
     prefs.begin("ota_ver", false);  // read-write
     prefs.putString("json", json);
     prefs.end();
+
+    // Write marker so next boot knows NVS versions are valid
+    File f = LittleFS.open(OTA_MARKER, "w");
+    if (f) { f.print("1"); f.close(); }
 }
 
 // ============================================================
@@ -170,7 +188,7 @@ CheckResult checkManifest() {
     // Only consider www/ files — ignore stale .py entries from old manifests
     std::vector<String> staleKeys;
     for (const auto& kv : _versions) {
-        if (!files.containsKey(kv.first)) {
+        if (!files[kv.first].is<JsonObject>()) {
             if (kv.first.startsWith("www/")) {
                 UpdateFile uf;
                 uf.name       = kv.first;
@@ -267,6 +285,14 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         }
 
         WiFiClient* tcpStream = http.getStreamPtr();
+        if (!tcpStream) {
+            Serial.printf("  OTA: no stream for %s\n", uf->name.c_str());
+            outFile.close();
+            LittleFS.remove(tmpPath);
+            http.end();
+            allOk = false;
+            continue;
+        }
         uint8_t buf[1024];
         int written = 0;
         unsigned long lastData = millis();

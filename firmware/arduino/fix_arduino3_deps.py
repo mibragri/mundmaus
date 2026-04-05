@@ -34,6 +34,44 @@ if not ota_auth:
     sys.exit(1)
 env.Append(CPPDEFINES=[('OTA_AUTH_B64', env.StringifyMacro(ota_auth))])
 
+# ── Guard: lint check before build ───────────────────────────────────
+# Run cppcheck + clang-tidy. Fail build on any defects.
+import shutil
+import subprocess
+_lint_marker = os.path.join(env.subst("$BUILD_DIR"), ".lint_passed")
+_src_dir = os.path.join(env.subst("$PROJECT_DIR"), "src")
+_pio_bin = shutil.which("pio") or os.path.expanduser("~/.platformio/penv/bin/pio")
+
+def _src_newer_than_marker():
+    if not os.path.exists(_lint_marker):
+        return True
+    marker_mtime = os.path.getmtime(_lint_marker)
+    for f in os.listdir(_src_dir):
+        if f.endswith((".cpp", ".h")):
+            if os.path.getmtime(os.path.join(_src_dir, f)) > marker_mtime:
+                return True
+    return False
+
+if _src_newer_than_marker() and "PIOTEST" not in os.environ and "_MUNDMAUS_LINT" not in os.environ:
+    print("  Running lint (cppcheck + clang-tidy)...")
+    lint_env = os.environ.copy()
+    lint_env["_MUNDMAUS_LINT"] = "1"
+    result = subprocess.run(
+        [_pio_bin, "check", "-e", env.subst("$PIOENV"), "--fail-on-defect=low"],
+        cwd=env.subst("$PROJECT_DIR"),
+        env=lint_env,
+    )
+    if result.returncode != 0:
+        print("\n" + "=" * 60)
+        print("  FATAL: Lint check failed! Fix defects before building.")
+        print("=" * 60 + "\n")
+        sys.exit(1)
+    # Touch marker so we don't re-lint until source changes
+    os.makedirs(os.path.dirname(_lint_marker), exist_ok=True)
+    with open(_lint_marker, "w") as f:
+        f.write("passed")
+    print("  Lint passed ✓")
+
 framework_dir = env.PioPlatform().get_package_dir("framework-arduinoespressif32")
 libs_dir = os.path.join(framework_dir, "libraries")
 

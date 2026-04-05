@@ -96,7 +96,7 @@ done
 
 # --- Verify ---
 echo -e "\n${YELLOW}--- Verifying ---${NC}"
-if curl -sf "https://mundmaus.de/ota/manifest.json" | python3 -c 'import json,sys; m=json.load(sys.stdin); print(f"  Remote manifest: {len(m[\"files\"])} files")'; then
+if curl -sf "https://mundmaus.de/ota/manifest.json" | python3 -c 'import json,sys; m=json.load(sys.stdin); n=len(m["files"]); print(f"  Remote manifest: {n} files")'; then
     echo -e "  ${GREEN}Verify OK${NC}"
 else
     echo -e "  ${YELLOW}WARNING: Could not verify HTTPS endpoint${NC}"

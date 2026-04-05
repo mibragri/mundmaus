@@ -187,7 +187,7 @@ std::pair<int, String> WiFiManager::getRSSI() {
         return {0, ""};
     }
 
-    int rssi = WiFi.RSSI();
+    int rssi = static_cast<int>(WiFi.RSSI());  // NOLINT(bugprone-signed-char-misuse) RSSI is signed
     String label;
     if      (rssi >= -50) label = "Perfekt";
     else if (rssi >= -60) label = "Gut";

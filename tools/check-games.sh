@@ -14,6 +14,7 @@ declare -A DISPLAY_NAMES=(
     [solitaire]="Solitaire"
     [freecell]="Freecell"
     [vier-gewinnt]="Vier Gewinnt"
+    [muehle]="Mühle"
 )
 declare -A IMG_NAMES=(
     [memo]="memory"

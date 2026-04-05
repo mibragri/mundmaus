@@ -101,8 +101,10 @@ void MundMausServer::_setupHttpRoutes() {
         [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total) {
             // Accumulate body (single chunk for small JSON)
             // M2: _tempObject leaks if client disconnects mid-upload.
-            // ESPAsyncWebServer does not call body handler on disconnect,
-            // so we cannot free it. Library limitation, not fixable here.
+            // ESPAsyncWebServer does not provide a request destructor callback
+            // and does not call body handler on disconnect, so we cannot free it.
+            // Reviewed: accepted as known limitation — only triggers during WiFi
+            // config (rare), not normal operation. Leak is one String object.
             if (index == 0) {
                 req->_tempObject = new String();
             }
@@ -292,7 +294,7 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
         // Drop messages instead of disconnecting when queue full.
         // Prevents patient losing joystick control during WiFi hiccups.
         client->setCloseClientOnQueueFull(false);
-        Serial.printf("  WS client #%u connected\n", client->id());
+        Serial.printf("  WS client #%lu connected\n", (unsigned long)client->id());
 
         // Send wifi_status
         JsonDocument wsDoc;
@@ -314,7 +316,7 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
         client->text(updBuf);
 
     } else if (type == WS_EVT_DISCONNECT) {
-        Serial.printf("  WS client #%u disconnected\n", client->id());
+        Serial.printf("  WS client #%lu disconnected\n", (unsigned long)client->id());
 
     } else if (type == WS_EVT_DATA) {
         AwsFrameInfo* info = static_cast<AwsFrameInfo*>(arg);
@@ -367,9 +369,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         const char* key = msg["key"] | "";
         if (strlen(key) > 0) {
             // M3: Accept both int and float values (JS may send 1.0 for 1)
-            if (msg["value"].is<int>()) {
-                Config::update(key, msg["value"].as<int>());
-            } else if (msg["value"].is<float>()) {
+            if (msg["value"].is<int>() || msg["value"].is<float>()) {
                 Config::update(key, (int)msg["value"].as<float>());
             }
         }
@@ -422,6 +422,23 @@ void MundMausServer::sendNav(const char* direction) {
     xQueueSend(_sensorQueue, &ev, 0);  // non-blocking
 }
 
+void MundMausServer::sendNavHold(const char* direction, float intensity) {
+    SensorEvent ev;
+    ev.type = SensorEvent::NAV_HOLD;
+    strncpy(ev.data, direction, sizeof(ev.data) - 1);
+    ev.data[sizeof(ev.data) - 1] = '\0';
+    ev.value = constrain(intensity, 0.0f, 1.0f);
+    xQueueSend(_sensorQueue, &ev, 0);
+}
+
+void MundMausServer::sendNavRelease() {
+    SensorEvent ev;
+    ev.type = SensorEvent::NAV_RELEASE;
+    ev.data[0] = '\0';
+    ev.value = 0;
+    xQueueSend(_sensorQueue, &ev, 0);
+}
+
 void MundMausServer::sendAction(const char* kind) {
     SensorEvent ev;
     ev.type = SensorEvent::ACTION;
@@ -454,6 +471,14 @@ void MundMausServer::processSensorQueue() {
         case SensorEvent::NAV:
             doc["type"] = "nav";
             doc["dir"]  = ev.data;
+            break;
+        case SensorEvent::NAV_HOLD:
+            doc["type"]      = "nav_hold";
+            doc["dir"]       = ev.data;
+            doc["intensity"] = ev.value;
+            break;
+        case SensorEvent::NAV_RELEASE:
+            doc["type"] = "nav_release";
             break;
         case SensorEvent::ACTION:
             doc["type"] = "action";

@@ -520,11 +520,13 @@
 </div>
 
 <div id="footer">
-  <span><kbd>←→</kbd> Spalte</span>
-  <span><kbd>⏎</kbd> Einwerfen</span>
+  <span><kbd>←→</kbd></span>
+  <span><kbd>⏎</kbd> <kbd>●</kbd></span>
+  <span><kbd>N</kbd> ↻</span>
   <span><kbd>U</kbd> ↩</span>
-  <span><kbd>N</kbd> <span style="border:1px solid currentColor;border-radius:3px;padding:0 4px;font-size:.85em;font-weight:900;letter-spacing:1px">NEW</span></span>
-  <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>M</kbd> 👥</span>
+  <span><kbd>J</kbd> ⌨</span>
+  <span><kbd>K</kbd> 📺</span>
   <span><kbd>P</kbd> 🏠</span>
 </div>
 
@@ -540,6 +542,7 @@
   <div class="diff-opt" data-d="1"><div class="dt">🏋️</div></div>
   <div class="diff-opt" data-d="2"><div class="dt">🏋️🏋️</div></div>
   <div class="diff-opt" data-d="3"><div class="dt">🏋️🏋️🏋️</div></div>
+  <div id="mp-mode-menu" style="margin-top:1vh;padding:0.6vh calc(1.4 * var(--vw));border-radius:0.8vmin;background:#1a2a3a;color:#80cbc4;font-size:2vh;font-weight:600">Modus: Einzelspieler (M)</div>
 </div>
 
 <div id="thinking" class="hidden">
@@ -616,6 +619,7 @@ let gameActive = false;
 let undoStack = []; // array of {col, player} pairs (2 per undo: player+AI)
 let winLine = null; // [{col,row}, ...] of 4 winning cells
 let aiDifficulty = 2; // 1=easy, 2=medium(depth4), 3=hard(depth8)
+let multiplayerMode = false; // false=vs AI, true=2-Spieler (caretaker vs patient)
 
 function createBoard() {
   board = [];
@@ -1061,13 +1065,17 @@ function renderBoard() {
   if (ui.phase === 'playing') {
     if (ui.aiThinking) {
       $statusText.innerHTML = '🟡 <i class="spin">⟳</i>';
+    } else if (multiplayerMode) {
+      $statusText.textContent = currentPlayer === PLAYER ? '🔴 Rot am Zug' : '🟡 Gelb am Zug';
     } else {
       $statusText.textContent = currentPlayer === PLAYER ? '🔴' : '🟡';
     }
   }
 
-  // Undo button state
-  const canUndo = ui.phase === 'playing' && currentPlayer === PLAYER && undoStack.length > 0 && !ui.aiThinking;
+  // Undo button state — single-player: only between player's moves;
+  // multiplayer: allowed any time there is a move to undo.
+  const canUndo = ui.phase === 'playing' && undoStack.length > 0 && !ui.aiThinking &&
+                  (multiplayerMode || currentPlayer === PLAYER);
   $btnUndo.classList.toggle('disabled', !canUndo);
 
   // Action button highlights
@@ -1076,8 +1084,196 @@ function renderBoard() {
   });
 }
 
+let lastNavTime = 0, navCooldown = 1200, kbSimMode = false;
+let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
+fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
+
+// ── Charge Navigation (hold-to-move) ─────────────────────
+function computeTarget(dir) {
+  if (ui.phase !== 'playing' || ui.aiThinking) return null;
+  let cursorCol = ui.cursorCol;
+  let inBtnCol = ui.inBtnCol;
+  let btnCursor = ui.btnCursor;
+  const btnCount = $actionBtns.length;
+  if (inBtnCol) {
+    switch (dir) {
+      case 'left':
+        inBtnCol = false;
+        break;
+      case 'up':
+        if (btnCursor > 0) btnCursor--;
+        else return null;
+        break;
+      case 'down':
+        if (btnCursor < btnCount - 1) btnCursor++;
+        else return null;
+        break;
+      case 'right':
+        return null;
+    }
+  } else {
+    switch (dir) {
+      case 'left':
+        if (cursorCol > 0) cursorCol--;
+        else return null;
+        break;
+      case 'right':
+        if (cursorCol < COLS - 1) cursorCol++;
+        else { inBtnCol = true; btnCursor = 0; }
+        break;
+      case 'up':
+      case 'down':
+        return null;
+    }
+  }
+  if (cursorCol === ui.cursorCol && inBtnCol === ui.inBtnCol && btnCursor === ui.btnCursor) return null;
+  return {cursorCol, inBtnCol, btnCursor};
+}
+
+function applyTarget(t) {
+  ui.cursorCol = t.cursorCol;
+  ui.inBtnCol = t.inBtnCol;
+  ui.btnCursor = t.btnCursor;
+}
+
+function getTargetElement(t) {
+  if (!t) return null;
+  if (t.inBtnCol) {
+    return $actionBtns[t.btnCursor] || null;
+  }
+  // Target the cursor-cell (column header above the board)
+  const cells = $cursorRow.querySelectorAll('.cursor-cell');
+  return cells[t.cursorCol] || null;
+}
+
+function renderChargePreview() {
+  let pv = document.getElementById('charge-preview');
+  if (!pv) {
+    pv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    pv.id = 'charge-preview';
+    pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    pv.appendChild(rect);
+    (document.getElementById('game') || document.body).appendChild(pv);
+  }
+  const el = getTargetElement(charge.target);
+  if (!el) { pv.style.display = 'none'; return; }
+  const r = el.getBoundingClientRect();
+  const g = (document.getElementById('game') || document.body).getBoundingClientRect();
+  const pad = 8;
+  const w = r.width + pad * 2;
+  const h = r.height + pad * 2;
+  pv.style.display = 'block';
+  pv.style.left = (r.left - g.left - pad) + 'px';
+  pv.style.top = (r.top - g.top - pad) + 'px';
+  pv.setAttribute('width', w);
+  pv.setAttribute('height', h);
+  pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const rect = pv.querySelector('rect');
+  const sw = 7;
+  const inset = sw / 2;
+  const rw = w - sw;
+  const rh = h - sw;
+  const rr = 10;
+  rect.setAttribute('x', inset);
+  rect.setAttribute('y', inset);
+  rect.setAttribute('width', rw);
+  rect.setAttribute('height', rh);
+  rect.setAttribute('rx', rr);
+  rect.setAttribute('stroke-width', sw);
+  // Perimeter approximation (accounting for rounded corners)
+  const perimeter = 2 * (rw + rh) - 8 * rr + 2 * Math.PI * rr;
+  const o = charge.progress;
+  rect.setAttribute('stroke-dasharray', perimeter);
+  // Start drawing from top-middle, offset shrinks as progress grows
+  rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
+  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+}
+
+function clearChargePreview() {
+  const pv = document.getElementById('charge-preview');
+  if (pv) pv.style.display = 'none';
+}
+
+function startCharge(dir, intensity, source) {
+  if (ui.phase !== 'playing' || ui.aiThinking) return;
+  resetIdle();
+  const target = computeTarget(dir);
+  if (!target) return;
+  charge.active = true;
+  charge.dir = dir;
+  charge.intensity = intensity;
+  charge.startTime = performance.now();
+  charge.progress = 0;
+  charge.target = target;
+  charge.source = source;
+  renderChargePreview();
+  if (!charge.animFrameId) charge.animFrameId = requestAnimationFrame(chargeLoop);
+}
+
+function cancelCharge() {
+  charge.active = false;
+  charge.dir = null;
+  charge.target = null;
+  charge.progress = 0;
+  charge.source = null;
+  if (charge.animFrameId) { cancelAnimationFrame(charge.animFrameId); charge.animFrameId = null; }
+  clearChargePreview();
+}
+
+function completeCharge() {
+  const t = charge.target;
+  if (t) {
+    applyTarget(t);
+    sndNav();
+    renderBoard();
+  }
+  if (charge.active && charge.dir) {
+    const next = computeTarget(charge.dir);
+    if (next) {
+      charge.startTime = performance.now();
+      charge.progress = 0;
+      charge.target = next;
+      renderChargePreview();
+    } else cancelCharge();
+  }
+}
+
+function chargeLoop(ts) {
+  if (!charge.active || ui.phase !== 'playing' || ui.aiThinking) { cancelCharge(); return; }
+  const elapsed = ts - charge.startTime;
+  if (elapsed > 5000) { cancelCharge(); return; }
+  const ei = Math.max(charge.intensity, 0.3);
+  const duration = navCooldown / ei;
+  charge.progress = Math.min(1.0, elapsed / duration);
+  renderChargePreview();
+  if (charge.progress >= 1.0) completeCharge();
+  if (charge.active) charge.animFrameId = requestAnimationFrame(chargeLoop);
+  else charge.animFrameId = null;
+}
+
+function updateKbMode() {
+  let el = document.getElementById('kb-mode');
+  if (!el) {
+    const footer = document.getElementById('footer');
+    if (footer) {
+      el = document.createElement('span');
+      el.id = 'kb-mode';
+      el.style.cssText = 'background:#1a2a3a;padding:2px 8px;border-radius:4px;color:#80cbc4;cursor:pointer';
+      el.onclick = () => { kbSimMode = !kbSimMode; updateKbMode(); };
+      footer.appendChild(el);
+    }
+  }
+  if (el) el.textContent = kbSimMode ? '⌨ Sim' : '⌨ Direkt';
+}
+
 // ── Navigation ──────────────────────────────────────────
 function navigate(dir) {
+  const now = Date.now(); if (now - lastNavTime < 120) return; lastNavTime = now;
   resetIdle();
   if (ui.phase === 'menu') return navMenu(dir);
   if (ui.phase === 'gameover') return navGameOver(dir);
@@ -1157,7 +1353,10 @@ function action() {
     return;
   }
 
-  if (ui.phase !== 'playing' || currentPlayer !== PLAYER || ui.aiThinking) return;
+  if (ui.phase !== 'playing' || ui.aiThinking) return;
+  // In single-player mode only PLAYER may act (AI drops via scheduleAI).
+  // In multiplayer both sides act through the same input handlers.
+  if (!multiplayerMode && currentPlayer !== PLAYER) return;
 
   // Button column action
   if (ui.inBtnCol) {
@@ -1174,14 +1373,15 @@ function action() {
     return;
   }
 
-  const row = dropPiece(ui.cursorCol, PLAYER);
+  const who = currentPlayer; // PLAYER (red) or AI (yellow) — in MP both are human
+  const row = dropPiece(ui.cursorCol, who);
   if (row === -1) { sndError(); return; }
 
-  undoStack.push({col: ui.cursorCol, player: PLAYER});
+  undoStack.push({col: ui.cursorCol, player: who});
   moveCount++;
 
   // Animate drop
-  animateDrop(ui.cursorCol, row, PLAYER);
+  animateDrop(ui.cursorCol, row, who);
 
   sndDrop();
 
@@ -1193,7 +1393,9 @@ function action() {
     renderBoard();
     setTimeout(() => {
       sndWin();
-      showGameOver('Rot gewinnt!', 'Glueckwunsch!');
+      const title = who === PLAYER ? 'Rot gewinnt!' : 'Gelb gewinnt!';
+      const info = multiplayerMode ? 'Gut gespielt!' : 'Glueckwunsch!';
+      showGameOver(title, info);
     }, 400);
     return;
   }
@@ -1209,10 +1411,12 @@ function action() {
     return;
   }
 
-  // AI turn
-  currentPlayer = AI;
+  // Next turn
+  currentPlayer = (who === PLAYER) ? AI : PLAYER;
   renderBoard();
-  scheduleAI();
+  if (!multiplayerMode && currentPlayer === AI) {
+    scheduleAI();
+  }
 }
 
 function animateDrop(col, row, player) {
@@ -1231,12 +1435,20 @@ function animateDrop(col, row, player) {
 // ── AI Turn ─────────────────────────────────────────────
 function scheduleAI() {
   if (currentPlayer !== AI || !gameActive) return;
+  if (multiplayerMode) { renderBoard(); return; }
 
   ui.aiThinking = true;
   $thinking.classList.remove('hidden');
   renderBoard();
 
   setTimeout(() => {
+    // Mode may have been toggled to multiplayer while we were "thinking"
+    if (multiplayerMode) {
+      $thinking.classList.add('hidden');
+      ui.aiThinking = false;
+      renderBoard();
+      return;
+    }
     const col = aiChooseColumn();
     $thinking.classList.add('hidden');
     ui.aiThinking = false;
@@ -1286,8 +1498,24 @@ function scheduleAI() {
 
 // ── Undo ────────────────────────────────────────────────
 function undo() {
-  if (ui.phase !== 'playing' || currentPlayer !== PLAYER || ui.aiThinking) return;
-  if (undoStack.length < 2) return; // need at least player + AI move
+  if (ui.phase !== 'playing' || ui.aiThinking) return;
+
+  if (multiplayerMode) {
+    // Single-step undo — simply rewind the last move
+    if (undoStack.length < 1) return;
+    const last = undoStack.pop();
+    removePiece(last.col);
+    moveCount--;
+    currentPlayer = last.player; // whoever moved last plays again
+    winLine = null;
+    beep(400, 100);
+    renderBoard();
+    return;
+  }
+
+  // Single-player: undo removes the pair (player + AI response)
+  if (currentPlayer !== PLAYER) return;
+  if (undoStack.length < 2) return;
 
   // Remove AI's last move
   const aiUndo = undoStack.pop();
@@ -1357,21 +1585,72 @@ function resetIdle() {
   }
 }
 
+// ── Mode Toggle ─────────────────────────────────────────
+function toggleMultiplayerMode() {
+  multiplayerMode = !multiplayerMode;
+  updateModeIndicator();
+  beep(multiplayerMode ? 700 : 500, 80);
+  // If switching to single-player mid-game and it is AI's turn, launch AI.
+  if (!multiplayerMode && ui.phase === 'playing' && gameActive && currentPlayer === AI && !ui.aiThinking) {
+    scheduleAI();
+  } else {
+    renderBoard();
+  }
+}
+
+function updateModeIndicator() {
+  // Footer indicator
+  let el = document.getElementById('mp-mode');
+  if (!el) {
+    const footer = document.getElementById('footer');
+    if (footer) {
+      el = document.createElement('span');
+      el.id = 'mp-mode';
+      el.style.cssText = 'background:#1a2a3a;padding:2px 8px;border-radius:4px;color:#80cbc4;font-size:.9em;cursor:pointer';
+      el.onclick = () => toggleMultiplayerMode();
+      footer.appendChild(el);
+    }
+  }
+  if (el) el.textContent = multiplayerMode ? 'Multiplayer' : 'Einzelspieler';
+
+  // Menu indicator (visible on the difficulty screen)
+  const menuEl = document.getElementById('mp-mode-menu');
+  if (menuEl) {
+    menuEl.textContent = multiplayerMode ? 'Modus: Multiplayer (M)' : 'Modus: Einzelspieler (M)';
+  }
+}
+
 // ── Keyboard ────────────────────────────────────────────
 document.addEventListener('keydown', e => {
   switch (e.key) {
-    case 'ArrowLeft':  e.preventDefault(); navigate('left'); break;
-    case 'ArrowRight': e.preventDefault(); navigate('right'); break;
-    case 'ArrowUp':    e.preventDefault(); navigate('up'); break;
-    case 'ArrowDown':  e.preventDefault(); navigate('down'); break;
+    case 'ArrowLeft':
+    case 'ArrowRight':
+    case 'ArrowUp':
+    case 'ArrowDown': {
+      e.preventDefault();
+      const dir = e.key.replace('Arrow','').toLowerCase();
+      if (ui.phase !== 'playing' || ui.aiThinking) { navigate(dir); break; }
+      if (kbSimMode) { if (!e.repeat) startCharge(dir, 1.0, 'kb'); }
+      else navigate(dir);
+      break;
+    }
     case ' ':
-    case 'Enter':      e.preventDefault(); action(); break;
+    case 'Enter':      e.preventDefault(); if (!e.repeat) { cancelCharge(); action(); } break;
     case 'Escape':     window.location.href = '/'; return;
-    case 'u': case 'U': undo(); break;
-    case 'n': case 'N': showDiffMenu(); break;
+    case 'u': case 'U': cancelCharge(); undo(); break;
+    case 'n': case 'N': cancelCharge(); showDiffMenu(); break;
+    case 'j': case 'J': kbSimMode = !kbSimMode; updateKbMode(); break;
     case 'k': case 'K': toggleKiosk(); break;
+    case 'm': case 'M': toggleMultiplayerMode(); break;
     case 'p': case 'P': window.location.href = '/'; return;
   }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (!kbSimMode) return;
+  const dirs = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down'};
+  const dir = dirs[e.key];
+  if (dir && charge.active && charge.dir === dir && charge.source === 'kb') cancelCharge();
 });
 
 // ── WebSocket ───────────────────────────────────────────
@@ -1394,11 +1673,22 @@ function wsConnect() {
       try {
         const msg = JSON.parse(evt.data);
         resetIdle();
-        if (msg.type === 'nav') navigate(msg.dir);
+        if (msg.type === 'nav_hold') {
+          charge.wsSupported = true;
+          if (ui.phase !== 'playing' || ui.aiThinking) { navigate(msg.dir); }
+          else if (!charge.active || charge.dir !== msg.dir) startCharge(msg.dir, parseFloat(msg.intensity) || 1.0, 'ws');
+          else if (charge.active) charge.intensity = parseFloat(msg.intensity) || 1.0;
+        }
+        else if (msg.type === 'nav_release') {
+          if (charge.active && charge.source === 'ws') cancelCharge();
+        }
+        else if (msg.type === 'nav') {
+          if (!charge.wsSupported) navigate(msg.dir);
+        }
         else if (msg.type === 'action') {
-          if (msg.kind === 'puff' || msg.kind === 'press') action();
-          else if (msg.kind === 'undo') undo();
-          else if (msg.kind === 'new_game') showDiffMenu();
+          if (msg.kind === 'puff' || msg.kind === 'press') { cancelCharge(); action(); }
+          else if (msg.kind === 'undo') { cancelCharge(); undo(); }
+          else if (msg.kind === 'new_game') { cancelCharge(); showDiffMenu(); }
           else if (msg.kind === 'kiosk') toggleKiosk();
         }
         else if (msg.type === 'puff_level') {
@@ -1423,8 +1713,10 @@ function wsConnect() {
 }
 
 // ── Init ────────────────────────────────────────────────
+updateModeIndicator();
 showDiffMenu();
 wsConnect();
+updateKbMode();
 </script>
 </body>
 </html>

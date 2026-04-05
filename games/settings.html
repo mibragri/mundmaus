@@ -411,7 +411,7 @@
       <input type="range" id="slider-speed" min="1" max="10" step="1" value="5">
       <span class="slider-value" id="val-speed">5</span>
     </div>
-    <div class="slider-hint">1 = langsam / slow &nbsp; 10 = schnell / fast</div>
+    <div class="slider-hint">1 = langsam / slow &nbsp; 10 = schnell / fast &nbsp; <span id="val-speed-ms" style="color:#80cbc4"></span></div>
   </div>
 
   <!-- Action Buttons -->
@@ -441,6 +441,11 @@
     <div class="expert-row">
       <label for="exp-NAV_REPEAT_MS">NAV_REPEAT_MS</label>
       <input type="number" id="exp-NAV_REPEAT_MS" min="50" max="800" step="10" value="300">
+      <span class="unit">ms</span>
+    </div>
+    <div class="expert-row">
+      <label for="exp-NAV_COOLDOWN_MS">NAV_COOLDOWN_MS</label>
+      <input type="number" id="exp-NAV_COOLDOWN_MS" min="50" max="3000" step="50" value="1000">
       <span class="unit">ms</span>
     </div>
     <div class="expert-row">
@@ -498,6 +503,7 @@ const EXPERT_FIELDS = {
   DEADZONE:        { min: 50,   max: 500,  step: 10,   unit: '' },
   NAV_THRESHOLD:   { min: 200,  max: 1500, step: 50,   unit: '' },
   NAV_REPEAT_MS:   { min: 50,   max: 800,  step: 10,   unit: 'ms' },
+  NAV_COOLDOWN_MS: { min: 50,   max: 3000, step: 50,   unit: 'ms' },
   PUFF_COOLDOWN_MS:   { min: 100,   max: 1000,   step: 50,   unit: 'ms' },
   PUFF_RAW_THRESHOLD: { min: 10000, max: 200000, step: 5000, unit: '' },
   SENSOR_POLL_MS:     { min: 10,    max: 100,    step: 5,    unit: 'ms' }
@@ -521,7 +527,8 @@ function sliderToConfig(sliderId, sliderVal) {
       };
     case 'slider-speed':
       return {
-        NAV_REPEAT_MS: Math.round(500 - t * (500 - 100))
+        NAV_REPEAT_MS: Math.round(500 - t * (500 - 100)),
+        NAV_COOLDOWN_MS: Math.round(2500 - t * (2500 - 500))
       };
   }
   return {};
@@ -544,6 +551,10 @@ function configToSlider(key, value) {
     }
     case 'NAV_REPEAT_MS': {
       const t = (500 - value) / (500 - 100);
+      return { sliderId: 'slider-speed', sliderVal: Math.round(t * 9 + 1) };
+    }
+    case 'NAV_COOLDOWN_MS': {
+      const t = (2500 - value) / (2500 - 500);
       return { sliderId: 'slider-speed', sliderVal: Math.round(t * 9 + 1) };
     }
   }
@@ -584,6 +595,14 @@ function updateSlidersFromConfig() {
       $valSpeed.textContent = $sliderSpeed.value;
     }
   }
+  updateSpeedMs();
+}
+
+function updateSpeedMs() {
+  const msEl = document.getElementById('val-speed-ms');
+  if (msEl && configCurrent.NAV_COOLDOWN_MS !== undefined) {
+    msEl.textContent = `(${configCurrent.NAV_COOLDOWN_MS}ms pro Sprung)`;
+  }
 }
 
 function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -622,6 +641,7 @@ function onSliderInput(sliderId) {
   const mapped = sliderToConfig(sliderId, parseInt(el.value));
   Object.assign(configCurrent, mapped);
   updateExpertFromConfig();
+  updateSpeedMs();
   checkUnsaved();
 
   // Send live preview for each changed key

@@ -35,7 +35,7 @@ static void sensorTask(void* param) {
         unsigned long now = millis();
 
         // -- I3: Handle calibrate request from WS handler (non-blocking) --
-        if (server->calibrateRequested) {
+        if (server && server->calibrateRequested) {
             server->calibrateRequested = false;
             Serial.println("  Calibrating (from WS request)...");
 
@@ -57,16 +57,37 @@ static void sensorTask(void* param) {
         }
 
         // -- Joystick navigation --
-        const char* nav = joystick->pollNavigation();
-        if (nav) {
-            server->sendNav(nav);
-            idleStart = now;
+        if (joystick) {
+            const char* nav = joystick->pollNavigation();
+            if (nav) {
+                server->sendNav(nav);
+                idleStart = now;
+            }
+
+            // -- Joystick button --
+            if (joystick->pollButton()) {
+                server->sendAction("press");
+                idleStart = now;
+            }
         }
 
-        // -- Joystick button --
-        if (joystick->pollButton()) {
-            server->sendAction("press");
-            idleStart = now;
+        // -- Continuous nav state for charge-based games --
+        if (joystick) {
+            static bool wasNavigating = false;
+            static unsigned long lastHoldSend = 0;
+            float intensity;
+            const char* state = joystick->getState(intensity);
+            if (state) {
+                // Throttle nav_hold to ~10Hz (every 100ms)
+                if ((now - lastHoldSend) >= 100) {
+                    server->sendNavHold(state, intensity);
+                    lastHoldSend = now;
+                }
+                wasNavigating = true;
+            } else if (wasNavigating) {
+                server->sendNavRelease();
+                wasNavigating = false;
+            }
         }
 
         // -- Puff sensor --
@@ -90,16 +111,18 @@ static void sensorTask(void* param) {
         }
 
         // -- Auto-recalibrate joystick when idle > 10s (max once per 60s) --
-        if (joystick->isIdle()) {
-            if ((now - idleStart) > (unsigned long)Config::DEFAULT_RECAL_IDLE_MS) {
-                if ((now - lastRecal) > 60000) {
-                    joystick->calibrate(20);
-                    lastRecal = now;
-                    idleStart = now;
+        if (joystick) {
+            if (joystick->isIdle()) {
+                if ((now - idleStart) > (unsigned long)Config::DEFAULT_RECAL_IDLE_MS) {
+                    if ((now - lastRecal) > 60000) {
+                        joystick->calibrate(20);
+                        lastRecal = now;
+                        idleStart = now;
+                    }
                 }
+            } else {
+                idleStart = now;
             }
-        } else {
-            idleStart = now;
         }
 
         // Update heartbeat for WDT check in loop()
@@ -225,7 +248,7 @@ void setup() {
     );
     Serial.println("\n[Sensor-Task] gestartet (Core 1, 50Hz)");
 
-    Serial.printf("\n[Start] Heap frei: %u bytes\n", ESP.getFreeHeap());
+    Serial.printf("\n[Start] Heap frei: %lu bytes\n", (unsigned long)ESP.getFreeHeap());
     Serial.println("Bereit.\n");
 
     // Mark firmware boot as valid (cancel OTA rollback)

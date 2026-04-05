@@ -23,9 +23,13 @@ public:
     int centerX;
     int centerY;
 
+    /// Continuous state: direction + intensity (0-1). Returns nullptr if idle.
+    const char* getState(float& outIntensity);
+
 private:
     int _pinX, _pinY, _pinSW;
     const char* _lastDir;
+    float _lastIntensity = 0.0f;
     unsigned long _lastNavTime;
     bool _navRepeating;
     unsigned long _dirLostTime;

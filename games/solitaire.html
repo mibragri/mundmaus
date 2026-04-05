@@ -340,14 +340,8 @@
     gap: calc(2 * var(--vw));
     font-size: 1.5vh;
     color: var(--text-dim);
-    background: rgba(15, 52, 96, 0.6);
-    backdrop-filter: blur(10px);
+    background: rgba(0, 0, 0, 0.7);
     flex-shrink: 0;
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
   }
 
   #footer kbd {
@@ -570,10 +564,11 @@
 
 <div id="footer">
   <span><kbd>←↑→↓</kbd></span>
-  <span><kbd>⏎</kbd> ●</span>
+  <span><kbd>⏎</kbd> <kbd>●</kbd></span>
+  <span><kbd>N</kbd> ↻</span>
   <span><kbd>U</kbd> ↩</span>
-  <span><kbd>N</kbd> NEW</span>
-  <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>J</kbd> ⌨</span>
+  <span><kbd>K</kbd> 📺</span>
   <span><kbd>P</kbd> 🏠</span>
 </div>
 
@@ -643,6 +638,9 @@ let stock=[], waste=[], foundations=[[],[],[],[]], tableau=[[],[],[],[],[],[],[]
 let moves=0, score=0, undoStack=[];
 let navZone='tableau', navCol=0, navCardIdx=-1, selectedCard=null, gameWon=false;
 let kioskMode=false, idleTimer=null;
+let lastNavTime=0, navCooldown=300, kbSimMode=false;
+let charge={active:false,dir:null,intensity:1.0,startTime:0,progress:0,target:null,source:null,animFrameId:null,wsSupported:false};
+fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 let hintsEnabled = localStorage.getItem('solitaire-hints') === 'true'; // default OFF
 const IDLE_TIMEOUT = 120000;
 
@@ -903,8 +901,157 @@ function addBadge(el,type) {
 // NAVIGATION & INPUT
 // ============================================================
 
+function computeTarget(dir) {
+  let z=navZone, c=navCol, ci=navCardIdx;
+  if(dir==='left'||dir==='right'){
+    const d=dir==='left'?-1:1;
+    if(z==='top')c=Math.max(0,Math.min(5,c+d));
+    else c=Math.max(0,Math.min(7,c+d));
+    ci=-1;
+  }
+  if(dir==='up'&&z==='tableau'){
+    if(c===7){if(ci>0)ci--;else{z='top';c=5;ci=-1;}}
+    else{
+      const{start,end,count}=getFaceUpRange(c);
+      if(count>1){const cur=resolveNavCardIdx(c);if(cur>start){ci=cur-1;}else{z='top';if(c>1)c=Math.min(c-1,5);ci=-1;}}
+      else{z='top';if(c>1)c=Math.min(c-1,5);ci=-1;}
+    }
+  }
+  if(dir==='down'&&z==='top'){
+    z='tableau';if(c>=2)c=Math.min(c+1,6);else c=Math.min(c,6);ci=-1;
+  }
+  if(dir==='down'&&navZone==='tableau'){
+    if(c===7){if(ci<3)ci++;else return null;}
+    else{
+      const{start,end,count}=getFaceUpRange(c);
+      if(count>1){const cur=resolveNavCardIdx(c);if(cur<end)ci=cur+1;else return null;}
+      else return null;
+    }
+  }
+  if(z===navZone&&c===navCol&&ci===navCardIdx)return null;
+  return{zone:z,col:c,cardIdx:ci};
+}
+
+function getTargetElement(t) {
+  if(!t)return null;
+  if(t.zone==='top'){
+    const tr=document.getElementById('top-row');
+    if(t.col<=1)return tr.children[t.col];
+    if(t.col>=2&&t.col<=5)return tr.children[t.col+1];
+  }
+  if(t.zone==='tableau'){
+    const tb=document.getElementById('tableau');
+    if(t.col===7){
+      const ac=tb.querySelector('.action-col');
+      if(ac){const idx=t.cardIdx<=0?0:Math.min(t.cardIdx,3);return ac.children[idx];}
+    }
+    if(t.col>=0&&t.col<=6){
+      const col=tb.children[t.col];if(!col)return null;
+      const cards=col.querySelectorAll('.card');
+      if(!cards.length)return col.querySelector('.pile-slot')||col;
+      const ri=t.cardIdx===-1?cards.length-1:Math.min(t.cardIdx,cards.length-1);
+      return cards[ri];
+    }
+  }
+  return null;
+}
+
+function renderChargePreview() {
+  let pv = document.getElementById('charge-preview');
+  if (!pv) {
+    pv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    pv.id = 'charge-preview';
+    pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    pv.appendChild(rect);
+    (document.getElementById('game') || document.body).appendChild(pv);
+  }
+  const el = getTargetElement(charge.target);
+  if (!el) { pv.style.display = 'none'; return; }
+  const r = el.getBoundingClientRect();
+  const g = (document.getElementById('game') || document.body).getBoundingClientRect();
+  const pad = 8;
+  const w = r.width + pad * 2;
+  const h = r.height + pad * 2;
+  pv.style.display = 'block';
+  pv.style.left = (r.left - g.left - pad) + 'px';
+  pv.style.top = (r.top - g.top - pad) + 'px';
+  pv.setAttribute('width', w);
+  pv.setAttribute('height', h);
+  pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const rect = pv.querySelector('rect');
+  const sw = 7;
+  const inset = sw / 2;
+  const rw = w - sw;
+  const rh = h - sw;
+  const rr = 10;
+  rect.setAttribute('x', inset);
+  rect.setAttribute('y', inset);
+  rect.setAttribute('width', rw);
+  rect.setAttribute('height', rh);
+  rect.setAttribute('rx', rr);
+  rect.setAttribute('stroke-width', sw);
+  // Perimeter approximation (accounting for rounded corners)
+  const perimeter = 2 * (rw + rh) - 8 * rr + 2 * Math.PI * rr;
+  const o = charge.progress;
+  rect.setAttribute('stroke-dasharray', perimeter);
+  // Start drawing from top-middle, offset shrinks as progress grows
+  rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
+  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+}
+
+function clearChargePreview() {
+  const pv=document.getElementById('charge-preview');
+  if(pv)pv.style.display='none';
+}
+
+function startCharge(dir, intensity, source) {
+  if(gameWon)return;resetIdleTimer();
+  const target=computeTarget(dir);
+  if(!target)return;
+  charge.active=true;charge.dir=dir;charge.intensity=intensity;
+  charge.startTime=performance.now();charge.progress=0;
+  charge.target=target;charge.source=source;
+  renderChargePreview();
+  if(!charge.animFrameId)charge.animFrameId=requestAnimationFrame(chargeLoop);
+}
+
+function cancelCharge() {
+  charge.active=false;charge.dir=null;charge.target=null;charge.progress=0;charge.source=null;
+  if(charge.animFrameId){cancelAnimationFrame(charge.animFrameId);charge.animFrameId=null;}
+  clearChargePreview();
+}
+
+function completeCharge() {
+  const t=charge.target;
+  navZone=t.zone;navCol=t.col;navCardIdx=t.cardIdx;
+  sndNav();render();
+  if(charge.active&&charge.dir){
+    const next=computeTarget(charge.dir);
+    if(next){charge.startTime=performance.now();charge.progress=0;charge.target=next;renderChargePreview();}
+    else cancelCharge();
+  }
+}
+
+function chargeLoop(ts) {
+  if(!charge.active||gameWon){cancelCharge();return;}
+  const elapsed=ts-charge.startTime;
+  if(elapsed>5000){cancelCharge();return;}
+  const ei=Math.max(charge.intensity,0.3);
+  const duration=navCooldown/ei;
+  charge.progress=Math.min(1.0,elapsed/duration);
+  renderChargePreview();
+  if(charge.progress>=1.0)completeCharge();
+  if(charge.active)charge.animFrameId=requestAnimationFrame(chargeLoop);
+  else charge.animFrameId=null;
+}
+
 function navigate(dir) {
-  if(gameWon)return; resetIdleTimer();
+  if(gameWon)return; const now=Date.now();if(now-lastNavTime<120)return;lastNavTime=now; resetIdleTimer();
   if(dir==='left'||dir==='right'){
     const d=dir==='left'?-1:1;
     if(navZone==='top')navCol=Math.max(0,Math.min(5,navCol+d));
@@ -929,6 +1076,7 @@ function navigate(dir) {
 }
 
 function doPuff() {
+  cancelCharge();
   resetIdleTimer();
   if(document.getElementById('idle-overlay').classList.contains('visible')){hideIdle();initGame();return;}
   if(gameWon){initGame();return;}
@@ -980,17 +1128,40 @@ function getSrc(z,c) { if(z==='top'&&c===1)return'waste';if(z==='top'&&c>=2)retu
 document.addEventListener('keydown',(e)=>{
   initAudio(); resetIdleTimer();
   switch(e.key){
-    case'ArrowLeft':navigate('left');break;case'ArrowRight':navigate('right');break;
-    case'ArrowUp':navigate('up');break;case'ArrowDown':navigate('down');break;
+    case'ArrowLeft':case'ArrowRight':case'ArrowUp':case'ArrowDown':{
+      const dir=e.key.replace('Arrow','').toLowerCase();
+      if(kbSimMode){if(!e.repeat)startCharge(dir,1.0,'kb');}
+      else navigate(dir);
+      break;}
     case' ':case'Enter':e.preventDefault();if(!e.repeat)doPuff();break;
-    case'Backspace':e.preventDefault();if(!e.repeat){doUndo();render();updateStatus();}break;
+    case'Backspace':e.preventDefault();if(!e.repeat){cancelCharge();doUndo();render();updateStatus();}break;
     case'u':case'U':doUndo();render();updateStatus();break;
     case'n':initGame();break;
     case'k':case'K':toggleKiosk();break;
+    case'j':kbSimMode=!kbSimMode;updateKbMode();break;
     case'p':case'P':window.location.href='/';return;
     case'Escape':window.location.href='/';return;
   }
 });
+
+document.addEventListener('keyup',(e)=>{
+  if(!kbSimMode)return;
+  const dirs={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'up',ArrowDown:'down'};
+  const dir=dirs[e.key];
+  if(dir&&charge.active&&charge.dir===dir&&charge.source==='kb')cancelCharge();
+});
+
+function updateKbMode(){
+  let el=document.getElementById('kb-mode');
+  if(!el){
+    const footer=document.getElementById('footer');
+    if(footer){el=document.createElement('span');el.id='kb-mode';
+      el.style.cssText='background:#1a2a3a;padding:2px 8px;border-radius:4px;color:#80cbc4;cursor:pointer';
+      el.onclick=()=>{kbSimMode=!kbSimMode;updateKbMode();};
+      footer.appendChild(el);}
+  }
+  if(el)el.textContent=kbSimMode?'⌨ Sim':'⌨ Direkt';
+}
 
 // ============================================================
 // WEBSOCKET - ESP32 Connection
@@ -1010,7 +1181,13 @@ function connectWebSocket() {
       wsBackoff=3000;
     };
     ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
-      if(m.type==='nav')navigate(m.dir);
+      if(m.type==='nav_hold'){
+        charge.wsSupported=true;
+        if(!charge.active||charge.dir!==m.dir)startCharge(m.dir,parseFloat(m.intensity)||1.0,'ws');
+        else if(charge.active)charge.intensity=parseFloat(m.intensity)||1.0;
+      }
+      else if(m.type==='nav_release'){if(charge.active&&charge.source==='ws')cancelCharge();}
+      else if(m.type==='nav'){if(!charge.wsSupported)navigate(m.dir);}
       else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':doPuff();break;case'press':doUndo();render();updateStatus();break;case'new_game':initGame();break;}}
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
@@ -1030,6 +1207,7 @@ function updateWs(on) {
 // Start
 initGame();
 connectWebSocket();
+updateKbMode();
 </script>
 </body>
 </html>

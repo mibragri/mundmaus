@@ -6,7 +6,7 @@ Ein ESP32 mit Joystick und Drucksensor steuert browserbasierte Spiele — pusten
 
 Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet werden
 
-![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png) ![Vier Gewinnt](screenshots/vier-gewinnt.png) ![Freecell](screenshots/freecell.png)
+![Solitaire](screenshots/solitaire.png) ![Chess](screenshots/chess.png) ![Memo](screenshots/memo.png) ![Vier Gewinnt](screenshots/vier-gewinnt.png) ![Freecell](screenshots/freecell.png) ![Mühle](screenshots/muehle.png)
 
 ![Portal](screenshots/portal.png) ![Settings](screenshots/settings.png)
 
@@ -32,6 +32,7 @@ Drucksensor ──┘                          Solitaire / Schach / Memo / ...
 | **Memo** | Memory-Spiel, 4 Feldgroessen |
 | **Vier Gewinnt** | Connect Four gegen KI, 3 Schwierigkeitsstufen |
 | **Freecell** | Freecell Solitaire mit Supermove und Auto-Complete |
+| **Mühle** | Nine Men's Morris gegen KI, 3 Schwierigkeitsstufen, mit Multiplayer |
 
 Alle Spiele sind barrierefrei: farbenblind-sichere Markierungen, Audio-Feedback, Kiosk-Modus fuer den Patienten, Keyboard-Fallback fuer Pfleger.
 
@@ -144,7 +145,7 @@ Oder manuell:
 mpremote connect /dev/ttyUSB0 cp boot.py main.py config.py :/
 mpremote connect /dev/ttyUSB0 cp sensors.py server.py updater.py wifi_manager.py display.py :/
 mpremote connect /dev/ttyUSB0 mkdir :www
-mpremote connect /dev/ttyUSB0 cp games/solitaire.html games/chess.html games/memo.html games/settings.html games/vier-gewinnt.html games/freecell.html :/www/
+mpremote connect /dev/ttyUSB0 cp games/solitaire.html games/chess.html games/memo.html games/settings.html games/vier-gewinnt.html games/freecell.html games/muehle.html :/www/
 ```
 
 ### Option B: Arduino C++ (mehr RAM, schneller)
@@ -209,6 +210,7 @@ mundmaus/
 │   ├── memo.html         # Memory/Memo
 │   ├── vier-gewinnt.html # Vier Gewinnt (Connect Four)
 │   ├── freecell.html     # Freecell Solitaire
+│   ├── muehle.html       # Muehle (Nine Men's Morris)
 │   └── settings.html     # Einstellungen
 ├── firmware/arduino/     # Arduino C++ Firmware (Alternative)
 ├── enclosure/            # 3D-Gehaeuse (CadQuery, druckfertig)

@@ -14,7 +14,7 @@ class PuffSensor;
 
 // Thread-safe event for sensor->WS bridge (I1)
 struct SensorEvent {
-    enum Type { NAV, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
+    enum Type { NAV, NAV_HOLD, NAV_RELEASE, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
                 UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT } type;
     char data[64];   // direction string, action kind, or filename/message
     float value;     // for puff_level
@@ -41,6 +41,8 @@ public:
 
     // -- Outbound (thread-safe: pushes to queue, safe from any core) --
     void sendNav(const char* direction);
+    void sendNavHold(const char* direction, float intensity);
+    void sendNavRelease();
     void sendAction(const char* kind);
     void sendPuffLevel(float value);
 

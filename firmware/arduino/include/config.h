@@ -59,6 +59,7 @@ constexpr const char* OTA_AUTH     = "";
 constexpr int DEFAULT_DEADZONE          = 150;
 constexpr int DEFAULT_NAV_THRESHOLD     = 450;
 constexpr int DEFAULT_NAV_REPEAT_MS     = 400;
+constexpr int DEFAULT_NAV_COOLDOWN_MS   = 1000;
 constexpr int DEFAULT_CALIBRATION_SAMPLES = 50;
 
 // Puff
@@ -74,6 +75,7 @@ constexpr int DEFAULT_SENSOR_POLL_MS        = 20;
 extern int DEADZONE;
 extern int NAV_THRESHOLD;
 extern int NAV_REPEAT_MS;
+extern int NAV_COOLDOWN_MS;
 extern int PUFF_COOLDOWN_MS;
 extern int PUFF_RAW_THRESHOLD;
 extern int SENSOR_POLL_MS;
@@ -82,7 +84,7 @@ extern int SENSOR_POLL_MS;
 // CONFIGURABLE KEYS (for settings UI)
 // ============================================================
 
-constexpr int NUM_CONFIGURABLE = 6;
+constexpr int NUM_CONFIGURABLE = 7;
 
 extern const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE];
 

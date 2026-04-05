@@ -74,6 +74,34 @@ const char* CalibratedJoystick::_getDirection() {
     return nullptr;
 }
 
+const char* CalibratedJoystick::getState(float& outIntensity) {
+    int dx, dy;
+    _readCentered(dx, dy);
+
+    const char* dir = nullptr;
+    int dominant = 0;
+
+    if (abs(dx) > abs(dy)) {
+        if (dx < -Config::NAV_THRESHOLD) { dir = "left";  dominant = dx; }
+        else if (dx > Config::NAV_THRESHOLD) { dir = "right"; dominant = dx; }
+    } else {
+        if (dy < -Config::NAV_THRESHOLD) { dir = "up";    dominant = dy; }
+        else if (dy > Config::NAV_THRESHOLD) { dir = "down";  dominant = dy; }
+    }
+
+    if (dir) {
+        float intensity = float(abs(dominant) - Config::NAV_THRESHOLD) / (2048.0f - Config::NAV_THRESHOLD);
+        intensity = constrain(intensity, 0.0f, 1.0f);
+        _lastIntensity = intensity;
+        outIntensity = intensity;
+        return dir;
+    }
+
+    _lastIntensity = 0;
+    outIntensity = 0;
+    return nullptr;
+}
+
 const char* CalibratedJoystick::pollNavigation() {
     unsigned long now = millis();
     const char* d = _getDirection();

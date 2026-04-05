@@ -1,0 +1,2216 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MundMaus Mühle</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%231a1a2e'/><text x='16' y='24' text-anchor='middle' font-size='22' font-weight='bold' fill='%2376FF03'>M</text></svg>">
+<style>
+  /* ═══════════════════════════════════════════════════════════
+     MundMaus Mühle v1.0
+     Nine Men's Morris für Tetraplegiker
+     Steuerung: Joystick (4 Richtungen) + Pusten
+     Protokoll: WebSocket auf ws://${hostname}:81
+     ═══════════════════════════════════════════════════════════ */
+
+  :root {
+    --bg: #000000;
+    --bg-light: #111111;
+    --text: #e8e8e8;
+    --text-dim: #aaa;
+    --header-bg: rgba(0, 0, 0, 0.7);
+
+    /* Board: warm wooden tones */
+    --board-bg: #2a1e10;
+    --line-color: #d8b26b;
+    --line-glow: rgba(216, 178, 107, 0.4);
+    --intersection: #3a2a15;
+    --intersection-border: #d8b26b;
+
+    /* Cursor: Green */
+    --cursor-color: #76FF03;
+    --cursor-glow: rgba(118, 255, 3, 0.4);
+
+    /* Selektion: Orange */
+    --selected-color: #FF8F00;
+    --selected-glow: rgba(255, 143, 0, 0.4);
+
+    /* Removable: Red */
+    --removable-color: #FF5252;
+    --removable-glow: rgba(255, 82, 82, 0.5);
+
+    /* Mill highlight: Gold */
+    --mill-color: #FFD700;
+    --mill-glow: rgba(255, 215, 0, 0.6);
+
+    /* Piece colors */
+    --piece-white: #f5f5f5;
+    --piece-white-stroke: #555555;
+    --piece-black: #1a1a1a;
+    --piece-black-stroke: #000000;
+    --vw: min(1vw, 19.2px);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+    max-width: 1920px;
+    margin: 0 auto;
+    height: 100vh;
+    width: 100%;
+    user-select: none;
+    -webkit-user-select: none;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ── Header ─────────────────────────────────── */
+  #header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.8vh calc(2 * var(--vw));
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+    height: 6vh;
+    flex-shrink: 0;
+    z-index: 10;
+  }
+
+  #header h1 {
+    font-size: 2.6vh;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  #header h1 span { color: var(--cursor-color); }
+
+  #status-text {
+    font-size: 2vh;
+    font-weight: 600;
+    padding: 0.3em 1em;
+    border-radius: 0.5em;
+    background: rgba(255,255,255,0.05);
+  }
+  #status-text.warn {
+    background: rgba(255, 82, 82, 0.3);
+  }
+
+  #phase-text {
+    font-size: 1.8vh;
+    color: var(--text-dim);
+    padding: 0.3em 1em;
+  }
+
+  /* ── WS Status ──────────────────────────────── */
+  #ws-status {
+    position: fixed;
+    top: 1vh;
+    right: calc(1 * var(--vw));
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #666;
+    z-index: 200;
+    transition: background 0.3s;
+  }
+  #ws-status.connected { background: #76ff03; box-shadow: 0 0 6px #76ff03; }
+
+  /* ── Puff Indicator ─────────────────────────── */
+  #puff-indicator {
+    display: flex;
+    align-items: center;
+    gap: calc(0.6 * var(--vw));
+  }
+  #puff-icon {
+    font-size: calc(1.4 * var(--vw));
+    color: rgba(255,255,255,0.25);
+    flex-shrink: 0;
+  }
+  #puff-track {
+    width: calc(8 * var(--vw));
+    height: 0.6vh;
+    background: rgba(255,255,255,0.1);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  #puff-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--cursor-color);
+    border-radius: 4px;
+    transition: width 0.05s;
+  }
+
+  /* ── Board Area ─────────────────────────────── */
+  #board-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1vmin;
+    position: relative;
+  }
+
+  #board-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 1vmin;
+  }
+
+  #board-container {
+    position: relative;
+    width: 72vmin;
+    height: 72vmin;
+    max-width: 72vh;
+    max-height: 72vh;
+    background: var(--board-bg);
+    border: 0.4vmin solid rgba(255, 215, 160, 0.25);
+    border-radius: 1vmin;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.5), inset 0 0 40px rgba(0,0,0,0.6);
+    padding: 0;
+  }
+
+  #board-svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  /* SVG styles applied via attributes + classes */
+  .board-line {
+    stroke: var(--line-color);
+    stroke-width: 0.6;
+    stroke-linecap: round;
+    fill: none;
+  }
+
+  .mill-line {
+    stroke: var(--mill-color);
+    stroke-width: 1.4;
+    stroke-linecap: round;
+    fill: none;
+    filter: drop-shadow(0 0 2px var(--mill-glow));
+    opacity: 0.9;
+  }
+
+  .intersection {
+    fill: var(--intersection);
+    stroke: var(--intersection-border);
+    stroke-width: 0.4;
+    cursor: default;
+    transition: all 0.15s;
+  }
+
+  .intersection.cursor {
+    r: 6.5;
+    fill: rgba(118, 255, 3, 0.15);
+    stroke: var(--cursor-color);
+    stroke-width: 1.2;
+    filter: drop-shadow(0 0 4px var(--cursor-glow));
+  }
+
+  .intersection.selected {
+    r: 6.5;
+    fill: rgba(255, 143, 0, 0.2);
+    stroke: var(--selected-color);
+    stroke-width: 1.2;
+    filter: drop-shadow(0 0 4px var(--selected-glow));
+  }
+
+  .intersection.legal-move {
+    r: 4.0;
+    fill: rgba(255, 152, 0, 0.25);
+    stroke: rgba(255, 152, 0, 0.6);
+    stroke-width: 0.5;
+  }
+
+  .intersection.removable {
+    r: 6.5;
+    stroke: var(--removable-color);
+    stroke-width: 1.2;
+    fill: rgba(212, 42, 42, 0.2);
+    filter: drop-shadow(0 0 4px var(--removable-glow));
+  }
+
+  .piece {
+    pointer-events: none;
+    transition: transform 0.15s;
+  }
+
+  .hl {
+    fill: none;
+    pointer-events: none;
+  }
+  .hl.cursor {
+    stroke: var(--cursor-color);
+    stroke-width: 1.4;
+    filter: drop-shadow(0 0 4px var(--cursor-glow));
+  }
+  .hl.selected {
+    stroke: var(--selected-color);
+    stroke-width: 1.4;
+    filter: drop-shadow(0 0 4px var(--selected-glow));
+  }
+  .hl.removable {
+    stroke: var(--removable-color);
+    stroke-width: 1.4;
+    filter: drop-shadow(0 0 4px var(--removable-glow));
+  }
+
+  .piece.white-piece {
+    fill: var(--piece-white);
+    stroke: var(--piece-white-stroke);
+    stroke-width: 0.6;
+    filter: drop-shadow(0.6px 0.9px 0.6px rgba(0,0,0,0.6));
+  }
+
+  .piece.black-piece {
+    fill: var(--piece-black);
+    stroke: var(--piece-black-stroke);
+    stroke-width: 0.6;
+    filter: drop-shadow(0.6px 0.9px 0.6px rgba(0,0,0,0.7));
+  }
+
+  .piece.in-mill {
+    filter: drop-shadow(0 0 3px var(--mill-glow));
+  }
+
+  /* ── Footer ─────────────────────────────────── */
+  #footer {
+    height: 5vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: calc(1.2 * var(--vw));
+    font-size: 1.5vh;
+    color: var(--text-dim);
+    background: var(--header-bg);
+    backdrop-filter: blur(10px);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  #footer kbd {
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 0.15em 0.4em;
+    font-family: inherit;
+    font-size: 0.9em;
+  }
+
+  #kb-mode {
+    background: #1a2a3a;
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: #80cbc4;
+    font-size: 0.9em;
+    cursor: pointer;
+  }
+
+  #mode-indicator {
+    background: rgba(118, 255, 3, 0.15);
+    padding: 2px 8px;
+    border-radius: 4px;
+    color: var(--cursor-color);
+    font-size: 0.9em;
+  }
+
+  /* ── Game Over ──────────────────────────────── */
+  #game-over {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+  }
+  #game-over.hidden { display: none; }
+  #game-over h2 {
+    font-size: 5vh;
+    margin-bottom: 2vh;
+    background: linear-gradient(135deg, var(--cursor-color), var(--selected-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  #game-over .go-info {
+    font-size: 2.5vh;
+    margin-bottom: 3vh;
+    color: var(--text-dim);
+  }
+  .go-btn {
+    padding: 1.5vh calc(3 * var(--vw));
+    border-radius: 1vmin;
+    background: var(--bg-light);
+    border: 0.3vmin solid rgba(255,255,255,0.1);
+    color: var(--text);
+    font-size: 2.2vh;
+    font-weight: 600;
+    cursor: default;
+    transition: all 0.15s;
+    margin: 0.5vh;
+  }
+  .go-btn.cursor {
+    border-color: var(--cursor-color);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 15px var(--cursor-glow);
+  }
+
+  /* ── Main Menu ──────────────────────────────── */
+  #main-menu {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2vh;
+    z-index: 200;
+  }
+  #main-menu.hidden { display: none; }
+  #main-menu h2 {
+    font-size: 5vh;
+    margin-bottom: 1vh;
+    background: linear-gradient(135deg, var(--cursor-color), var(--mill-color));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+  #main-menu .menu-sub {
+    font-size: 1.8vh;
+    color: var(--text-dim);
+    margin-bottom: 2vh;
+  }
+
+  .menu-opt {
+    width: calc(38 * var(--vw));
+    max-width: 420px;
+    padding: 2vh calc(2.5 * var(--vw));
+    border-radius: 1.2vmin;
+    background: var(--bg-light);
+    border: 0.3vmin solid rgba(255,255,255,0.1);
+    text-align: center;
+    cursor: default;
+    transition: all 0.15s;
+  }
+  .menu-opt.cursor {
+    border-color: var(--cursor-color);
+    box-shadow: 0 0 0 0.3vmin var(--cursor-color), 0 0 15px var(--cursor-glow);
+    transform: scale(1.04);
+  }
+  .menu-opt .mt { font-size: 2.6vh; font-weight: 700; margin-bottom: 0.3vh; }
+  .menu-opt .md { font-size: 1.7vh; color: var(--text-dim); }
+  .menu-opt.mode-opt {
+    margin-top: 1vh;
+    border-color: rgba(118, 255, 3, 0.3);
+  }
+  .menu-opt.mode-opt .mt { color: var(--cursor-color); }
+
+  /* ── Thinking indicator ─────────────────────── */
+  #thinking {
+    position: fixed;
+    bottom: 7vh;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15,52,96,0.9);
+    padding: 0.8vh calc(2 * var(--vw));
+    border-radius: 1vmin;
+    font-size: 2vh;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: calc(0.8 * var(--vw));
+  }
+  #thinking.hidden { display: none; }
+  #thinking .dots span {
+    display: inline-block;
+    width: 0.8vh;
+    height: 0.8vh;
+    border-radius: 50%;
+    background: var(--cursor-color);
+    animation: dot-pulse 1.2s ease-in-out infinite;
+    margin: 0 calc(0.15 * var(--vw));
+  }
+  #thinking .dots span:nth-child(2) { animation-delay: 0.2s; }
+  #thinking .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes dot-pulse {
+    0%, 100% { opacity: 0.3; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1.2); }
+  }
+
+  /* ── Action Button Column (right of board) ──── */
+  #action-col {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5vmin;
+    padding-top: 0.5vmin;
+    margin-left: 1vmin;
+  }
+
+  .action-btn {
+    width: 10vmin;
+    max-width: 10vh;
+    padding: 1.5vmin 1vmin;
+    border-radius: 0.8vmin;
+    background: rgba(255,255,255,0.06);
+    border: 2px solid rgba(255,255,255,0.12);
+    color: var(--text);
+    font-size: 2.2vmin;
+    font-weight: 600;
+    cursor: default;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .action-btn.cursor {
+    background: rgba(118, 255, 3, 0.2);
+    border: 2px solid #76FF03;
+    box-shadow: 0 0 8px rgba(118, 255, 3, 0.4);
+    color: #fff;
+  }
+
+  .action-btn.active {
+    border-color: var(--cursor-color);
+    color: var(--cursor-color);
+  }
+
+  .action-btn.disabled {
+    opacity: 0.3;
+    color: var(--text-dim);
+  }
+
+  /* ── Reserve pieces display ─────────────────── */
+  .reserve-row {
+    display: flex;
+    gap: 0.3vmin;
+    align-items: center;
+    padding: 0.4vmin 0.8vmin;
+    min-height: 3vmin;
+    font-size: 2vmin;
+    color: var(--text-dim);
+  }
+  .reserve-dot {
+    display: inline-block;
+    width: 1.6vmin;
+    height: 1.6vmin;
+    border-radius: 50%;
+    margin: 0 0.1vmin;
+  }
+  .reserve-dot.w { background: var(--piece-white); border: 1px solid var(--piece-white-stroke); }
+  .reserve-dot.b { background: var(--piece-black); border: 1px solid var(--piece-black-stroke); }
+  .reserve-dot.spent { opacity: 0.2; }
+
+  /* ── Kiosk ──────────────────────────────────── */
+  body.kiosk #footer { display: none; }
+  body.kiosk { cursor: none; }
+
+  /* ── Idle Screen ────────────────────────────── */
+  #idle-screen {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    z-index: 300;
+    transition: opacity 0.5s;
+  }
+  #idle-screen.hidden { opacity: 0; pointer-events: none; }
+  #idle-screen h2 { font-size: 4vh; margin-bottom: 2vh; }
+  #idle-screen p {
+    font-size: 2.5vh; color: var(--text-dim);
+    animation: idle-p 2s ease-in-out infinite;
+  }
+  @keyframes idle-p { 0%,100%{opacity:0.5} 50%{opacity:1} }
+</style>
+</head>
+<body>
+
+<div id="ws-status" title="ESP32 nicht verbunden"></div>
+
+<div id="header">
+  <h1>Mund<span>Maus</span> Mühle</h1>
+  <span id="status-text">Weiß am Zug</span>
+  <span id="phase-text">Setzphase</span>
+  <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
+</div>
+
+<div id="board-area">
+  <div id="board-wrap">
+    <div id="board-inner" style="display:flex;flex-direction:column">
+      <div class="reserve-row" id="reserve-black"></div>
+      <div id="board-container">
+        <svg id="board-svg" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid meet"></svg>
+      </div>
+      <div class="reserve-row" id="reserve-white"></div>
+    </div>
+    <div id="action-col">
+      <div class="action-btn disabled" id="btn-undo" data-btn="0">↩</div>
+      <div class="action-btn" id="btn-new" data-btn="1"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+      <div class="action-btn" id="btn-hints" data-btn="2">💡</div>
+      <div class="action-btn" id="btn-back" data-btn="3" onclick="window.location.href='/'">🏠</div>
+      <div class="action-btn" id="btn-kiosk" data-btn="4"><span style="display:inline-grid;grid-template-columns:1fr 1fr;width:1.2em;height:1.2em;line-height:1;font-size:.55em;text-align:center"><span>↖</span><span>↗</span><span>↙</span><span>↘</span></span></div>
+    </div>
+  </div>
+</div>
+
+<div id="footer">
+  <span><kbd>←↑→↓</kbd></span>
+  <span><kbd>⏎</kbd> <kbd>●</kbd></span>
+  <span><kbd>N</kbd> ↻</span>
+  <span><kbd>U</kbd> ↩</span>
+  <span><kbd>H</kbd> 💡</span>
+  <span><kbd>J</kbd> ⌨</span>
+  <span><kbd>M</kbd> 👥</span>
+  <span><kbd>K</kbd> 📺</span>
+  <span><kbd>P</kbd> 🏠</span>
+  <span id="mode-indicator">👥 Einzel</span>
+</div>
+
+<div id="main-menu">
+  <h2>Mühle</h2>
+  <div class="menu-sub">Nine Men's Morris</div>
+  <div class="menu-opt" data-d="1"><div class="mt">Leicht</div><div class="md">Zufällige Züge mit einfacher Taktik</div></div>
+  <div class="menu-opt" data-d="2"><div class="mt">Mittel</div><div class="md">Minimax Tiefe 3</div></div>
+  <div class="menu-opt" data-d="3"><div class="mt">Schwer</div><div class="md">Minimax Tiefe 5 mit Alpha-Beta</div></div>
+  <div class="menu-opt mode-opt" data-d="mode"><div class="mt" id="mode-opt-label">Einzelspieler</div><div class="md">Leertaste zum Wechseln auf Multiplayer</div></div>
+</div>
+
+<div id="game-over" class="hidden">
+  <h2 id="go-title"></h2>
+  <div class="go-info" id="go-info"></div>
+  <div class="go-btn cursor" id="go-new"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+  <div class="go-btn" id="go-portal" onclick="window.location.href='/'">🏠</div>
+</div>
+
+<div id="thinking" class="hidden">
+  Computer denkt <div class="dots"><span></span><span></span><span></span></div>
+</div>
+
+<div id="idle-screen" class="hidden">
+  <h2>Mühle</h2>
+  <p>Pusten zum Starten</p>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════
+   MundMaus Mühle v1.0 – Nine Men's Morris Engine + KI
+   ═══════════════════════════════════════════════════════════ */
+
+// ── Konstanten ───────────────────────────────────────────
+const W = 'W', B_ = 'B';
+
+// Board: 24 intersections. Position coordinates on 100x100 SVG viewport.
+// Layout (3 concentric squares):
+//
+//   0----------1----------2
+//   |          |          |
+//   |   3------4------5   |
+//   |   |      |      |   |
+//   |   |  6---7---8  |   |
+//   |   |  |       |  |   |
+//   9---10-11     12-13--14
+//   |   |  |       |  |   |
+//   |   |  15--16--17 |   |
+//   |   |      |      |   |
+//   |   18-----19-----20  |
+//   |          |          |
+//   21---------22---------23
+//
+const POS = [
+  // Outer square (y=5..95, x=5..95)
+  {x:  5, y:  5}, {x: 50, y:  5}, {x: 95, y:  5},  // 0,1,2 (top)
+  // Middle square (y=20..80, x=20..80)
+  {x: 20, y: 20}, {x: 50, y: 20}, {x: 80, y: 20},  // 3,4,5
+  // Inner square (y=35..65, x=35..65)
+  {x: 35, y: 35}, {x: 50, y: 35}, {x: 65, y: 35},  // 6,7,8
+  // Middle row
+  {x:  5, y: 50}, {x: 20, y: 50}, {x: 35, y: 50},  // 9,10,11 (left)
+  {x: 65, y: 50}, {x: 80, y: 50}, {x: 95, y: 50},  // 12,13,14 (right)
+  // Inner bottom
+  {x: 35, y: 65}, {x: 50, y: 65}, {x: 65, y: 65},  // 15,16,17
+  // Middle bottom
+  {x: 20, y: 80}, {x: 50, y: 80}, {x: 80, y: 80},  // 18,19,20
+  // Outer bottom
+  {x:  5, y: 95}, {x: 50, y: 95}, {x: 95, y: 95},  // 21,22,23
+];
+
+// Adjacency list (who is directly connected to whom along a line)
+const ADJ = {
+   0:[1,9],   1:[0,2,4],   2:[1,14],
+   3:[4,10],  4:[1,3,5,7], 5:[4,13],
+   6:[7,11],  7:[4,6,8],   8:[7,12],
+   9:[0,10,21], 10:[3,9,11,18], 11:[6,10,15],
+  12:[8,13,17], 13:[5,12,14,20], 14:[2,13,23],
+  15:[11,16], 16:[15,17,19], 17:[12,16],
+  18:[10,19], 19:[16,18,20,22], 20:[13,19],
+  21:[9,22],  22:[19,21,23], 23:[14,22],
+};
+
+// All 16 possible mills (3-in-a-row lines)
+const MILLS = [
+  // Horizontal
+  [0,1,2],  [3,4,5],  [6,7,8],
+  [9,10,11],[12,13,14],
+  [15,16,17],[18,19,20],[21,22,23],
+  // Vertical
+  [0,9,21], [3,10,18],[6,11,15],
+  [1,4,7],  [16,19,22],
+  [8,12,17],[5,13,20],[2,14,23],
+];
+
+// Precompute mills per position (for fast lookup)
+const MILLS_BY_POS = (() => {
+  const m = {};
+  for (let i = 0; i < 24; i++) m[i] = [];
+  MILLS.forEach(mill => mill.forEach(p => m[p].push(mill)));
+  return m;
+})();
+
+// Lines of the board (for drawing)
+const LINES = [
+  // Outer square
+  [0,2],[2,23],[23,21],[21,0],
+  // Middle square
+  [3,5],[5,20],[20,18],[18,3],
+  // Inner square
+  [6,8],[8,17],[17,15],[15,6],
+  // Vertical connectors (middle column)
+  [1,4],[4,7],[16,19],[19,22],
+  // Horizontal connectors (middle row)
+  [9,10],[10,11],[12,13],[13,14],
+];
+
+// ── Audio ────────────────────────────────────────────────
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx;
+function ensureAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function beep(f, d, t = 'square') {
+  ensureAudio();
+  const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+  o.type = t; o.frequency.value = f;
+  g.gain.setValueAtTime(0.07, audioCtx.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + d/1000);
+  o.connect(g); g.connect(audioCtx.destination);
+  o.start(); o.stop(audioCtx.currentTime + d/1000);
+}
+function sndNav()     { beep(600, 50); }
+function sndSelect()  { beep(800, 80); beep(1000, 60); }
+function sndPlace()   { beep(500, 80); setTimeout(()=>beep(700, 80), 80); }
+function sndMill()    { beep(880, 120, 'sine'); setTimeout(()=>beep(1175, 180, 'sine'), 120); }
+function sndCapture() { beep(300, 100, 'sawtooth'); setTimeout(()=>beep(200, 120, 'sawtooth'), 100); }
+function sndError()   { beep(200, 200, 'sawtooth'); flashError(); }
+function sndWin() {
+  [523,659,784,1047,1318].forEach((f,i) => setTimeout(()=>beep(f,200,'sine'), i*160));
+}
+function flashError() {
+  let o = document.getElementById("error-flash");
+  if (!o) {
+    o = document.createElement("div");
+    o.id = "error-flash";
+    o.style.cssText = "position:fixed;inset:0;background:rgba(255,0,0,0.5);pointer-events:none;z-index:9999;opacity:0";
+    document.body.appendChild(o);
+  }
+  o.style.transition = "none";
+  o.style.opacity = "1";
+  o.offsetHeight;
+  o.style.transition = "opacity 0.5s";
+  o.style.opacity = "0";
+}
+
+// ── Game State ───────────────────────────────────────────
+// board[pos] = null | 'W' | 'B'
+let game = {
+  board: new Array(24).fill(null),
+  phase: 'setz',       // setz | zug | remove | gameover
+  turn: W,             // whose turn
+  pendingRemover: null,// who just formed a mill and must remove
+  toPlace: {W: 9, B: 9}, // pieces remaining to place
+  onBoard: {W: 0, B: 0},
+  selected: null,      // selected piece in zug phase
+  history: [],
+};
+
+function newGameState() {
+  game.board = new Array(24).fill(null);
+  game.phase = 'setz';
+  game.turn = W;
+  game.pendingRemover = null;
+  game.toPlace = {W: 9, B: 9};
+  game.onBoard = {W: 0, B: 0};
+  game.selected = null;
+  game.history = [];
+}
+
+// ── Rules / Logic ────────────────────────────────────────
+
+// Does position `pos` currently belong to a completed mill of `player` on `board`?
+function isInMill(board, pos, player) {
+  if (board[pos] !== player) return false;
+  for (const mill of MILLS_BY_POS[pos]) {
+    if (mill.every(p => board[p] === player)) return true;
+  }
+  return false;
+}
+
+// After placing/moving to `pos` by `player`, does that complete a new mill?
+function formsMill(board, pos, player) {
+  for (const mill of MILLS_BY_POS[pos]) {
+    if (mill.every(p => board[p] === player)) return true;
+  }
+  return false;
+}
+
+// Count pieces on board for player
+function countOnBoard(board, player) {
+  let n = 0;
+  for (let i = 0; i < 24; i++) if (board[i] === player) n++;
+  return n;
+}
+
+// Can we remove the opponent's piece at `pos`?
+// Rule: piece must NOT be in a mill, UNLESS all opponent pieces are in mills.
+function canRemove(board, pos, byPlayer) {
+  const opp = byPlayer === W ? B_ : W;
+  if (board[pos] !== opp) return false;
+  if (!isInMill(board, pos, opp)) return true;
+  // All opponent pieces in mills? Then anything goes.
+  for (let i = 0; i < 24; i++) {
+    if (board[i] === opp && !isInMill(board, i, opp)) return false;
+  }
+  return true;
+}
+
+// Return list of positions removable by byPlayer
+function removablePositions(board, byPlayer) {
+  const list = [];
+  for (let i = 0; i < 24; i++) {
+    if (canRemove(board, i, byPlayer)) list.push(i);
+  }
+  return list;
+}
+
+// Legal moves in the current sub-phase for a player. Returns array of move objects:
+//   setz: {type:'place', to}
+//   zug:  {type:'move', from, to}
+function getLegalMoves(board, player, phase, toPlace) {
+  const moves = [];
+  if (phase === 'setz') {
+    for (let i = 0; i < 24; i++) {
+      if (board[i] === null) moves.push({type:'place', to: i});
+    }
+  } else {
+    // zug: move each own piece to adjacent empty
+    for (let i = 0; i < 24; i++) {
+      if (board[i] === player) {
+        for (const adj of ADJ[i]) {
+          if (board[adj] === null) moves.push({type:'move', from: i, to: adj});
+        }
+      }
+    }
+  }
+  return moves;
+}
+
+// Simulated move: returns new board + mill flag (for AI search).
+// Caller handles turn + phase changes.
+function simMove(board, move, player) {
+  const nb = board.slice();
+  if (move.type === 'place') {
+    nb[move.to] = player;
+  } else {
+    nb[move.from] = null;
+    nb[move.to] = player;
+  }
+  const mill = formsMill(nb, move.to, player);
+  return {board: nb, mill};
+}
+
+function simRemove(board, pos) {
+  const nb = board.slice();
+  nb[pos] = null;
+  return nb;
+}
+
+// Win check — returns winner ('W'/'B') or null.
+// Losing conditions:
+//   - < 3 pieces total (on board + not yet placed)
+//   - in zug phase: player has no legal move
+function checkWin(board, phase, turn, toPlace) {
+  const owTotal = toPlace[W] + countOnBoard(board, W);
+  const obTotal = toPlace[B_] + countOnBoard(board, B_);
+  if (phase === 'zug') {
+    if (countOnBoard(board, W) < 3) return B_;
+    if (countOnBoard(board, B_) < 3) return W;
+  }
+  // Blocked player check (only zug phase, for the player whose turn it is)
+  if (phase === 'zug') {
+    const moves = getLegalMoves(board, turn, phase, toPlace);
+    if (moves.length === 0) return turn === W ? B_ : W;
+  }
+  return null;
+}
+
+// ── AI Evaluation ────────────────────────────────────────
+// score > 0 = good for W, < 0 = good for B
+// We always evaluate from W's perspective in minimax,
+// but the AI plays B (human is W), so the AI minimizes.
+//
+// Metrics:
+//   piece count difference
+//   mill count difference
+//   potential mills (2-in-a-row with a free third)
+//   mobility (number of legal moves in zug phase)
+//   blocked opponent bonus
+
+function countMills(board, player) {
+  let n = 0;
+  for (const mill of MILLS) {
+    if (mill.every(p => board[p] === player)) n++;
+  }
+  return n;
+}
+
+function countPotentialMills(board, player) {
+  // lines with 2 player pieces + 1 empty
+  let n = 0;
+  for (const mill of MILLS) {
+    let pc = 0, ec = 0;
+    for (const p of mill) {
+      if (board[p] === player) pc++;
+      else if (board[p] === null) ec++;
+    }
+    if (pc === 2 && ec === 1) n++;
+  }
+  return n;
+}
+
+function countMobility(board, player) {
+  let n = 0;
+  for (let i = 0; i < 24; i++) {
+    if (board[i] === player) {
+      for (const adj of ADJ[i]) if (board[adj] === null) n++;
+    }
+  }
+  return n;
+}
+
+function evaluate(board, phase) {
+  const wp = countOnBoard(board, W);
+  const bp = countOnBoard(board, B_);
+  const wm = countMills(board, W);
+  const bm = countMills(board, B_);
+  const wpot = countPotentialMills(board, W);
+  const bpot = countPotentialMills(board, B_);
+  const wmo = countMobility(board, W);
+  const bmo = countMobility(board, B_);
+
+  let score = 10 * (wp - bp)
+            + 18 * (wm - bm)
+            + 5 * (wpot - bpot)
+            + 1 * (wmo - bmo);
+
+  // Terminal states
+  if (phase === 'zug') {
+    if (wp < 3) score -= 10000;
+    if (bp < 3) score += 10000;
+    if (wmo === 0 && wp >= 3) score -= 10000;
+    if (bmo === 0 && bp >= 3) score += 10000;
+  }
+  return score;
+}
+
+let aiDifficulty = 2; // 1=leicht, 2=mittel, 3=schwer
+
+// Minimax with alpha-beta pruning.
+// state: {board, phase, turn, toPlace, pendingRemover, onBoard}
+// Note: if a move forms a mill, the same player gets to remove an opponent piece
+// before the turn passes. We handle this by recursing with pendingRemover set.
+function minimax(state, depth, alpha, beta) {
+  const {board, phase, turn, toPlace, pendingRemover} = state;
+
+  // Terminal / leaf
+  const winner = checkWin(board, phase, turn, toPlace);
+  if (winner) return winner === W ? 20000 - (10 - depth) : -20000 + (10 - depth);
+  if (depth === 0) return evaluate(board, phase);
+
+  // Handle pending removal first
+  if (pendingRemover) {
+    const removes = removablePositions(board, pendingRemover);
+    if (removes.length === 0) {
+      // Can't remove anything — skip
+      const nextTurn = pendingRemover === W ? B_ : W;
+      const nextPhase = (toPlace[W] === 0 && toPlace[B_] === 0) ? 'zug' : 'setz';
+      return minimax({...state, turn: nextTurn, phase: nextPhase, pendingRemover: null}, depth - 1, alpha, beta);
+    }
+    const maximizing = pendingRemover === W;
+    let best = maximizing ? -Infinity : Infinity;
+    for (const rp of removes) {
+      const nb = simRemove(board, rp);
+      const nextTurn = pendingRemover === W ? B_ : W;
+      const newToPlace = toPlace; // removing doesn't change placement counts
+      const nextPhase = (newToPlace[W] === 0 && newToPlace[B_] === 0) ? 'zug' : 'setz';
+      const v = minimax({board: nb, phase: nextPhase, turn: nextTurn, toPlace: newToPlace, pendingRemover: null}, depth - 1, alpha, beta);
+      if (maximizing) { if (v > best) best = v; alpha = Math.max(alpha, v); }
+      else { if (v < best) best = v; beta = Math.min(beta, v); }
+      if (beta <= alpha) break;
+    }
+    return best;
+  }
+
+  const moves = getLegalMoves(board, turn, phase, toPlace);
+  if (moves.length === 0) {
+    // Blocked: loss for the player to move
+    return turn === W ? -20000 + (10 - depth) : 20000 - (10 - depth);
+  }
+
+  const maximizing = turn === W;
+  let best = maximizing ? -Infinity : Infinity;
+
+  for (const mv of moves) {
+    const {board: nb, mill} = simMove(board, mv, turn);
+    const newToPlace = {...toPlace};
+    if (mv.type === 'place') newToPlace[turn]--;
+
+    let next;
+    if (mill) {
+      // Stay as same player, force removal
+      const nextPhase = (newToPlace[W] === 0 && newToPlace[B_] === 0) ? 'zug' : 'setz';
+      next = {board: nb, phase: nextPhase, turn, toPlace: newToPlace, pendingRemover: turn};
+    } else {
+      const nextTurn = turn === W ? B_ : W;
+      const nextPhase = (newToPlace[W] === 0 && newToPlace[B_] === 0) ? 'zug' : 'setz';
+      next = {board: nb, phase: nextPhase, turn: nextTurn, toPlace: newToPlace, pendingRemover: null};
+    }
+
+    const v = minimax(next, depth - 1, alpha, beta);
+    if (maximizing) { if (v > best) best = v; alpha = Math.max(alpha, v); }
+    else { if (v < best) best = v; beta = Math.min(beta, v); }
+    if (beta <= alpha) break;
+  }
+  return best;
+}
+
+// Pick best AI move (for Black). Returns {move, removeAfter?}.
+function aiMove() {
+  const state = {
+    board: game.board.slice(),
+    phase: game.phase,
+    turn: B_,
+    toPlace: {...game.toPlace},
+    pendingRemover: null,
+  };
+  const moves = getLegalMoves(state.board, B_, state.phase, state.toPlace);
+  if (moves.length === 0) return null;
+
+  // Level 1 (Leicht): random but prefer mill-forming, avoid letting W form mills next
+  if (aiDifficulty === 1) {
+    // Shuffle
+    const shuffled = moves.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    // 1st priority: move that forms a mill
+    for (const mv of shuffled) {
+      const {board: nb, mill} = simMove(state.board, mv, B_);
+      if (mill) return mv;
+    }
+    // 2nd priority: block opponent's potential mill (W has 2 in a row and W would fill third)
+    for (const mv of shuffled) {
+      // Check if W could form a mill by placing/moving to this position
+      // i.e. before the move, was mv.to a position where W had 2-in-a-row potential?
+      for (const mill of MILLS_BY_POS[mv.to]) {
+        let wc = 0, ec = 0;
+        for (const p of mill) {
+          if (state.board[p] === W) wc++;
+          else if (state.board[p] === null) ec++;
+        }
+        if (wc === 2 && ec >= 1) return mv;
+      }
+    }
+    // 3rd: avoid moves that open a mill for opponent
+    const safe = [];
+    for (const mv of shuffled) {
+      const {board: nb} = simMove(state.board, mv, B_);
+      // Can opponent form a mill next turn?
+      let dangerous = false;
+      const oppMoves = getLegalMoves(nb, W, state.phase, state.toPlace);
+      for (const om of oppMoves) {
+        const {mill} = simMove(nb, om, W);
+        if (mill) { dangerous = true; break; }
+      }
+      if (!dangerous) safe.push(mv);
+    }
+    if (safe.length > 0) return safe[0];
+    return shuffled[0];
+  }
+
+  // Level 2/3: minimax
+  const depth = aiDifficulty === 2 ? 3 : 5;
+  let bestVal = Infinity, bestMoves = [];
+
+  // Shuffle for move ordering variety
+  const shuffled = moves.slice();
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  // Move ordering: mill-forming moves first (help alpha-beta)
+  shuffled.sort((a, b) => {
+    const am = formsMill(simMove(state.board, a, B_).board, a.to, B_) ? 1 : 0;
+    const bm = formsMill(simMove(state.board, b, B_).board, b.to, B_) ? 1 : 0;
+    return bm - am;
+  });
+
+  for (const mv of shuffled) {
+    const {board: nb, mill} = simMove(state.board, mv, B_);
+    const newToPlace = {...state.toPlace};
+    if (mv.type === 'place') newToPlace[B_]--;
+
+    let next;
+    if (mill) {
+      const nextPhase = (newToPlace[W] === 0 && newToPlace[B_] === 0) ? 'zug' : 'setz';
+      next = {board: nb, phase: nextPhase, turn: B_, toPlace: newToPlace, pendingRemover: B_};
+    } else {
+      const nextPhase = (newToPlace[W] === 0 && newToPlace[B_] === 0) ? 'zug' : 'setz';
+      next = {board: nb, phase: nextPhase, turn: W, toPlace: newToPlace, pendingRemover: null};
+    }
+
+    const v = minimax(next, depth - 1, -Infinity, Infinity);
+    if (v < bestVal) {
+      bestVal = v;
+      bestMoves = [mv];
+    } else if (v === bestVal) {
+      bestMoves.push(mv);
+    }
+  }
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+}
+
+// Pick best removal target for AI after forming a mill
+function aiPickRemoval() {
+  const removes = removablePositions(game.board, B_);
+  if (removes.length === 0) return null;
+  if (aiDifficulty === 1) {
+    return removes[Math.floor(Math.random() * removes.length)];
+  }
+  // Pick the one that minimizes the resulting evaluation for W
+  let bestVal = Infinity, bestPos = removes[0];
+  for (const rp of removes) {
+    const nb = simRemove(game.board, rp);
+    // eval after removal
+    const v = evaluate(nb, game.phase);
+    if (v < bestVal) {
+      bestVal = v;
+      bestPos = rp;
+    }
+  }
+  return bestPos;
+}
+
+// ── UI State ─────────────────────────────────────────────
+let lastNavTime = 0, navCooldown = 1200, kbSimMode = false;
+let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
+fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
+
+let multiplayerMode = false;
+let hintsEnabled = false;
+let kioskMode = false;
+let idleTimeout = null;
+let aiInProgress = false;
+
+let ui = {
+  phase: 'menu',     // menu | playing | gameover
+  cursor: 0,         // current board position 0-23
+  inBtnCol: false,
+  btnCursor: 0,
+  menuCursor: 0,
+  goCursor: 0,
+};
+
+// ── DOM Refs ─────────────────────────────────────────────
+const $svg = document.getElementById('board-svg');
+const $statusText = document.getElementById('status-text');
+const $phaseText = document.getElementById('phase-text');
+const $wsStatus = document.getElementById('ws-status');
+const $gameOver = document.getElementById('game-over');
+const $goTitle = document.getElementById('go-title');
+const $goInfo = document.getElementById('go-info');
+const $mainMenu = document.getElementById('main-menu');
+const $thinking = document.getElementById('thinking');
+const $reserveW = document.getElementById('reserve-white');
+const $reserveB = document.getElementById('reserve-black');
+const $idleScreen = document.getElementById('idle-screen');
+const $btnUndo = document.getElementById('btn-undo');
+const $btnHints = document.getElementById('btn-hints');
+const $actionBtns = document.querySelectorAll('#action-col .action-btn');
+const $modeIndicator = document.getElementById('mode-indicator');
+const $modeOptLabel = document.getElementById('mode-opt-label');
+
+// ── Build SVG Board ──────────────────────────────────────
+function buildBoardSVG() {
+  // Clear
+  $svg.innerHTML = '';
+  const NS = 'http://www.w3.org/2000/svg';
+
+  // Background subtle texture
+  const bg = document.createElementNS(NS, 'rect');
+  bg.setAttribute('x', '0');
+  bg.setAttribute('y', '0');
+  bg.setAttribute('width', '100');
+  bg.setAttribute('height', '100');
+  bg.setAttribute('fill', 'transparent');
+  $svg.appendChild(bg);
+
+  // Lines (base layer)
+  for (const [a, b] of LINES) {
+    const ln = document.createElementNS(NS, 'line');
+    ln.setAttribute('x1', POS[a].x);
+    ln.setAttribute('y1', POS[a].y);
+    ln.setAttribute('x2', POS[b].x);
+    ln.setAttribute('y2', POS[b].y);
+    ln.setAttribute('class', 'board-line');
+    $svg.appendChild(ln);
+  }
+
+  // Mill overlay group (drawn above lines, below intersections)
+  const millGroup = document.createElementNS(NS, 'g');
+  millGroup.setAttribute('id', 'mill-group');
+  $svg.appendChild(millGroup);
+
+  // Intersections + pieces
+  for (let i = 0; i < 24; i++) {
+    const {x, y} = POS[i];
+    const c = document.createElementNS(NS, 'circle');
+    c.setAttribute('cx', x);
+    c.setAttribute('cy', y);
+    c.setAttribute('r', 2.6);
+    c.setAttribute('class', 'intersection');
+    c.setAttribute('data-pos', i);
+    $svg.appendChild(c);
+  }
+
+  // Piece group (middle)
+  const pieceGroup = document.createElementNS(NS, 'g');
+  pieceGroup.setAttribute('id', 'piece-group');
+  $svg.appendChild(pieceGroup);
+
+  // Highlight group (top) — cursor/selected/removable rings always visible over pieces
+  const hlGroup = document.createElementNS(NS, 'g');
+  hlGroup.setAttribute('id', 'highlight-group');
+  hlGroup.setAttribute('pointer-events', 'none');
+  $svg.appendChild(hlGroup);
+}
+
+// ── Render Board ─────────────────────────────────────────
+function renderBoard() {
+  // Clear highlight overlay group (on top of pieces)
+  const hlGroup = document.getElementById('highlight-group');
+  hlGroup.innerHTML = '';
+  const NS_HL = 'http://www.w3.org/2000/svg';
+  const addHighlight = (pos, cls) => {
+    const {x, y} = POS[pos];
+    const ring = document.createElementNS(NS_HL, 'circle');
+    ring.setAttribute('cx', x);
+    ring.setAttribute('cy', y);
+    ring.setAttribute('r', 6.5);
+    ring.setAttribute('class', 'hl ' + cls);
+    hlGroup.appendChild(ring);
+  };
+
+  // Intersection classes (keeps base dot visible when no piece)
+  const intersections = $svg.querySelectorAll('.intersection');
+  intersections.forEach(el => {
+    const pos = +el.dataset.pos;
+    el.className.baseVal = 'intersection';
+    // Cursor (only when not in button col and playing)
+    if (ui.phase === 'playing' && !ui.inBtnCol && pos === ui.cursor) {
+      el.className.baseVal = 'intersection cursor';
+      addHighlight(pos, 'cursor');
+    }
+    // Selected piece (zug phase)
+    if (game.selected === pos) {
+      el.className.baseVal = 'intersection selected';
+      addHighlight(pos, 'selected');
+    }
+  });
+
+  // Is it a human's turn to act right now?
+  const humanActing = ui.phase === 'playing' &&
+    (multiplayerMode || game.turn === W) &&
+    !aiInProgress &&
+    (!game.pendingRemover || multiplayerMode || game.pendingRemover === W);
+
+  // Legal move hints (if enabled)
+  if (hintsEnabled && humanActing && !game.pendingRemover) {
+    if (game.phase === 'setz') {
+      intersections.forEach(el => {
+        const pos = +el.dataset.pos;
+        if (game.board[pos] === null) {
+          if (!el.className.baseVal.includes('cursor') && !el.className.baseVal.includes('selected'))
+            el.className.baseVal += ' legal-move';
+        }
+      });
+    } else if (game.phase === 'zug') {
+      if (game.selected !== null) {
+        for (const adj of ADJ[game.selected]) {
+          if (game.board[adj] === null) {
+            const el = $svg.querySelector(`.intersection[data-pos="${adj}"]`);
+            if (el && !el.className.baseVal.includes('cursor'))
+              el.className.baseVal += ' legal-move';
+          }
+        }
+      }
+    }
+  }
+
+  // Removable highlight when we're in remove phase (human's turn)
+  if (game.pendingRemover && humanActing) {
+    const removes = removablePositions(game.board, game.pendingRemover);
+    for (const rp of removes) {
+      const el = $svg.querySelector(`.intersection[data-pos="${rp}"]`);
+      if (el && !el.className.baseVal.includes('cursor')) {
+        el.className.baseVal += ' removable';
+        addHighlight(rp, 'removable');
+      }
+    }
+  }
+
+  // Mill highlight overlay
+  const millGroup = document.getElementById('mill-group');
+  millGroup.innerHTML = '';
+  const NS = 'http://www.w3.org/2000/svg';
+  for (const mill of MILLS) {
+    const [a, b, c] = mill;
+    const p = game.board[a];
+    if (p && game.board[b] === p && game.board[c] === p) {
+      const ln = document.createElementNS(NS, 'line');
+      ln.setAttribute('x1', POS[a].x);
+      ln.setAttribute('y1', POS[a].y);
+      ln.setAttribute('x2', POS[c].x);
+      ln.setAttribute('y2', POS[c].y);
+      ln.setAttribute('class', 'mill-line');
+      millGroup.appendChild(ln);
+    }
+  }
+
+  // Pieces
+  const pieceGroup = document.getElementById('piece-group');
+  pieceGroup.innerHTML = '';
+  for (let i = 0; i < 24; i++) {
+    if (game.board[i]) {
+      const {x, y} = POS[i];
+      const piece = document.createElementNS(NS, 'circle');
+      piece.setAttribute('cx', x);
+      piece.setAttribute('cy', y);
+      piece.setAttribute('r', 5.0);
+      const inMill = isInMill(game.board, i, game.board[i]);
+      piece.setAttribute('class', 'piece ' + (game.board[i] === W ? 'white-piece' : 'black-piece') + (inMill ? ' in-mill' : ''));
+      pieceGroup.appendChild(piece);
+    }
+  }
+
+  // Reserve rows
+  renderReserve();
+
+  // Action buttons
+  const canUndo = ui.phase === 'playing' && !game.pendingRemover && !aiInProgress && game.history.length > 0 && (multiplayerMode || game.turn === W);
+  $btnUndo.classList.toggle('disabled', !canUndo);
+  $btnHints.classList.toggle('active', hintsEnabled);
+  $actionBtns.forEach((btn, i) => {
+    btn.classList.toggle('cursor', ui.phase === 'playing' && ui.inBtnCol && ui.btnCursor === i);
+  });
+}
+
+function renderReserve() {
+  // Show unplaced pieces as small dots
+  const makeRow = (count, placed, klass) => {
+    let html = '';
+    const total = 9;
+    for (let i = 0; i < total; i++) {
+      const isSpent = i >= count;
+      html += `<span class="reserve-dot ${klass}${isSpent ? ' spent' : ''}"></span>`;
+    }
+    return html;
+  };
+  $reserveB.innerHTML = makeRow(game.toPlace[B_], game.onBoard[B_], 'b');
+  $reserveW.innerHTML = makeRow(game.toPlace[W], game.onBoard[W], 'w');
+}
+
+// ── Status / Phase Display ───────────────────────────────
+function updateStatus() {
+  let txt = '';
+  let phaseTxt = '';
+
+  if (game.pendingRemover) {
+    if (multiplayerMode) {
+      const name = game.pendingRemover === W ? 'Weiß' : 'Schwarz';
+      txt = `${name}: gegnerischen Stein entfernen`;
+      $statusText.className = 'warn';
+    } else if (game.pendingRemover === W) {
+      txt = 'Entferne gegnerischen Stein';
+      $statusText.className = 'warn';
+    } else {
+      txt = 'Computer entfernt Stein…';
+      $statusText.className = '';
+    }
+  } else if (game.turn === W) {
+    txt = 'Weiß am Zug';
+    $statusText.className = '';
+  } else {
+    if (multiplayerMode) {
+      txt = 'Schwarz am Zug';
+    } else {
+      txt = 'Computer denkt…';
+    }
+    $statusText.className = '';
+  }
+
+  if (game.phase === 'setz') {
+    const remain = game.toPlace[game.turn];
+    phaseTxt = `Setzphase (${remain} übrig)`;
+  } else if (game.phase === 'zug') {
+    phaseTxt = 'Zugphase';
+  }
+
+  $statusText.textContent = txt;
+  $phaseText.textContent = phaseTxt;
+}
+
+// ── Game Flow ────────────────────────────────────────────
+function saveHistory() {
+  game.history.push({
+    board: game.board.slice(),
+    phase: game.phase,
+    turn: game.turn,
+    pendingRemover: game.pendingRemover,
+    toPlace: {...game.toPlace},
+    onBoard: {...game.onBoard},
+    selected: game.selected,
+  });
+  if (game.history.length > 200) game.history.shift();
+}
+
+function restoreHistory(h) {
+  game.board = h.board.slice();
+  game.phase = h.phase;
+  game.turn = h.turn;
+  game.pendingRemover = h.pendingRemover;
+  game.toPlace = {...h.toPlace};
+  game.onBoard = {...h.onBoard};
+  game.selected = h.selected;
+}
+
+function checkAndHandleWin() {
+  const winner = checkWin(game.board, game.phase, game.turn, game.toPlace);
+  if (winner) {
+    game.phase = 'gameover';
+    ui.phase = 'gameover';
+    const title = winner === W ? (multiplayerMode ? 'Weiß gewinnt!' : 'Du gewinnst!') : (multiplayerMode ? 'Schwarz gewinnt!' : 'Computer gewinnt');
+    let reason;
+    if (countOnBoard(game.board, winner === W ? B_ : W) < 3) reason = 'Weniger als 3 Steine';
+    else reason = 'Keine Züge möglich';
+    showGameOver(title, reason);
+    if (winner === W) sndWin(); else sndCapture();
+    return true;
+  }
+  return false;
+}
+
+// Advance turn after a move (not after removal)
+function advanceTurn() {
+  // When both players have 0 to place, we're in zug phase
+  if (game.toPlace[W] === 0 && game.toPlace[B_] === 0) {
+    game.phase = 'zug';
+  }
+  game.turn = game.turn === W ? B_ : W;
+  game.selected = null;
+}
+
+// After a removal happens
+function afterRemoval() {
+  game.pendingRemover = null;
+  if (game.toPlace[W] === 0 && game.toPlace[B_] === 0) {
+    game.phase = 'zug';
+  }
+  game.turn = game.turn === W ? B_ : W;
+  game.selected = null;
+}
+
+function executePlacement(pos) {
+  saveHistory();
+  game.board[pos] = game.turn;
+  game.toPlace[game.turn]--;
+  game.onBoard[game.turn]++;
+  const mill = formsMill(game.board, pos, game.turn);
+  if (mill) {
+    sndMill();
+    game.pendingRemover = game.turn;
+  } else {
+    sndPlace();
+    advanceTurn();
+  }
+}
+
+function executeZug(from, to) {
+  saveHistory();
+  game.board[from] = null;
+  game.board[to] = game.turn;
+  const mill = formsMill(game.board, to, game.turn);
+  if (mill) {
+    sndMill();
+    game.pendingRemover = game.turn;
+  } else {
+    sndPlace();
+    advanceTurn();
+  }
+}
+
+function executeRemoval(pos) {
+  // Don't save history here — removal is part of the previous move
+  game.board[pos] = null;
+  // Recompute onBoard from scratch
+  game.onBoard[W] = countOnBoard(game.board, W);
+  game.onBoard[B_] = countOnBoard(game.board, B_);
+  sndCapture();
+  afterRemoval();
+}
+
+// ── AI Scheduler ─────────────────────────────────────────
+function scheduleAI() {
+  if (multiplayerMode) return;
+  if (ui.phase !== 'playing') return;
+  if (game.pendingRemover && game.pendingRemover !== B_) return;
+  if (!game.pendingRemover && game.turn !== B_) return;
+  if (aiInProgress) return;
+
+  aiInProgress = true;
+  $thinking.classList.remove('hidden');
+  renderBoard();
+  updateStatus();
+
+  setTimeout(() => {
+    // AI removal step
+    if (game.pendingRemover === B_) {
+      const rp = aiPickRemoval();
+      if (rp !== null && rp !== undefined) {
+        executeRemoval(rp);
+      } else {
+        // no valid removal — skip
+        afterRemoval();
+      }
+      renderBoard();
+      updateStatus();
+      $thinking.classList.add('hidden');
+      aiInProgress = false;
+      if (checkAndHandleWin()) return;
+      // After removal, check if AI still has to play (turn was advanced)
+      return;
+    }
+
+    // AI normal move
+    const mv = aiMove();
+    if (!mv) {
+      $thinking.classList.add('hidden');
+      aiInProgress = false;
+      checkAndHandleWin();
+      return;
+    }
+    if (mv.type === 'place') {
+      executePlacement(mv.to);
+    } else {
+      executeZug(mv.from, mv.to);
+    }
+    renderBoard();
+    updateStatus();
+    $thinking.classList.add('hidden');
+    aiInProgress = false;
+
+    if (checkAndHandleWin()) return;
+
+    // If AI formed a mill, schedule removal next
+    if (game.pendingRemover === B_) {
+      scheduleAI();
+    }
+  }, aiDifficulty <= 2 ? 400 : 150);
+}
+
+// ── User Actions ─────────────────────────────────────────
+function userAction() {
+  ensureAudio();
+  resetIdle();
+
+  if (ui.phase === 'menu') {
+    handleMenuSelect();
+    return;
+  }
+  if (ui.phase === 'gameover') {
+    if (ui.goCursor === 1) {
+      window.location.href = '/';
+      return;
+    }
+    $gameOver.classList.add('hidden');
+    showMenu();
+    return;
+  }
+  if (ui.phase !== 'playing') return;
+
+  // Button column
+  if (ui.inBtnCol) {
+    handleBtnAction();
+    return;
+  }
+
+  // Ignore if it's AI's turn
+  if (!multiplayerMode && (game.turn === B_ || game.pendingRemover === B_)) return;
+
+  // Ignore if AI is working
+  if (aiInProgress) return;
+
+  const pos = ui.cursor;
+
+  // Remove phase (human)
+  if (game.pendingRemover && (multiplayerMode || game.pendingRemover === W)) {
+    if (canRemove(game.board, pos, game.pendingRemover)) {
+      executeRemoval(pos);
+      renderBoard();
+      updateStatus();
+      if (checkAndHandleWin()) return;
+      scheduleAI();
+    } else {
+      sndError();
+    }
+    return;
+  }
+
+  // Setz phase
+  if (game.phase === 'setz') {
+    if (game.board[pos] === null) {
+      executePlacement(pos);
+      renderBoard();
+      updateStatus();
+      if (checkAndHandleWin()) return;
+      scheduleAI();
+    } else {
+      sndError();
+    }
+    return;
+  }
+
+  // Zug phase
+  if (game.phase === 'zug') {
+    if (game.selected === null) {
+      // Select own piece
+      if (game.board[pos] === game.turn) {
+        // Check if it has any legal moves
+        const hasMove = ADJ[pos].some(a => game.board[a] === null);
+        if (hasMove) {
+          game.selected = pos;
+          sndSelect();
+          renderBoard();
+        } else {
+          sndError();
+        }
+      } else {
+        sndError();
+      }
+    } else {
+      // Try to move selected piece to pos
+      if (pos === game.selected) {
+        // Deselect
+        game.selected = null;
+        sndNav();
+        renderBoard();
+        return;
+      }
+      if (game.board[pos] === game.turn) {
+        // Reselect different own piece
+        const hasMove = ADJ[pos].some(a => game.board[a] === null);
+        if (hasMove) {
+          game.selected = pos;
+          sndSelect();
+          renderBoard();
+        } else {
+          sndError();
+        }
+        return;
+      }
+      if (game.board[pos] === null && ADJ[game.selected].includes(pos)) {
+        executeZug(game.selected, pos);
+        renderBoard();
+        updateStatus();
+        if (checkAndHandleWin()) return;
+        scheduleAI();
+      } else {
+        sndError();
+      }
+    }
+  }
+}
+
+function handleBtnAction() {
+  const i = ui.btnCursor;
+  if (i === 0) undo();
+  else if (i === 1) { showMenu(); }
+  else if (i === 2) { toggleHints(); }
+  else if (i === 3) { window.location.href = '/'; }
+  else if (i === 4) { toggleKiosk(); }
+}
+
+function toggleHints() {
+  hintsEnabled = !hintsEnabled;
+  renderBoard();
+  beep(700, 50);
+}
+
+function undo() {
+  if (ui.phase !== 'playing') return;
+  if (game.pendingRemover) return;
+  if (aiInProgress) return;
+  if (game.history.length === 0) { sndError(); return; }
+
+  // saveHistory() is called BEFORE a move executes, storing the state *before* that move.
+  // Popping the last entry restores the state immediately before the most recent move.
+  // In single-player (turn === W), the most recent move was B's — restoring that entry
+  // takes us back to the state where W had just moved (turn is B). We then pop once more
+  // to get back to the state where W was about to move.
+  // In multiplayer, undo is a single-ply step (either player's turn).
+  if (!multiplayerMode) {
+    if (game.turn !== W) { sndError(); return; }
+    // Pop once — state before B's last move (turn=B, W already moved)
+    restoreHistory(game.history.pop());
+    // Pop again — state before W's last move (turn=W)
+    if (game.history.length > 0) {
+      restoreHistory(game.history.pop());
+    }
+  } else {
+    // Multiplayer: single ply
+    restoreHistory(game.history.pop());
+  }
+  game.selected = null;
+  beep(400, 100);
+  renderBoard();
+  updateStatus();
+}
+
+// ── Menu ─────────────────────────────────────────────────
+function showMenu() {
+  ui.phase = 'menu';
+  ui.menuCursor = Math.min(aiDifficulty - 1, 2);
+  $gameOver.classList.add('hidden');
+  $mainMenu.classList.remove('hidden');
+  updateMenuCursor();
+  updateModeLabels();
+}
+
+function updateMenuCursor() {
+  $mainMenu.querySelectorAll('.menu-opt').forEach((el, i) =>
+    el.classList.toggle('cursor', i === ui.menuCursor));
+}
+
+function updateModeLabels() {
+  $modeOptLabel.textContent = multiplayerMode ? 'Multiplayer' : 'Einzelspieler';
+  $modeIndicator.textContent = multiplayerMode ? '👥 Multi' : '👥 Einzel';
+}
+
+function handleMenuSelect() {
+  const idx = ui.menuCursor;
+  if (idx < 3) {
+    aiDifficulty = idx + 1;
+    $mainMenu.classList.add('hidden');
+    startGame();
+  } else {
+    // Mode toggle
+    multiplayerMode = !multiplayerMode;
+    updateModeLabels();
+    beep(700, 60);
+  }
+}
+
+function navMenu(dir) {
+  const opts = $mainMenu.querySelectorAll('.menu-opt');
+  if (dir === 'up' && ui.menuCursor > 0) { ui.menuCursor--; beep(500, 50); }
+  else if (dir === 'down' && ui.menuCursor < opts.length - 1) { ui.menuCursor++; beep(500, 50); }
+  updateMenuCursor();
+}
+
+function navGameOver(dir) {
+  if (dir === 'up' || dir === 'down') {
+    ui.goCursor = ui.goCursor === 0 ? 1 : 0;
+    document.getElementById('go-new').classList.toggle('cursor', ui.goCursor === 0);
+    document.getElementById('go-portal').classList.toggle('cursor', ui.goCursor === 1);
+    beep(500, 50);
+  }
+}
+
+function startGame() {
+  newGameState();
+  ui.phase = 'playing';
+  ui.cursor = 4;  // start at center of top middle square
+  ui.inBtnCol = false;
+  ui.btnCursor = 0;
+  game.selected = null;
+  renderBoard();
+  updateStatus();
+  sndSelect();
+}
+
+function showGameOver(title, info) {
+  ui.goCursor = 0;
+  $goTitle.textContent = title;
+  $goInfo.textContent = info;
+  $gameOver.classList.remove('hidden');
+  document.getElementById('go-new').classList.add('cursor');
+  document.getElementById('go-portal').classList.remove('cursor');
+}
+
+// ── Spatial Navigation ───────────────────────────────────
+// For a given current position and direction, find the closest intersection
+// in that direction. "Closest" = smallest angular deviation + euclidean distance.
+function findNeighborInDirection(fromPos, dir) {
+  const from = POS[fromPos];
+  let best = -1, bestScore = Infinity;
+  for (let i = 0; i < 24; i++) {
+    if (i === fromPos) continue;
+    const to = POS[i];
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    // Direction filter: must be primarily in `dir`
+    let primary = false;
+    if (dir === 'left'  && dx < -0.5 && Math.abs(dy) <= Math.abs(dx) + 0.1) primary = true;
+    if (dir === 'right' && dx >  0.5 && Math.abs(dy) <= Math.abs(dx) + 0.1) primary = true;
+    if (dir === 'up'    && dy < -0.5 && Math.abs(dx) <= Math.abs(dy) + 0.1) primary = true;
+    if (dir === 'down'  && dy >  0.5 && Math.abs(dx) <= Math.abs(dy) + 0.1) primary = true;
+    if (!primary) continue;
+    // Score: euclidean distance (prefer close), plus small penalty for off-axis deviation
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    let perp;
+    if (dir === 'left' || dir === 'right') perp = Math.abs(dy);
+    else perp = Math.abs(dx);
+    const score = dist + perp * 3;
+    if (score < bestScore) {
+      bestScore = score;
+      best = i;
+    }
+  }
+  return best;
+}
+
+// ── Navigate ─────────────────────────────────────────────
+function navigate(dir) {
+  const now = Date.now();
+  if (now - lastNavTime < 120) return;
+  lastNavTime = now;
+  resetIdle();
+
+  if (ui.phase === 'menu') return navMenu(dir);
+  if (ui.phase === 'gameover') return navGameOver(dir);
+  if (ui.phase !== 'playing') return;
+  if (!multiplayerMode && game.turn === B_ && !game.pendingRemover) return;
+  if (!multiplayerMode && game.pendingRemover === B_) return;
+  if (aiInProgress) return;
+
+  const btnCount = $actionBtns.length;
+
+  if (ui.inBtnCol) {
+    // In button column
+    switch (dir) {
+      case 'left':
+        ui.inBtnCol = false;
+        // Find rightmost board position (position 14 or 2 or 23)
+        ui.cursor = findNearestToX(95);
+        sndNav();
+        renderBoard();
+        break;
+      case 'up':
+        if (ui.btnCursor > 0) { ui.btnCursor--; sndNav(); renderBoard(); }
+        break;
+      case 'down':
+        if (ui.btnCursor < btnCount - 1) { ui.btnCursor++; sndNav(); renderBoard(); }
+        break;
+    }
+    return;
+  }
+
+  // On board — try spatial navigation
+  if (dir === 'right') {
+    // Check if current pos is already at the right edge
+    const cur = POS[ui.cursor];
+    const n = findNeighborInDirection(ui.cursor, 'right');
+    if (n === -1 || cur.x >= 90) {
+      // Enter button column
+      ui.inBtnCol = true;
+      ui.btnCursor = 0;
+      sndNav();
+      renderBoard();
+      return;
+    }
+    ui.cursor = n;
+    sndNav();
+    renderBoard();
+    return;
+  }
+
+  const n = findNeighborInDirection(ui.cursor, dir);
+  if (n !== -1) {
+    ui.cursor = n;
+    sndNav();
+    renderBoard();
+  }
+}
+
+function findNearestToX(targetX) {
+  let best = 0, bestDist = Infinity;
+  for (let i = 0; i < 24; i++) {
+    const d = Math.abs(POS[i].x - targetX);
+    if (d < bestDist) { bestDist = d; best = i; }
+  }
+  return best;
+}
+
+// ── Charge Mechanic (for joystick/kbSim) ─────────────────
+function computeTarget(dir) {
+  if (ui.phase === 'menu') {
+    const opts = $mainMenu.querySelectorAll('.menu-opt');
+    if (dir === 'up' && ui.menuCursor > 0) return {kind:'menu', i: ui.menuCursor - 1};
+    if (dir === 'down' && ui.menuCursor < opts.length - 1) return {kind:'menu', i: ui.menuCursor + 1};
+    return null;
+  }
+  if (ui.phase === 'gameover') {
+    if (dir === 'up' || dir === 'down') return {kind:'go', i: ui.goCursor === 0 ? 1 : 0};
+    return null;
+  }
+  if (ui.phase !== 'playing') return null;
+  if (!multiplayerMode && game.turn === B_ && !game.pendingRemover) return null;
+
+  if (ui.inBtnCol) {
+    if (dir === 'left') return {kind:'board', pos: findNearestToX(95)};
+    if (dir === 'up' && ui.btnCursor > 0) return {kind:'btn', i: ui.btnCursor - 1};
+    if (dir === 'down' && ui.btnCursor < $actionBtns.length - 1) return {kind:'btn', i: ui.btnCursor + 1};
+    return null;
+  }
+
+  if (dir === 'right') {
+    const cur = POS[ui.cursor];
+    const n = findNeighborInDirection(ui.cursor, 'right');
+    if (n === -1 || cur.x >= 90) return {kind:'btn', i: 0};
+    return {kind:'board', pos: n};
+  }
+  const n = findNeighborInDirection(ui.cursor, dir);
+  if (n === -1) return null;
+  return {kind:'board', pos: n};
+}
+
+function getTargetElement(t) {
+  if (!t) return null;
+  if (t.kind === 'menu') {
+    const opts = $mainMenu.querySelectorAll('.menu-opt');
+    return opts[t.i];
+  }
+  if (t.kind === 'go') {
+    return document.getElementById(t.i === 0 ? 'go-new' : 'go-portal');
+  }
+  if (t.kind === 'btn') {
+    return $actionBtns[t.i];
+  }
+  if (t.kind === 'board') {
+    return $svg.querySelector(`.intersection[data-pos="${t.pos}"]`);
+  }
+  return null;
+}
+
+function renderChargePreview() {
+  let pv = document.getElementById('charge-preview');
+  if (!pv) {
+    pv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    pv.id = 'charge-preview';
+    pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    pv.appendChild(rect);
+    (document.getElementById('game') || document.body).appendChild(pv);
+  }
+  const el = getTargetElement(charge.target);
+  if (!el) { pv.style.display = 'none'; return; }
+  const r = el.getBoundingClientRect();
+  const g = (document.getElementById('game') || document.body).getBoundingClientRect();
+  const pad = 8;
+  const w = r.width + pad * 2;
+  const h = r.height + pad * 2;
+  pv.style.display = 'block';
+  pv.style.left = (r.left - g.left - pad) + 'px';
+  pv.style.top = (r.top - g.top - pad) + 'px';
+  pv.setAttribute('width', w);
+  pv.setAttribute('height', h);
+  pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const rect = pv.querySelector('rect');
+  const sw = 7;
+  const inset = sw / 2;
+  const rw = w - sw;
+  const rh = h - sw;
+  const rr = 10;
+  rect.setAttribute('x', inset);
+  rect.setAttribute('y', inset);
+  rect.setAttribute('width', rw);
+  rect.setAttribute('height', rh);
+  rect.setAttribute('rx', rr);
+  rect.setAttribute('stroke-width', sw);
+  // Perimeter approximation (accounting for rounded corners)
+  const perimeter = 2 * (rw + rh) - 8 * rr + 2 * Math.PI * rr;
+  const o = charge.progress;
+  rect.setAttribute('stroke-dasharray', perimeter);
+  // Start drawing from top-middle, offset shrinks as progress grows
+  rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
+  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+}
+
+function clearChargePreview() {
+  const pv = document.getElementById('charge-preview');
+  if (pv) pv.style.display = 'none';
+}
+
+function startCharge(dir, intensity, source) {
+  if (ui.phase === 'gameover' && charge.source !== 'kb') {
+    // still allow
+  }
+  resetIdle();
+  const target = computeTarget(dir);
+  if (!target) return;
+  charge.active = true;
+  charge.dir = dir;
+  charge.intensity = intensity;
+  charge.startTime = performance.now();
+  charge.progress = 0;
+  charge.target = target;
+  charge.source = source;
+  renderChargePreview();
+  if (!charge.animFrameId) charge.animFrameId = requestAnimationFrame(chargeLoop);
+}
+
+function cancelCharge() {
+  charge.active = false;
+  charge.dir = null;
+  charge.target = null;
+  charge.progress = 0;
+  charge.source = null;
+  if (charge.animFrameId) { cancelAnimationFrame(charge.animFrameId); charge.animFrameId = null; }
+  clearChargePreview();
+}
+
+function completeCharge() {
+  const t = charge.target;
+  if (t) {
+    if (t.kind === 'menu') { ui.menuCursor = t.i; updateMenuCursor(); }
+    else if (t.kind === 'go') { ui.goCursor = t.i; document.getElementById('go-new').classList.toggle('cursor', ui.goCursor === 0); document.getElementById('go-portal').classList.toggle('cursor', ui.goCursor === 1); }
+    else if (t.kind === 'btn') { ui.inBtnCol = true; ui.btnCursor = t.i; renderBoard(); }
+    else if (t.kind === 'board') { ui.cursor = t.pos; ui.inBtnCol = false; renderBoard(); }
+    sndNav();
+  }
+  if (charge.active && charge.dir) {
+    const next = computeTarget(charge.dir);
+    if (next) {
+      charge.startTime = performance.now();
+      charge.progress = 0;
+      charge.target = next;
+      renderChargePreview();
+    } else {
+      cancelCharge();
+    }
+  }
+}
+
+function chargeLoop(ts) {
+  if (!charge.active) { cancelCharge(); return; }
+  const elapsed = ts - charge.startTime;
+  if (elapsed > 5000) { cancelCharge(); return; }
+  const ei = Math.max(charge.intensity, 0.3);
+  const duration = navCooldown / ei;
+  charge.progress = Math.min(1.0, elapsed / duration);
+  renderChargePreview();
+  if (charge.progress >= 1.0) completeCharge();
+  if (charge.active) charge.animFrameId = requestAnimationFrame(chargeLoop);
+  else charge.animFrameId = null;
+}
+
+// ── Kiosk / Idle ─────────────────────────────────────────
+function toggleKiosk() {
+  kioskMode = !kioskMode;
+  document.body.classList.toggle('kiosk', kioskMode);
+  if (kioskMode) {
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+    resetIdle();
+  } else {
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+    if (idleTimeout) { clearTimeout(idleTimeout); idleTimeout = null; }
+    $idleScreen.classList.add('hidden');
+  }
+}
+
+function resetIdle() {
+  $idleScreen.classList.add('hidden');
+  if (idleTimeout) clearTimeout(idleTimeout);
+  if (kioskMode) {
+    idleTimeout = setTimeout(() => $idleScreen.classList.remove('hidden'), 120000);
+  }
+}
+
+// ── Multiplayer toggle ───────────────────────────────────
+function toggleMultiplayer() {
+  multiplayerMode = !multiplayerMode;
+  updateModeLabels();
+  beep(700, 60);
+  // If we turned multiplayer OFF and it's B's turn, let AI take over
+  if (!multiplayerMode && ui.phase === 'playing' && (game.turn === B_ || game.pendingRemover === B_)) {
+    scheduleAI();
+  }
+}
+
+// ── Keyboard ─────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  ensureAudio();
+  resetIdle();
+  switch (e.key) {
+    case 'ArrowLeft':
+    case 'ArrowRight':
+    case 'ArrowUp':
+    case 'ArrowDown': {
+      e.preventDefault();
+      const dir = e.key.replace('Arrow', '').toLowerCase();
+      if (kbSimMode) { if (!e.repeat) startCharge(dir, 1.0, 'kb'); }
+      else navigate(dir);
+      break;
+    }
+    case ' ':
+    case 'Enter':
+      e.preventDefault();
+      if (!e.repeat) { cancelCharge(); userAction(); }
+      break;
+    case 'Backspace':
+      e.preventDefault();
+      if (!e.repeat) { cancelCharge(); undo(); }
+      break;
+    case 'u': case 'U': undo(); break;
+    case 'n': case 'N': showMenu(); break;
+    case 'h': case 'H': toggleHints(); break;
+    case 'j': case 'J': kbSimMode = !kbSimMode; updateKbMode(); break;
+    case 'm': case 'M': toggleMultiplayer(); break;
+    case 'k': case 'K': toggleKiosk(); break;
+    case 'Escape':
+      if (game.selected !== null) { game.selected = null; renderBoard(); }
+      else window.location.href = '/';
+      return;
+    case 'p': case 'P': window.location.href = '/'; return;
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (!kbSimMode) return;
+  const dirs = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down'};
+  const dir = dirs[e.key];
+  if (dir && charge.active && charge.dir === dir && charge.source === 'kb') cancelCharge();
+});
+
+function updateKbMode() {
+  let el = document.getElementById('kb-mode');
+  if (!el) {
+    const footer = document.getElementById('footer');
+    if (footer) {
+      el = document.createElement('span');
+      el.id = 'kb-mode';
+      el.onclick = () => { kbSimMode = !kbSimMode; updateKbMode(); };
+      footer.appendChild(el);
+    }
+  }
+  if (el) el.textContent = kbSimMode ? '⌨ Sim' : '⌨ Direkt';
+}
+
+// ── WebSocket ────────────────────────────────────────────
+let ws = null;
+let wsReconnectTimer = null;
+let wsBackoff = 3000;
+const WS_BACKOFF_INIT = 3000;
+const WS_BACKOFF_MAX = 30000;
+
+function wsConnect() {
+  const host = location.hostname || '192.168.4.1';
+  try {
+    ws = new WebSocket(`ws://${host}:81`);
+    ws.onopen = () => {
+      $wsStatus.className = 'connected';
+      $wsStatus.title = 'ESP32 verbunden';
+      wsBackoff = WS_BACKOFF_INIT;
+    };
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        ensureAudio();
+        resetIdle();
+        if (msg.type === 'nav_hold') {
+          charge.wsSupported = true;
+          if (!charge.active || charge.dir !== msg.dir) startCharge(msg.dir, parseFloat(msg.intensity) || 1.0, 'ws');
+          else charge.intensity = parseFloat(msg.intensity) || 1.0;
+        } else if (msg.type === 'nav_release') {
+          if (charge.active && charge.source === 'ws') cancelCharge();
+        } else if (msg.type === 'nav') {
+          if (!charge.wsSupported) navigate(msg.dir);
+        } else if (msg.type === 'action') {
+          if (msg.kind === 'puff' || msg.kind === 'press' || msg.kind === 'short_puff' || msg.kind === 'long_puff') {
+            cancelCharge();
+            userAction();
+          } else if (msg.kind === 'undo') {
+            undo();
+          } else if (msg.kind === 'new_game') {
+            showMenu();
+          } else if (msg.kind === 'kiosk') {
+            toggleKiosk();
+          }
+        } else if (msg.type === 'puff_level') {
+          document.getElementById('puff-bar').style.width = (msg.value * 100) + '%';
+        }
+      } catch (e) {}
+    };
+    ws.onclose = () => {
+      $wsStatus.className = '';
+      $wsStatus.title = 'ESP32 nicht verbunden';
+      ws = null;
+      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+      wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+    };
+    ws.onerror = () => ws?.close();
+  } catch (e) {
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
+    wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+  }
+}
+
+// ── Init ─────────────────────────────────────────────────
+buildBoardSVG();
+newGameState();
+renderBoard();
+updateStatus();
+showMenu();
+updateKbMode();
+wsConnect();
+</script>
+</body>
+</html>

@@ -561,9 +561,10 @@
 <!-- Footer (Hilfe) -->
 <div id="footer">
   <span><kbd>←↑→↓</kbd></span>
-  <span><kbd>⏎</kbd> ●</span>
-  <span><kbd>N</kbd> NEW</span>
-  <span><kbd>K</kbd> Kiosk</span>
+  <span><kbd>⏎</kbd> <kbd>●</kbd></span>
+  <span><kbd>N</kbd> ↻</span>
+  <span><kbd>J</kbd> ⌨</span>
+  <span><kbd>K</kbd> 📺</span>
   <span><kbd>P</kbd> 🏠</span>
 </div>
 
@@ -684,6 +685,10 @@ function sndWin() {
   notes.forEach((f, i) => setTimeout(() => beep(f, 200, 'sine'), i * 180));
 }
 function sndMenuNav() { beep(500, 50); }
+
+let lastNavTime = 0, navCooldown = 1200, kbSimMode = false;
+let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
+fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 
 // ── State ────────────────────────────────────────────────
 let state = {
@@ -820,8 +825,202 @@ function updateCursor() {
   });
 }
 
+// ── Charge Navigation (hold-to-move) ─────────────────────
+function computeTarget(dir) {
+  if (state.phase !== 'playing') return null;
+  let cursor = state.cursor;
+  let inBtnCol = state.inBtnCol;
+  let btnIdx = state.btnIdx;
+  const { cols, rows } = state;
+  const btnCount = $actionBtns.length;
+  if (inBtnCol) {
+    switch (dir) {
+      case 'left': {
+        inBtnCol = false;
+        const row = Math.floor(cursor / cols);
+        cursor = row * cols + (cols - 1);
+        break;
+      }
+      case 'up':
+        if (btnIdx > 0) btnIdx--;
+        else return null;
+        break;
+      case 'down':
+        if (btnIdx < btnCount - 1) btnIdx++;
+        else return null;
+        break;
+      case 'right':
+        return null;
+    }
+  } else {
+    const row = Math.floor(cursor / cols);
+    const col = cursor % cols;
+    switch (dir) {
+      case 'left':
+        if (col > 0) cursor--;
+        else return null;
+        break;
+      case 'right':
+        if (col < cols - 1) cursor++;
+        else { inBtnCol = true; btnIdx = 0; }
+        break;
+      case 'up':
+        if (row > 0) cursor -= cols;
+        else return null;
+        break;
+      case 'down':
+        if (row < rows - 1) cursor += cols;
+        else return null;
+        break;
+    }
+  }
+  if (cursor === state.cursor && inBtnCol === state.inBtnCol && btnIdx === state.btnIdx) return null;
+  return {cursor, inBtnCol, btnIdx};
+}
+
+function applyTarget(t) {
+  state.cursor = t.cursor;
+  state.inBtnCol = t.inBtnCol;
+  state.btnIdx = t.btnIdx;
+}
+
+function getTargetElement(t) {
+  if (!t) return null;
+  if (t.inBtnCol) {
+    return $actionBtns[t.btnIdx] || null;
+  }
+  const cards = $board.querySelectorAll('.card');
+  return cards[t.cursor] || null;
+}
+
+function renderChargePreview() {
+  let pv = document.getElementById('charge-preview');
+  if (!pv) {
+    pv = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    pv.id = 'charge-preview';
+    pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
+    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+    rect.setAttribute('fill', 'none');
+    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke-linecap', 'round');
+    rect.setAttribute('stroke-linejoin', 'round');
+    pv.appendChild(rect);
+    (document.getElementById('game') || document.body).appendChild(pv);
+  }
+  const el = getTargetElement(charge.target);
+  if (!el) { pv.style.display = 'none'; return; }
+  const r = el.getBoundingClientRect();
+  const g = (document.getElementById('game') || document.body).getBoundingClientRect();
+  const pad = 8;
+  const w = r.width + pad * 2;
+  const h = r.height + pad * 2;
+  pv.style.display = 'block';
+  pv.style.left = (r.left - g.left - pad) + 'px';
+  pv.style.top = (r.top - g.top - pad) + 'px';
+  pv.setAttribute('width', w);
+  pv.setAttribute('height', h);
+  pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
+  const rect = pv.querySelector('rect');
+  const sw = 7;
+  const inset = sw / 2;
+  const rw = w - sw;
+  const rh = h - sw;
+  const rr = 10;
+  rect.setAttribute('x', inset);
+  rect.setAttribute('y', inset);
+  rect.setAttribute('width', rw);
+  rect.setAttribute('height', rh);
+  rect.setAttribute('rx', rr);
+  rect.setAttribute('stroke-width', sw);
+  // Perimeter approximation (accounting for rounded corners)
+  const perimeter = 2 * (rw + rh) - 8 * rr + 2 * Math.PI * rr;
+  const o = charge.progress;
+  rect.setAttribute('stroke-dasharray', perimeter);
+  // Start drawing from top-middle, offset shrinks as progress grows
+  rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
+  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+}
+
+function clearChargePreview() {
+  const pv = document.getElementById('charge-preview');
+  if (pv) pv.style.display = 'none';
+}
+
+function startCharge(dir, intensity, source) {
+  if (state.phase !== 'playing') return;
+  resetIdle();
+  const target = computeTarget(dir);
+  if (!target) return;
+  charge.active = true;
+  charge.dir = dir;
+  charge.intensity = intensity;
+  charge.startTime = performance.now();
+  charge.progress = 0;
+  charge.target = target;
+  charge.source = source;
+  renderChargePreview();
+  if (!charge.animFrameId) charge.animFrameId = requestAnimationFrame(chargeLoop);
+}
+
+function cancelCharge() {
+  charge.active = false;
+  charge.dir = null;
+  charge.target = null;
+  charge.progress = 0;
+  charge.source = null;
+  if (charge.animFrameId) { cancelAnimationFrame(charge.animFrameId); charge.animFrameId = null; }
+  clearChargePreview();
+}
+
+function completeCharge() {
+  const t = charge.target;
+  if (t) {
+    applyTarget(t);
+    sndNav();
+    updateCursor();
+  }
+  if (charge.active && charge.dir) {
+    const next = computeTarget(charge.dir);
+    if (next) {
+      charge.startTime = performance.now();
+      charge.progress = 0;
+      charge.target = next;
+      renderChargePreview();
+    } else cancelCharge();
+  }
+}
+
+function chargeLoop(ts) {
+  if (!charge.active || state.phase !== 'playing') { cancelCharge(); return; }
+  const elapsed = ts - charge.startTime;
+  if (elapsed > 5000) { cancelCharge(); return; }
+  const ei = Math.max(charge.intensity, 0.3);
+  const duration = navCooldown / ei;
+  charge.progress = Math.min(1.0, elapsed / duration);
+  renderChargePreview();
+  if (charge.progress >= 1.0) completeCharge();
+  if (charge.active) charge.animFrameId = requestAnimationFrame(chargeLoop);
+  else charge.animFrameId = null;
+}
+
+function updateKbMode() {
+  let el = document.getElementById('kb-mode');
+  if (!el) {
+    const footer = document.getElementById('footer');
+    if (footer) {
+      el = document.createElement('span');
+      el.id = 'kb-mode';
+      el.style.cssText = 'background:#1a2a3a;padding:2px 8px;border-radius:4px;color:#80cbc4;cursor:pointer';
+      el.onclick = () => { kbSimMode = !kbSimMode; updateKbMode(); };
+      footer.appendChild(el);
+    }
+  }
+  if (el) el.textContent = kbSimMode ? '⌨ Sim' : '⌨ Direkt';
+}
+
 // ── Navigation ───────────────────────────────────────────
 function navigate(dir) {
+  const now = Date.now(); if (now - lastNavTime < 120) return; lastNavTime = now;
   resetIdle();
   if (state.phase === 'menu') return navigateMenu(dir);
   if (state.phase === 'win') return navigateWin(dir);
@@ -1065,20 +1264,34 @@ function toggleKiosk() {
 // ── Tastatur ─────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
   switch (e.key) {
-    case 'ArrowLeft':  navigate('left'); break;
-    case 'ArrowRight': navigate('right'); break;
-    case 'ArrowUp':    navigate('up'); break;
-    case 'ArrowDown':  navigate('down'); break;
+    case 'ArrowLeft':
+    case 'ArrowRight':
+    case 'ArrowUp':
+    case 'ArrowDown': {
+      const dir = e.key.replace('Arrow','').toLowerCase();
+      if (state.phase !== 'playing') { navigate(dir); break; }
+      if (kbSimMode) { if (!e.repeat) startCharge(dir, 1.0, 'kb'); }
+      else navigate(dir);
+      break;
+    }
     case ' ':
     case 'Enter':
       e.preventDefault();
-      action();
+      if (!e.repeat) { cancelCharge(); action(); }
       break;
-    case 'n': case 'N': showMenu(); break;
+    case 'n': case 'N': cancelCharge(); showMenu(); break;
+    case 'j': case 'J': kbSimMode = !kbSimMode; updateKbMode(); break;
     case 'k': case 'K': toggleKiosk(); break;
     case 'p': case 'P': window.location.href = '/'; return;
     case 'Escape': window.location.href = '/'; return;
   }
+});
+
+document.addEventListener('keyup', (e) => {
+  if (!kbSimMode) return;
+  const dirs = {ArrowLeft:'left', ArrowRight:'right', ArrowUp:'up', ArrowDown:'down'};
+  const dir = dirs[e.key];
+  if (dir && charge.active && charge.dir === dir && charge.source === 'kb') cancelCharge();
 });
 
 // ── WebSocket (MundMaus ESP32) ───────────────────────────
@@ -1106,13 +1319,20 @@ function wsConnect() {
         const msg = JSON.parse(evt.data);
         resetIdle();
 
-        if (msg.type === 'nav') {
-          navigate(msg.dir);
+        if (msg.type === 'nav_hold') {
+          charge.wsSupported = true;
+          if (state.phase !== 'playing') { navigate(msg.dir); }
+          else if (!charge.active || charge.dir !== msg.dir) startCharge(msg.dir, parseFloat(msg.intensity) || 1.0, 'ws');
+          else if (charge.active) charge.intensity = parseFloat(msg.intensity) || 1.0;
+        } else if (msg.type === 'nav_release') {
+          if (charge.active && charge.source === 'ws') cancelCharge();
+        } else if (msg.type === 'nav') {
+          if (!charge.wsSupported) navigate(msg.dir);
         } else if (msg.type === 'action') {
           if (msg.kind === 'puff' || msg.kind === 'press') {
-            action();
+            cancelCharge(); action();
           } else if (msg.kind === 'new_game') {
-            showMenu();
+            cancelCharge(); showMenu();
           } else if (msg.kind === 'kiosk') {
             toggleKiosk();
           }
@@ -1146,6 +1366,7 @@ function wsConnect() {
 // ── Init ─────────────────────────────────────────────────
 showMenu();
 wsConnect();
+updateKbMode();
 </script>
 </body>
 </html>
