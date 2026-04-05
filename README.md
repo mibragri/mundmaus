@@ -178,9 +178,24 @@ Ueber das Portal (Zahnrad-Symbol ⚙) koennen Pfleger die Empfindlichkeit anpass
 
 - **Joystick-Empfindlichkeit** — wie weit der Joystick bewegt werden muss
 - **Puste-Staerke** — wie stark gepustet werden muss fuer einen Klick
-- **Geschwindigkeit** — wie schnell der Cursor bei gehaltenem Joystick wandert
+- **Geschwindigkeit** — wie lang der Patient den Joystick halten muss bis der Cursor ein Feld weiterspringt (Standard 1000ms)
 
 Aenderungen wirken sofort (Live-Preview). "Save" speichert dauerhaft, "Cancel" verwirft.
+
+## Vorausschauende Navigation (Charge-Mechanik)
+
+Damit der Patient die Kontrolle behaelt und nicht versehentlich ueber Karten hinwegspringt, nutzt die Navigation keine unsichtbaren Cooldowns sondern ein sichtbares Ladeprinzip:
+
+1. Joystick in eine Richtung halten → das **Zielfeld** bekommt einen gruenen Rahmen der sich **im Uhrzeigersinn aufbaut** (wie ein Timer-Kreis, nur rechteckig)
+2. Sobald der Rahmen geschlossen ist (~1 Sekunde), springt der Cursor dorthin
+3. Joystick loslassen bevor der Rahmen voll ist → kein Sprung
+4. **Analoge Joystick-Intensitaet**: leicht antippen = langsam laden, voll auslenken = schneller laden
+
+Der Patient sieht also **immer vorher**, wohin der naechste Sprung geht und **wann** er passiert.
+
+**Tastatur-Testmodus**: Mit **J** kann der Pfleger am Laptop zwischen Direktmodus (sofortige Navigation fuer Pflege) und Joystick-Simulation (Charge-Mechanik wie am Geraet) umschalten. Im Footer wird der aktuelle Modus als `⌨ Direkt` / `⌨ Sim` angezeigt.
+
+**Multiplayer-Modus** (Schach, Vier gewinnt, Muehle): Mit **M** umschaltbar. Im Multiplayer spielt der Pfleger mit der Tastatur gegen den Patienten — beide nutzen die gleichen Eingabeformen, nur die KI wird durch den Pfleger ersetzt.
 
 ## Architektur
 

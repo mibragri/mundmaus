@@ -154,6 +154,7 @@ static void discoverGames(std::vector<GameEntry>& out) {
         String label;
         if (raw == "memo")           label = "Memo";
         else if (raw == "solitaire") label = "Solitaer";
+        else if (raw == "muehle")    label = "Muehle";
         else {
             label = raw;
             label.replace("-", " ");
