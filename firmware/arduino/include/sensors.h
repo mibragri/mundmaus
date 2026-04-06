@@ -20,8 +20,15 @@ public:
     /// True if both axes remain strictly within the configured deadzone.
     bool isIdle();
 
+    /// Store raw ADC readings for this frame (call once per iteration).
+    /// All other methods use these cached values instead of re-reading ADC.
+    void sampleRaw();
+
     int centerX;
     int centerY;
+
+    /// Last sampled raw values (valid after sampleRaw())
+    int rawX = 0, rawY = 0;
 
     /// Continuous state: direction + intensity (0-1). Returns nullptr if idle.
     const char* getState(float& outIntensity);

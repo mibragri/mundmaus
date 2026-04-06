@@ -36,6 +36,9 @@ static void sensorTask(void* param) {
         const char* holdState = nullptr;
         float holdIntensity = 0.0f;
 
+        // Sample ADC once per iteration -- all joystick methods use cached values
+        if (joystick) joystick->sampleRaw();
+
         // -- I3: Handle calibrate request from WS handler (non-blocking) --
         if (server && server->calibrateRequested) {
             server->calibrateRequested = false;
@@ -147,8 +150,9 @@ static void sensorTask(void* param) {
             static int prevRawX = 0, prevRawY = 0;
             static unsigned long stableStart = 0;
 
-            int rawX = analogRead(PIN_VRX);
-            int rawY = analogRead(PIN_VRY);
+            // Use cached ADC values from sampleRaw() (single read per iteration)
+            int rawX = joystick->rawX;
+            int rawY = joystick->rawY;
             bool isStable = abs(rawX - prevRawX) < 20 && abs(rawY - prevRawY) < 20;
             bool belowNavThreshold = (holdState == nullptr) && !joystick->isIdle();
 

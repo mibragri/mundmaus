@@ -59,9 +59,15 @@ void CalibratedJoystick::calibrate(int samples) {
     Serial.printf("  Center=(%d,%d) dz=+/-%d\n", centerX, centerY, Config::DEADZONE);
 }
 
+void CalibratedJoystick::sampleRaw() {
+    rawX = analogRead(_pinX);
+    rawY = analogRead(_pinY);
+}
+
 void CalibratedJoystick::_readCentered(int& dx, int& dy) {
-    dx = analogRead(_pinX) - centerX;
-    dy = analogRead(_pinY) - centerY;
+    // Uses cached rawX/rawY from sampleRaw() -- one ADC read per iteration
+    dx = rawX - centerX;
+    dy = rawY - centerY;
     if (abs(dx) < Config::DEADZONE) dx = 0;
     if (abs(dy) < Config::DEADZONE) dy = 0;
 }
@@ -200,11 +206,11 @@ bool CalibratedJoystick::pollButton() {
 }
 
 bool CalibratedJoystick::isIdle() {
-    // Use raw (pre-deadzone) values so we can check strictly within deadzone.
+    // Use cached raw values (pre-deadzone) so we check strictly within deadzone.
     // Previously used DEADZONE*2 which created a gap between "idle" and "active"
     // where held joystick could trigger auto-recalibration while being used.
-    int rawDx = analogRead(_pinX) - centerX;
-    int rawDy = analogRead(_pinY) - centerY;
+    int rawDx = rawX - centerX;
+    int rawDy = rawY - centerY;
     return abs(rawDx) < Config::DEADZONE && abs(rawDy) < Config::DEADZONE;
 }
 

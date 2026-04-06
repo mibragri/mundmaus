@@ -9,13 +9,13 @@ namespace Config {
 // GLOBALS (runtime-adjustable, initialized to defaults)
 // ============================================================
 
-int DEADZONE         = DEFAULT_DEADZONE;
-int NAV_THRESHOLD    = DEFAULT_NAV_THRESHOLD;
-int NAV_REPEAT_MS    = DEFAULT_NAV_REPEAT_MS;
-int NAV_COOLDOWN_MS  = DEFAULT_NAV_COOLDOWN_MS;
-int PUFF_COOLDOWN_MS  = DEFAULT_PUFF_COOLDOWN_MS;
-int PUFF_RAW_THRESHOLD = DEFAULT_PUFF_RAW_THRESHOLD;
-int SENSOR_POLL_MS    = DEFAULT_SENSOR_POLL_MS;
+volatile int DEADZONE         = DEFAULT_DEADZONE;
+volatile int NAV_THRESHOLD    = DEFAULT_NAV_THRESHOLD;
+volatile int NAV_REPEAT_MS    = DEFAULT_NAV_REPEAT_MS;
+volatile int NAV_COOLDOWN_MS  = DEFAULT_NAV_COOLDOWN_MS;
+volatile int PUFF_COOLDOWN_MS  = DEFAULT_PUFF_COOLDOWN_MS;
+volatile int PUFF_RAW_THRESHOLD = DEFAULT_PUFF_RAW_THRESHOLD;
+volatile int SENSOR_POLL_MS    = DEFAULT_SENSOR_POLL_MS;
 
 // ============================================================
 // KEY TABLES
@@ -46,7 +46,7 @@ const Range RANGES[NUM_CONFIGURABLE] = {
 // ============================================================
 
 /// Map key index to the corresponding global variable pointer
-static int* _globalPtr(int idx) {
+static volatile int* _globalPtr(int idx) {
     switch (idx) {
         case 0: return &DEADZONE;
         case 1: return &NAV_THRESHOLD;
@@ -89,7 +89,7 @@ void load() {
     prefs.begin("settings", true);  // read-only
 
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
-        int* ptr = _globalPtr(i);
+        volatile int* ptr = _globalPtr(i);
         if (ptr) {
             // P2-1: Clamp to the valid range. Corrupt or legacy NVS values
             // (e.g. a PUFF_RAW_THRESHOLD of 0 from an older firmware schema)
@@ -108,7 +108,7 @@ void save() {
     prefs.begin("settings", false);  // read-write
 
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
-        int* ptr = _globalPtr(i);
+        volatile int* ptr = _globalPtr(i);
         if (!ptr) continue;
 
         if (*ptr != _defaultVal(i)) {
@@ -125,7 +125,7 @@ void save() {
 void reset() {
     // Restore defaults in RAM
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
-        int* ptr = _globalPtr(i);
+        volatile int* ptr = _globalPtr(i);
         if (ptr) *ptr = _defaultVal(i);
     }
 
@@ -140,7 +140,7 @@ bool update(const char* key, int value) {
     int idx = _findKey(key);
     if (idx < 0) return false;
 
-    int* ptr = _globalPtr(idx);
+    volatile int* ptr = _globalPtr(idx);
     if (!ptr) return false;
 
     // Clamp to valid range
@@ -151,7 +151,7 @@ bool update(const char* key, int value) {
 
 void getAll(JsonDocument& doc) {
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
-        int* ptr = _globalPtr(i);
+        volatile int* ptr = _globalPtr(i);
         if (ptr) doc[CONFIGURABLE_KEYS[i]] = *ptr;
     }
 }

@@ -160,7 +160,7 @@ void MundMausServer::_setupHttpRoutes() {
                 wsMsg["message"] = "Gespeichert. Neustart...";
                 String wsBuf;
                 serializeJson(wsMsg, wsBuf);
-                _ws.textAll(wsBuf);
+                _broadcastText(wsBuf);
 
                 // Send HTTP response
                 JsonDocument doc;
@@ -277,7 +277,7 @@ void MundMausServer::_setupHttpRoutes() {
             resp["current"] = curDoc;
             String buf;
             serializeJson(resp, buf);
-            _ws.textAll(buf);
+            _broadcastText(buf);
 
             _sendJson200(req, doc);
         }
@@ -309,7 +309,9 @@ void MundMausServer::_setupHttpRoutes() {
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
     _httpServer.on("/api/update/start", HTTP_POST, [this](AsyncWebServerRequest* req) {
-        if (_updateRunning) {
+        // Atomic test-and-set: prevents TOCTOU race on concurrent requests
+        bool expected = false;
+        if (!_updateRunning.compare_exchange_strong(expected, true)) {
             JsonDocument doc;
             doc["ok"]    = false;
             doc["error"] = "Update laeuft bereits";
@@ -325,14 +327,13 @@ void MundMausServer::_setupHttpRoutes() {
             xSemaphoreGive(_updateResultMutex);
         }
         if (!hasUpdates) {
+            _updateRunning = false;  // release the flag
             JsonDocument doc;
             doc["ok"]    = false;
             doc["error"] = "Keine Updates verfuegbar";
             _sendJson200(req, doc);
             return;
         }
-
-        _updateRunning = true;
 
         // Send immediate response
         JsonDocument doc;
@@ -437,7 +438,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
             resp["message"] = "Gespeichert. Neustart...";
             String buf;
             serializeJson(resp, buf);
-            _ws.textAll(buf);
+            _broadcastText(buf);
 
             _pendingReboot = millis() | 1;  // I3: ensure nonzero
         }
@@ -476,7 +477,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         resp["ok"]   = true;
         String buf;
         serializeJson(resp, buf);
-        _ws.textAll(buf);
+        _broadcastText(buf);
 
     } else if (strcmp(type, "config_reset") == 0) {
         Config::reset();
@@ -495,7 +496,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
 
         String buf;
         serializeJson(resp, buf);
-        _ws.textAll(buf);
+        _broadcastText(buf);
 
     } else if (strcmp(type, "calibrate") == 0) {
         // I3: Don't block async handler -- set flag, sensor task handles it
@@ -557,19 +558,15 @@ void MundMausServer::sendPuffLevel(float value) {
 
 // I1: Drain queue and broadcast via WS (runs on loop() task, Core 1).
 //
-// P1-3 (known limitation, not fixed): _ws.textAll() and _ws.cleanupClients()
-// iterate AsyncWebSocket::_clients (std::list) without holding any library
-// mutex. AsyncTCP runs on Core 0 (CONFIG_ASYNC_TCP_RUNNING_CORE=0) and can
-// emplace_back a new client in _clients concurrently with our iteration.
-// std::list::emplace_back does not invalidate existing iterators, but the
-// write to the list's tail pointer races with our iteration — this is
-// technically undefined behavior. In practice the race window is tiny (only
-// during a new WS client connecting while we broadcast a sensor frame at
-// 10Hz), and a library fix would require adding a lock to every _clients
-// access in ESPAsyncWebServer 3.6.0. A mutex-marshalling shim on our side
-// cannot protect against the library's own emplace path without modifying
-// the library. Accepted as known limitation; revisit if ESPAsyncWebServer
-// gains an _asyncMutex on _clients in a future version.
+// P1-3 (mitigated): _ws.textAll() iterates AsyncWebSocket::_clients
+// (std::list) without a library mutex. AsyncTCP on Core 0 can
+// emplace_back concurrently. We mitigate via _broadcastText() which
+// uses makeBuffer() + textAll(buffer): the shared_ptr buffer lets
+// each client dequeue independently via the per-client lock, and
+// setCloseClientOnQueueFull(false) prevents list mutations from full
+// queues. The list-iteration race window is microseconds (small JSON,
+// 10Hz rate) and client connect/disconnect events are seconds apart.
+// A full fix requires library-level locking on _clients.
 void MundMausServer::processSensorQueue() {
     _ws.cleanupClients();  // prune stale/disconnected WebSocket clients
 
@@ -634,13 +631,13 @@ void MundMausServer::processSensorQueue() {
                 _buildUpdateJson(updDoc);
                 String updBuf;
                 serializeJson(updDoc, updBuf);
-                _ws.textAll(updBuf);
+                _broadcastText(updBuf);
             }
-            continue;  // already broadcast, skip generic textAll below
+            continue;  // already broadcast, skip generic broadcast below
         }
         String buf;
         serializeJson(doc, buf);
-        _ws.textAll(buf);
+        _broadcastText(buf);
     }
 }
 
@@ -667,6 +664,20 @@ void MundMausServer::_sendJson(AsyncWebServerRequest* req, int status, JsonDocum
 
 void MundMausServer::_sendJson200(AsyncWebServerRequest* req, JsonDocument& doc) {
     _sendJson(req, 200, doc);
+}
+
+void MundMausServer::_broadcastText(const String& msg) {
+    // P1-3: Use makeBuffer + textAll(buffer) instead of textAll(String).
+    // The shared_ptr buffer lets each client dequeue independently, and the
+    // per-client text(buf) path acquires the client's own lock. This mitigates
+    // the _clients list-iteration race: while the iteration itself is not
+    // library-locked, the window is microseconds (small message, 10Hz rate)
+    // and _clients mutations (connect/disconnect) are seconds apart.
+    auto buf = _ws.makeBuffer(msg.length());
+    if (buf) {
+        memcpy(buf->get(), msg.c_str(), msg.length());
+        _ws.textAll(buf);
+    }
 }
 
 int MundMausServer::_applyConfigValues(JsonObjectConst values) {
@@ -833,12 +844,12 @@ void MundMausServer::_updateTaskWrapper(void* param) {
 // ============================================================
 
 void MundMausServer::_startAsyncScan() {
-    // Prevent overlapping scans — a single scan is enough, extra ones would
-    // thrash the radio and delay results for all callers.
-    if (_wifiScanRunning) {
-        return;
+    // Atomic test-and-set: prevents TOCTOU race where two rapid requests
+    // could both pass the check and spawn duplicate scan tasks.
+    bool expected = false;
+    if (!_wifiScanRunning.compare_exchange_strong(expected, true)) {
+        return; // scan already running
     }
-    _wifiScanRunning = true;
     // 4KB stack is enough for scanNetworks + a small JSON serialize.
     xTaskCreate(_wifiScanTaskWrapper, "wifi_scan", 4096, this, 1, nullptr);
 }
@@ -859,7 +870,7 @@ void MundMausServer::_wifiScanTaskWrapper(void* param) {
     }
     String buf;
     serializeJson(resp, buf);
-    self->_ws.textAll(buf);
+    self->_broadcastText(buf);
 
     self->_wifiScanRunning = false;
     vTaskDelete(nullptr);

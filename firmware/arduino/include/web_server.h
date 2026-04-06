@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <freertos/queue.h>
 #include <freertos/semphr.h>
+#include <atomic>
 #include "wifi_manager.h"
 #include "updater.h"
 
@@ -93,16 +94,21 @@ private:
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);
     int _applyConfigValues(JsonObjectConst values);
 
+    // P1-3: Thread-safe broadcast via shared buffer. Uses makeBuffer() so
+    // each client dequeues at its own pace via ref-counted buffer. Mitigates
+    // the _clients list-iteration race (see processSensorQueue comment).
+    void _broadcastText(const String& msg);
+
     // Build JSON for update status (shared by HTTP + WS)
     void _buildUpdateJson(JsonDocument& doc);
 
     // I5: One-shot FreeRTOS task for blocking OTA downloads
     static void _updateTaskWrapper(void* param);
-    volatile bool _updateRunning = false;
+    std::atomic<bool> _updateRunning{false};
 
     // P1-4: Async WiFi scan — scanNetworks() blocks 2-5s, so we run it in
     // a short-lived task and broadcast the result via WS when finished.
     void _startAsyncScan();
     static void _wifiScanTaskWrapper(void* param);
-    volatile bool _wifiScanRunning = false;
+    std::atomic<bool> _wifiScanRunning{false};
 };

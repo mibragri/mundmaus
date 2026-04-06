@@ -72,13 +72,16 @@ constexpr int DEFAULT_PUFF_SEND_INTERVAL_MS = 100;
 constexpr int DEFAULT_SENSOR_POLL_MS        = 20;
 
 // Globals (defined in config.cpp)
-extern int DEADZONE;
-extern int NAV_THRESHOLD;
-extern int NAV_REPEAT_MS;
-extern int NAV_COOLDOWN_MS;
-extern int PUFF_COOLDOWN_MS;
-extern int PUFF_RAW_THRESHOLD;
-extern int SENSOR_POLL_MS;
+// volatile: written from Core 0 (WS config_preview handler),
+// read from Core 1 (sensor task). ESP32 guarantees atomic 32-bit
+// aligned access; volatile prevents compiler caching across cores.
+extern volatile int DEADZONE;
+extern volatile int NAV_THRESHOLD;
+extern volatile int NAV_REPEAT_MS;
+extern volatile int NAV_COOLDOWN_MS;
+extern volatile int PUFF_COOLDOWN_MS;
+extern volatile int PUFF_RAW_THRESHOLD;
+extern volatile int SENSOR_POLL_MS;
 
 // ============================================================
 // CONFIGURABLE KEYS (for settings UI)
