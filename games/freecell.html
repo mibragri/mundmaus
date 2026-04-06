@@ -78,7 +78,7 @@
 
   .pile-slot {
     width: calc(10.2 * var(--vw));
-    min-height: calc(13.3 * var(--vw));
+    min-height: calc(14.5 * var(--vw));
     border: 3px dashed rgba(255,255,255,0.15);
     border-radius: var(--card-radius);
     position: relative;
@@ -147,7 +147,7 @@
   /* CARDS */
   .card {
     width: calc(10.2 * var(--vw));
-    height: calc(13.3 * var(--vw));
+    height: calc(14.5 * var(--vw));
     border-radius: var(--card-radius);
     position: absolute;
     transition: transform 0.15s ease, box-shadow 0.15s ease;
@@ -220,7 +220,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: calc(4.5 * var(--vw));
+    font-size: calc(3.5 * var(--vw));
+    line-height: 1;
+    padding: calc(0.8 * var(--vw)) 0;
   }
 
   .card .card-bottom {
@@ -1028,7 +1030,23 @@ function renderTopRow() {
 
 function renderTableau() {
   const cont = document.getElementById('tableau'); cont.innerHTML = '';
-  const CARD_H = 13.3, FUO = 2.6;
+  const CARD_H = 14.5;
+  // Dynamic FUO: shrink face-up offset so tallest column + cursor bar
+  // fit into available viewport height without scrolling.
+  const vw = window.innerWidth / 100;
+  const headerEl = document.getElementById('header');
+  const topRowEl = document.getElementById('top-row');
+  const footerEl = document.getElementById('footer');
+  const usedPx = (headerEl ? headerEl.offsetHeight : 0) + (topRowEl ? topRowEl.offsetHeight : 0) + (footerEl ? footerEl.offsetHeight : 0) + 20;
+  const availVw = (window.innerHeight - usedPx) / vw;
+  // All freecell cards are face-up, find tallest column
+  let maxCards = 0;
+  for (let ci = 0; ci < 8; ci++) { if (tableau[ci].length > maxCards) maxCards = tableau[ci].length; }
+  let FUO = 3.8;
+  if (maxCards > 1) {
+    const maxFUO = (availVw - CARD_H) / (maxCards - 1);
+    FUO = Math.max(1.2, Math.min(3.8, maxFUO));
+  }
   let maxBottom = CARD_H;
 
   for (let ci = 0; ci < 8; ci++) {
@@ -1038,7 +1056,7 @@ function renderTableau() {
 
     if (!col.length) {
       const slot = mkSlot();
-      slot.style.cssText = 'position:relative;width:100%;min-height:calc(13.3 * var(--vw));';
+      slot.style.cssText = 'position:relative;width:100%;min-height:calc(14.5 * var(--vw));';
       if (navZone === 'tableau' && navCol === ci) slot.classList.add('nav-active');
       // Target highlight for empty columns
       if (selectedCard) {
