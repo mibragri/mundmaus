@@ -22,6 +22,12 @@ CalibratedJoystick::CalibratedJoystick(int pinX, int pinY, int pinSW)
     , _swDebounceTime(0)
 {
     pinMode(_pinSW, INPUT_PULLUP);
+    // Arduino-ESP32 3.x only accepts per-pin attenuation changes after the
+    // pin has been attached to the ADC bus. A first analogRead performs that
+    // registration and avoids noisy boot-time "not configured as analog channel"
+    // errors on otherwise valid ADC pins.
+    analogRead(_pinX);
+    analogRead(_pinY);
     analogSetPinAttenuation(_pinX, ADC_11db);
     analogSetPinAttenuation(_pinY, ADC_11db);
     calibrate();
@@ -116,7 +122,17 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
     }
 
     if (dir) {
-        float intensity = float(abs(dominant) - Config::NAV_THRESHOLD) / (2048.0f - Config::NAV_THRESHOLD);
+        int maxTravel = 0;
+        if (xDominant) {
+            maxTravel = (dominant > 0) ? (4095 - centerX) : centerX;
+        } else {
+            maxTravel = (dominant > 0) ? (4095 - centerY) : centerY;
+        }
+        int usableRange = maxTravel - Config::NAV_THRESHOLD;
+        if (usableRange < 1) {
+            usableRange = 1;
+        }
+        float intensity = float(abs(dominant) - Config::NAV_THRESHOLD) / float(usableRange);
         intensity = constrain(intensity, 0.0f, 1.0f);
         _lastIntensity = intensity;
         outIntensity = intensity;

@@ -3,6 +3,7 @@
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 # Files that should be in the manifest
@@ -10,6 +11,8 @@ FIRMWARE_EXCLUDES = {'boot.py',  # NEVER OTA-update boot.py — it's the safety 
                      'wifi.json', 'versions.json', 'update_state.json',
                      'deploy.sh', 'pyproject.toml', 'uv.lock'}
 GAME_DIR = 'games'  # Source dir in repo (mapped to www/ on ESP32)
+FIRMWARE_NAME = 'firmware.bin'
+PLATFORMIO_INI = Path('firmware/arduino/platformio.ini')
 
 
 def compute_hash(filepath):
@@ -45,6 +48,19 @@ def scan_files(project_dir):
             })
 
     return files
+
+
+def read_firmware_version(project_dir):
+    """Read MUNDMAUS_FW_VERSION from firmware/arduino/platformio.ini."""
+    ini_path = Path(project_dir) / PLATFORMIO_INI
+    if not ini_path.exists():
+        return None
+
+    text = ini_path.read_text(encoding='utf-8')
+    match = re.search(r'-DMUNDMAUS_FW_VERSION=(\d+)', text)
+    if not match:
+        return None
+    return int(match.group(1))
 
 
 def update_manifest(project_dir, manifest_path=None, state_path=None):
@@ -90,6 +106,16 @@ def update_manifest(project_dir, manifest_path=None, state_path=None):
         if f['firmware']:
             entry['firmware'] = True
         new_files[name] = entry
+
+    firmware_path = project_dir / FIRMWARE_NAME
+    old_fw = old_manifest.get('files', {}).get(FIRMWARE_NAME)
+    fw_version = read_firmware_version(project_dir)
+    if firmware_path.exists() or old_fw:
+        entry = {
+            'version': fw_version if fw_version is not None else old_fw.get('version', 0),
+            'firmware': True,
+        }
+        new_files[FIRMWARE_NAME] = entry
 
     # Write manifest
     manifest = {

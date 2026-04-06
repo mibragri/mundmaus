@@ -17,7 +17,7 @@ public:
     /// Poll button (debounced, active LOW). Returns true on press edge.
     bool pollButton();
 
-    /// True if both axes within 2x DEADZONE of center.
+    /// True if both axes remain strictly within the configured deadzone.
     bool isIdle();
 
     int centerX;

@@ -688,13 +688,35 @@ function doSave() {
   showToast('Speichern... / Saving...', '');
 }
 
-function doCancel() {
+async function doCancel() {
   const effective = Object.assign({}, configDefaults, configSaved);
+  let changed = false;
   for (const k in effective) {
     if (configCurrent[k] !== effective[k]) {
-      wsSend({ type: 'config_preview', key: k, value: effective[k] });
+      changed = true;
+      break;
     }
   }
+
+  if (changed) {
+    showToast('Verwerfe Aenderungen... / Reverting...', '');
+    try {
+      const resp = await fetch('/api/settings/preview', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ values: effective })
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      configCurrent = Object.assign({}, effective);
+      applyFullConfig(configCurrent);
+      checkUnsaved();
+    } catch (err) {
+      console.warn('[Settings] Cancel revert failed:', err);
+      showToast('✗ Ruecknahme fehlgeschlagen / Revert failed', 'error');
+      return;
+    }
+  }
+
   window.location.href = '/';
 }
 
@@ -813,8 +835,9 @@ async function loadSettings() {
     // Apply hardcoded defaults so the UI is usable offline
     applyFullConfig({
       DEADZONE: 150,
-      NAV_THRESHOLD: 800,
-      NAV_REPEAT_MS: 300,
+      NAV_THRESHOLD: 450,
+      NAV_REPEAT_MS: 400,
+      NAV_COOLDOWN_MS: 1000,
       PUFF_COOLDOWN_MS: 400,
       PUFF_RAW_THRESHOLD: 75000,
       SENSOR_POLL_MS: 20

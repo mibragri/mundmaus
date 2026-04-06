@@ -33,6 +33,8 @@ static void sensorTask(void* param) {
 
     for (;;) {
         unsigned long now = millis();
+        const char* holdState = nullptr;
+        float holdIntensity = 0.0f;
 
         // -- I3: Handle calibrate request from WS handler (non-blocking) --
         if (server && server->calibrateRequested) {
@@ -76,13 +78,12 @@ static void sensorTask(void* param) {
             static bool wasNavigating = false;
             static unsigned long lastHoldSend = 0;
             static unsigned long releaseStart = 0;
-            float intensity;
-            const char* state = joystick->getState(intensity);
-            if (state) {
+            holdState = joystick->getState(holdIntensity);
+            if (holdState) {
                 releaseStart = 0;  // cancel any pending release
                 // Throttle nav_hold to ~10Hz (every 100ms)
                 if ((now - lastHoldSend) >= 100) {
-                    server->sendNavHold(state, intensity);
+                    server->sendNavHold(holdState, holdIntensity);
                     lastHoldSend = now;
                 }
                 wasNavigating = true;
@@ -134,6 +135,39 @@ static void sensorTask(void* param) {
             } else {
                 idleStart = now;
             }
+        }
+
+        // -- Drift guard (stability-based): if raw ADC readings are
+        // extremely stable for >30s while the stick sits outside the deadzone
+        // but below the navigation threshold, the calibrated center likely
+        // drifted. We explicitly avoid recalibrating while a real direction is
+        // active; false recalibration during an intentional hold is worse than
+        // waiting for the normal idle/manual calibration path.
+        if (joystick) {
+            static int prevRawX = 0, prevRawY = 0;
+            static unsigned long stableStart = 0;
+
+            int rawX = analogRead(PIN_VRX);
+            int rawY = analogRead(PIN_VRY);
+            bool isStable = abs(rawX - prevRawX) < 20 && abs(rawY - prevRawY) < 20;
+            bool belowNavThreshold = (holdState == nullptr) && !joystick->isIdle();
+
+            if (isStable) {
+                if (stableStart == 0) stableStart = now;
+                if (belowNavThreshold &&
+                    (now - stableStart) > 30000 &&
+                    (now - lastRecal) > 60000) {
+                    Serial.printf("  Drift detected (stable %lus): recalibrating\n",
+                                  (now - stableStart) / 1000);
+                    joystick->calibrate(20);
+                    lastRecal = now;
+                    stableStart = 0;
+                }
+            } else {
+                stableStart = 0;
+            }
+            prevRawX = rawX;
+            prevRawY = rawY;
         }
 
         // Update heartbeat for WDT check in loop()

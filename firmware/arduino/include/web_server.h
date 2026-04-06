@@ -91,6 +91,7 @@ private:
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
     void _sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc);
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);
+    int _applyConfigValues(JsonObjectConst values);
 
     // Build JSON for update status (shared by HTTP + WS)
     void _buildUpdateJson(JsonDocument& doc);

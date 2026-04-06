@@ -220,6 +220,69 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
     });
 
+    // --- POST /api/settings/preview ---
+    // Used by the settings page to synchronously revert live-preview values
+    // before navigating away. HTTP gives us an explicit success/failure point
+    // that a best-effort WS send cannot guarantee during page unload.
+    _httpServer.on("/api/settings/preview", HTTP_POST,
+        [this](AsyncWebServerRequest* req) {},
+        nullptr,
+        [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total) {
+            if (index == 0) {
+                req->_tempObject = new String();
+            }
+            String* body = static_cast<String*>(req->_tempObject);
+            body->concat(reinterpret_cast<const char*>(data), len);
+
+            if (index + len < total) {
+                return;
+            }
+
+            JsonDocument input;
+            DeserializationError err = deserializeJson(input, *body);
+            delete body;
+            req->_tempObject = nullptr;
+
+            if (err) {
+                JsonDocument doc;
+                doc["ok"]    = false;
+                doc["error"] = "JSON parse error";
+                _sendJson(req, 400, doc);
+                return;
+            }
+
+            int applied = 0;
+            if (input["values"].is<JsonObjectConst>()) {
+                applied = _applyConfigValues(input["values"].as<JsonObjectConst>());
+            } else {
+                const char* key = input["key"] | "";
+                if (strlen(key) > 0 && (input["value"].is<int>() || input["value"].is<float>())) {
+                    applied = Config::update(key, (int)input["value"].as<float>()) ? 1 : 0;
+                }
+            }
+
+            JsonDocument doc;
+            doc["ok"]      = (applied > 0);
+            doc["applied"] = applied;
+            if (applied <= 0) {
+                doc["error"] = "Keine gueltigen Werte";
+                _sendJson(req, 400, doc);
+                return;
+            }
+
+            JsonDocument resp;
+            resp["type"] = "config_values";
+            JsonDocument curDoc;
+            Config::getAll(curDoc);
+            resp["current"] = curDoc;
+            String buf;
+            serializeJson(resp, buf);
+            _ws.textAll(buf);
+
+            _sendJson200(req, doc);
+        }
+    );
+
     // --- GET /api/reboot ---
     _httpServer.on("/api/reboot", HTTP_GET, [this](AsyncWebServerRequest* req) {
         JsonDocument doc;
@@ -399,6 +462,11 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
             if (msg["value"].is<int>() || msg["value"].is<float>()) {
                 Config::update(key, (int)msg["value"].as<float>());
             }
+        }
+
+    } else if (strcmp(type, "config_preview_bulk") == 0) {
+        if (msg["values"].is<JsonObjectConst>()) {
+            _applyConfigValues(msg["values"].as<JsonObjectConst>());
         }
 
     } else if (strcmp(type, "config_save") == 0) {
@@ -601,6 +669,23 @@ void MundMausServer::_sendJson200(AsyncWebServerRequest* req, JsonDocument& doc)
     _sendJson(req, 200, doc);
 }
 
+int MundMausServer::_applyConfigValues(JsonObjectConst values) {
+    int applied = 0;
+    for (JsonPairConst kv : values) {
+        const char* key = kv.key().c_str();
+        if (key == nullptr || strlen(key) == 0) {
+            continue;
+        }
+        if (!kv.value().is<int>() && !kv.value().is<float>()) {
+            continue;
+        }
+        if (Config::update(key, (int)kv.value().as<float>())) {
+            applied++;
+        }
+    }
+    return applied;
+}
+
 // ============================================================
 // OTA JSON BUILDER
 // ============================================================
@@ -689,6 +774,17 @@ void MundMausServer::_updateTaskWrapper(void* param) {
                 });
             if (fwOk) needsReboot = true;
             else ok = false;
+        }
+    }
+
+    if (!needsReboot) {
+        Updater::CheckResult refreshed = Updater::checkManifest();
+        if (!refreshed.offline) {
+            self->setUpdateResult(refreshed);
+        } else if (ok) {
+            Updater::CheckResult resolved;
+            resolved.offline = false;
+            self->setUpdateResult(resolved);
         }
     }
 
