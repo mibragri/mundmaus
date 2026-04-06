@@ -48,6 +48,12 @@ class StaticChecker:
         self._check_opacity_minimums()
         self._check_puff_visibility()
         self._check_action_btn_visibility()
+        self._check_card_proportions()
+        self._check_win_overlay_clear()
+        self._check_ws_dot_in_header()
+        self._check_idle_overlay()
+        self._check_kiosk_mode()
+        self._check_portal_link()
         return len(self.errors) == 0
 
     def _check_charge_nav(self):
@@ -157,6 +163,39 @@ class StaticChecker:
                 h = float(match.group(1))
                 if h < 14.0:
                     self.warnings.append(f"CARD_H={h} < 14.0 — cards may look squished")
+
+    def _check_win_overlay_clear(self):
+        # Win message must be cleared on new game (prevents sticky overlay)
+        if "message" in self.content and "className" in self.content:
+            # Game has a message element — check if initGame/startGame/newGame clears it
+            for fn in ["initGame", "newGameState", "startGame", "createBoard"]:
+                match = re.search(rf'function {fn}\s*\([^)]*\)\s*\{{', self.content)
+                if match:
+                    body = self.content[match.end():match.end()+800]
+                    if "message" in self.content and "show win" in self.content:
+                        if "className" not in body and "''" not in body:
+                            self.errors.append(f"{fn}() may not clear win overlay — message.className not reset")
+                    break
+
+    def _check_ws_dot_in_header(self):
+        # WS status dot should be inside the h1 (between MundMaus and game name)
+        if '<span id="ws-status"' not in self.content:
+            if '<div id="ws-status"' in self.content:
+                self.errors.append("ws-status is a <div> (should be <span> inside h1 for inline display)")
+            elif "ws-status" in self.content:
+                self.warnings.append("ws-status exists but may not be inline in header")
+
+    def _check_idle_overlay(self):
+        if "idle-overlay" not in self.content and "idle_overlay" not in self.content:
+            self.warnings.append("No idle overlay — screen may burn in on OLED/plasma if left unattended")
+
+    def _check_kiosk_mode(self):
+        if "toggleKiosk" not in self.content and "kiosk" not in self.content.lower():
+            self.warnings.append("No kiosk mode — patient may be confused by UI clutter")
+
+    def _check_portal_link(self):
+        if "location.href='/'" not in self.content and "location.href = '/'" not in self.content:
+            self.warnings.append("No portal link (P key) — user cannot navigate back to game selection")
 
 
 # ══════════════════════════════════════════════════════════════
