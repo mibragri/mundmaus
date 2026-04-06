@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "files": {
     "firmware.bin": {
-      "version": 40,
+      "version": 41,
       "firmware": true
     },
     "www/chess.html.gz": {
@@ -18,7 +18,7 @@
       "version": 6
     },
     "www/settings.html.gz": {
-      "version": 5
+      "version": 7
     },
     "www/solitaire.html.gz": {
       "version": 28

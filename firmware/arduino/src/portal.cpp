@@ -19,102 +19,95 @@ static const char PORTAL_HEAD[] PROGMEM = R"==(<!DOCTYPE html><html lang="de"><h
 body{font-family:system-ui,sans-serif;background:#000000;color:#e0e0e0;
 min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:2em}
 h1{font-size:clamp(2em,5vw,3.5em);color:#76FF03;margin-bottom:.2em}
-.sub{color:#78909c;margin-bottom:1.5em}
 .gs{display:flex;flex-wrap:wrap;gap:1.5em;justify-content:center;max-width:800px}
 .g{display:flex;align-items:center;justify-content:center;width:220px;height:120px;
 background:linear-gradient(135deg,#1a1a1a,#111111);border:2px solid rgba(118,255,3,.3);border-radius:16px;
 color:#76FF03;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}
 .g:hover{border-color:#76FF03;transform:scale(1.05);box-shadow:0 0 20px rgba(118,255,3,.3)}
-.wf{background:rgba(255,255,255,.04);border:1px solid #333;border-radius:12px;padding:1.2em;
-margin-top:2em;max-width:500px;width:100%}
-.wf h2{font-size:1.1em;color:#76FF03;margin-bottom:.8em;display:flex;align-items:center;gap:.5em}
-.wf label{font-size:.85em;color:#aaa;display:block;margin-bottom:.3em}
-.wf select,.wf input{width:100%;padding:8px;margin-bottom:.8em;background:#1a1a1a;
-border:1px solid #444;border-radius:6px;color:#fff;font-size:15px}
-.wf select:focus,.wf input:focus{border-color:#76FF03;outline:none}
-.wf button{padding:10px 16px;border:none;border-radius:6px;font-size:15px;font-weight:600;cursor:pointer}
-.wb{background:#76FF03;color:#000;width:100%}
-.wb:hover{background:#a0ff50}
-.wsc{background:#333;color:#ccc;margin-bottom:.8em;width:100%}
-.wsc:hover{background:#444}
-.wm{font-size:.85em;color:#76FF03;margin-top:.5em;min-height:1.2em}
-.rb{background:#8b0000;color:#fff;padding:8px 20px;border:none;border-radius:6px;
-font-size:.9em;cursor:pointer;margin-top:1.5em}
-.rb:hover{background:#a00}
-.i{margin-top:1.5em;color:#546e7a;font-size:.85em;text-align:center}
-code{background:#1a2a3a;padding:2px 6px;border-radius:4px;color:#80cbc4}
+.upd-btn{display:none;width:100%;max-width:500px;padding:16px;margin-bottom:2em;
+background:#76FF03;color:#000;border:none;border-radius:12px;font-size:1.2em;
+font-weight:700;cursor:pointer;text-align:center}
+.upd-btn:hover{background:#a0ff50}
+.upd-bar{background:#333;border-radius:4px;height:20px;margin:8px 0;max-width:500px;width:100%;display:none}
+.upd-fill{background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s}
+.upd-status{font-size:.85em;color:#aaa;margin-bottom:1em;display:none}
+.settings-gear{position:fixed;bottom:1.5em;right:1.5em;color:rgba(255,255,255,0.3);
+font-size:1.5em;text-decoration:none;transition:color .2s}
+.settings-gear:hover{color:rgba(255,255,255,0.6)}
 </style></head><body>
 <h1>MundMaus</h1>)==";
 
 static const char PORTAL_SETTINGS_LINK[] PROGMEM =
-    R"==(<a href="/www/settings.html" style="display:inline-flex;align-items:center;gap:6px;)=="
-    R"==(color:#78909c;text-decoration:none;font-size:.9em;margin-top:1.5em;padding:8px 16px;)=="
-    R"==(border:1px solid #333;border-radius:8px;transition:all .2s">&#9881; Einstellungen / Settings</a>)==";
+    R"==(<a href="/www/settings.html" class="settings-gear">&#9881;</a>)==";
 
-static const char PORTAL_UPDATE_SECTION[] PROGMEM = R"==(<div class="wf" id="upd" style="display:none">
-<h2>Software</h2>
-<div id="upd-info"></div>
-<button class="wb" id="upd-btn" onclick="startUpdate()" style="display:none">&#11015; Install</button>
-<div id="upd-progress" style="display:none">
-<div style="background:#333;border-radius:4px;height:24px;margin:8px 0">
-<div id="upd-bar" style="background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s"></div>
-</div>
-<div id="upd-file" style="font-size:.85em;color:#aaa"></div>
-</div>
-</div>)==";
-
-static const char PORTAL_WIFI_FORM_BOTTOM[] PROGMEM =
-    R"==(<button class="wsc" onclick="sc()">&#128269; Scan</button>)=="
-    R"==(<div class="wm" id="wm"></div>)=="
-    R"==(<select id="sl" onchange="document.getElementById('si').value=this.value" style="display:none"></select>)=="
-    R"==(<label>SSID</label>)=="
-    R"==(<input id="si" placeholder="SSID">)=="
-    R"==(<label>Passwort / Password</label>)=="
-    R"==(<input id="pw" type="password" placeholder="Passwort / Password">)=="
-    R"==(<button class="wb" onclick="sv()">Connect</button>)=="
-    R"==(</div>)==";
-
-static const char PORTAL_REBOOT_BTN[] PROGMEM =
-    R"==(<button class="rb" onclick="rb()">&#8635; Restart</button>)==";
-
-static const char PORTAL_KEYBOARD_HINT[] PROGMEM =
-    R"==(<div style="margin-top:1em;color:#546e7a;font-size:.8em">)=="
-    R"==(<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#8592;&#8593;&#8594;&#8595;</kbd> )=="
-    R"==(<kbd style="background:#1a2a3a;padding:1px 5px;border-radius:3px;color:#80cbc4">&#9166;</kbd>)=="
-    R"==(</div>)==";
+static const char PORTAL_UPDATE_SECTION[] PROGMEM =
+    R"==(<button class="upd-btn" id="upd-btn" onclick="startUpdate()">&#128260; Aktualisieren</button>)=="
+    R"==(<div class="upd-bar" id="upd-bar-wrap"><div class="upd-fill" id="upd-fill"></div></div>)=="
+    R"==(<div class="upd-status" id="upd-status"></div>)==";
 
 static const char PORTAL_SCRIPT[] PROGMEM = R"==(<script>
-// P1-4: /api/scan is now async — it kicks off a background scan and the
-// result arrives via WebSocket as a 'wifi_networks' message. We trigger the
-// scan here and rely on the ws.onmessage handler below to populate the list.
-async function sc(){document.getElementById('wm').textContent='\ud83d\udd0d...';try{await fetch('/api/scan')}
-catch(e){document.getElementById('wm').textContent='\u2717 Scan'}}
-function _fillNetworks(list){const s=document.getElementById('sl');if(!s)return;s.innerHTML='<option>-- select --</option>';list.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;s.appendChild(o)});s.style.display='block';document.getElementById('wm').textContent='\u2713 '+list.length}
-async function sv(){const s=document.getElementById('si').value,p=document.getElementById('pw').value;
-if(!s)return(document.getElementById('wm').textContent='SSID!');
-document.getElementById('wm').textContent='...';
-try{const r=await fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},
-body:JSON.stringify({ssid:s,password:p})}),d=await r.json();
-document.getElementById('wm').textContent=d.message||'OK'}
-catch(e){document.getElementById('wm').textContent='Fehler: '+e}}
-async function rb(){if(confirm('ESP32 neu starten?')){try{await fetch('/api/reboot')}catch(e){}
-document.getElementById('wm').textContent='Neustart...'}}
-function showUpd(d){const el=document.getElementById('upd'),info=document.getElementById('upd-info'),btn=document.getElementById('upd-btn');if(d.offline){el.style.display='none';return}el.style.display='block';if(d.available&&d.available.length>0){info.innerHTML='\u2b07 '+d.available.length+' update'+(d.available.length>1?'s':'');btn.textContent='\u2b07 Install';btn.onclick=startUpdate;btn.style.display='block'}else{info.innerHTML='\u2713 Up to date';btn.style.display='none'}}
-let _wsLost=0;
-function connectWS(){const ws=new WebSocket('ws://'+location.hostname+':81');ws.onopen=function(){if(_wsLost&&(Date.now()-_wsLost)>5000)location.reload();_wsLost=0;const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip');if(d)d.style.background='#4caf50';if(c){c.style.background='rgba(76,175,80,.15)';c.style.borderColor='#4caf50'};const t=document.getElementById('ws-text');if(t)t.textContent='\u2713';fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{})};ws.onclose=function(){if(!_wsLost)_wsLost=Date.now();const d=document.getElementById('ws-dot'),c=document.getElementById('ws-chip'),t=document.getElementById('ws-text');if(d)d.style.background='#d42a2a';if(c){c.style.background='rgba(212,42,42,.15)';c.style.borderColor='#d42a2a'};if(t)t.textContent='\u2717';setTimeout(connectWS,3000)};ws.onmessage=function(e){const d=JSON.parse(e.data);
-if(d.type==='wifi_networks'){_fillNetworks(d.networks||[])}
-else if(d.type==='update_status'){showUpd(d)}
-else if(d.type==='update_progress'){document.getElementById('upd-btn').style.display='none';document.getElementById('upd-progress').style.display='block';document.getElementById('upd-bar').style.width=(d.current/d.total*100)+'%';document.getElementById('upd-file').textContent='Datei '+d.current+'/'+d.total+': '+d.file}
-else if(d.type==='update_complete'){document.getElementById('upd-progress').style.display='none';document.getElementById('upd-info').textContent=d.message;document.getElementById('upd-btn').style.display='none';fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{})}
-else if(d.type==='update_error'){document.getElementById('upd-file').textContent='Fehler: '+d.file+' - '+d.error}
-else if(d.type==='nav'&&_navItems.length){if(d.dir==='right'||d.dir==='down'){_navIdx=Math.min(_navItems.length-1,_navIdx+1)}else if(d.dir==='left'||d.dir==='up'){_navIdx=Math.max(0,_navIdx-1)}  _navUpdate()}
-else if(d.type==='action'&&_navItems.length){_navItems[_navIdx].click()}};}connectWS();
-fetch('/api/updates').then(r=>r.json()).then(d=>showUpd(d)).catch(()=>{});
-async function startUpdate(){document.getElementById('upd-info').textContent='\u2b07...';document.getElementById('upd-btn').style.display='none';try{await fetch('/api/update/start',{method:'POST'})}catch(e){document.getElementById('upd-info').textContent='Fehler: '+e}}
-let _navIdx=0;const _navItems=document.querySelectorAll('.g');
-function _navUpdate(){_navItems.forEach((el,i)=>{el.style.border=i===_navIdx?'4px solid #00e5ff':'2px solid rgba(255,255,255,.15)';el.style.boxShadow=i===_navIdx?'0 0 24px rgba(0,229,255,.6)':'none'})}
-if(_navItems.length)_navUpdate();
-document.addEventListener('keydown',function(e){if(!_navItems.length)return;if(e.key==='ArrowRight'||e.key==='ArrowDown'){_navIdx=Math.min(_navItems.length-1,_navIdx+1);_navUpdate()}else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){_navIdx=Math.max(0,_navIdx-1);_navUpdate()}else if(e.key===' '||e.key==='Enter'){_navItems[_navIdx].click()}});
+function showUpd(d){
+  var btn=document.getElementById('upd-btn');
+  if(!d.offline && d.available && d.available.length>0){
+    btn.style.display='block';
+  } else {
+    btn.style.display='none';
+  }
+}
+function connectWS(){
+  var ws=new WebSocket('ws://'+location.hostname+':81');
+  ws.onopen=function(){
+    fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
+  };
+  ws.onclose=function(){setTimeout(connectWS,3000)};
+  ws.onmessage=function(e){
+    var d=JSON.parse(e.data);
+    if(d.type==='update_status') showUpd(d);
+    else if(d.type==='update_progress'){
+      document.getElementById('upd-btn').style.display='none';
+      document.getElementById('upd-bar-wrap').style.display='block';
+      document.getElementById('upd-fill').style.width=(d.current/d.total*100)+'%';
+      document.getElementById('upd-status').style.display='block';
+      document.getElementById('upd-status').textContent=d.current+'/'+d.total;
+    }
+    else if(d.type==='update_complete'){
+      document.getElementById('upd-status').textContent='Fertig \u2014 Neustart...';
+      setTimeout(function(){fetch('/api/reboot').catch(function(){})},1000);
+    }
+    else if(d.type==='update_error'){
+      document.getElementById('upd-status').textContent='Fehler: '+d.file;
+    }
+    else if(d.type==='nav'&&_navItems.length){
+      if(d.dir==='right'||d.dir==='down') _navIdx=Math.min(_navItems.length-1,_navIdx+1);
+      else if(d.dir==='left'||d.dir==='up') _navIdx=Math.max(0,_navIdx-1);
+      _navUpdate();
+    }
+    else if(d.type==='action'&&_navItems.length){_navItems[_navIdx].click()}
+  };
+}
+connectWS();
+fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
+async function startUpdate(){
+  document.getElementById('upd-btn').textContent='\u231b...';
+  document.getElementById('upd-btn').disabled=true;
+  try{await fetch('/api/update/start',{method:'POST'})}
+  catch(e){document.getElementById('upd-status').textContent='Fehler'}
+}
+var _navIdx=0;
+var _navItems=document.querySelectorAll('.g');
+function _navUpdate(){
+  _navItems.forEach(function(el,i){
+    el.style.border=i===_navIdx?'4px solid #00e5ff':'2px solid rgba(118,255,3,.3)';
+    el.style.boxShadow=i===_navIdx?'0 0 24px rgba(0,229,255,.6)':'none';
+  });
+}
+if(_navItems.length) _navUpdate();
+document.addEventListener('keydown',function(e){
+  if(!_navItems.length)return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown'){_navIdx=Math.min(_navItems.length-1,_navIdx+1);_navUpdate()}
+  else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){_navIdx=Math.max(0,_navIdx-1);_navUpdate()}
+  else if(e.key===' '||e.key==='Enter'){_navItems[_navIdx].click()}
+});
 </script>)==";
 
 // ============================================================
@@ -187,49 +180,12 @@ static void discoverGames(std::vector<GameEntry>& out) {
 }
 
 // ============================================================
-// HW STATUS CHIP HELPER
-// ============================================================
-
-static void appendHwChip(String& html, const char* label, bool ok) {
-    const char* bgColor   = ok ? "rgba(76,175,80,.15)"  : "rgba(212,42,42,.15)";
-    const char* borderClr = ok ? "#4caf50" : "#d42a2a";
-    const char* dotClr    = ok ? "#4caf50" : "#d42a2a";
-
-    html += F("<span title=\"");
-    html += label;
-    html += (ok ? " \xe2\x9c\x93" : " \xe2\x9c\x97");
-    html += F("\" style=\"display:inline-flex;align-items:center;gap:4px;background:");
-    html += bgColor;
-    html += F(";border:1px solid ");
-    html += borderClr;
-    html += F(";border-radius:12px;padding:2px 10px;font-size:.8em\"><span style=\"width:6px;height:6px;border-radius:50%;background:");
-    html += dotClr;
-    html += F("\"></span>");
-    html += label;
-    html += F("</span>");
-}
-
-// ============================================================
 // GENERATE PORTAL
 // ============================================================
 
 String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
-    // Pre-compute WiFi values
-    String modeStr  = wifi.mode;
-    String ssidStr  = wifi.ssid.length() > 0 ? wifi.ssid : String(Config::AP_SSID);
-    bool   connected = (modeStr == "station" && WiFi.isConnected());
-    String modeLabel = (modeStr == "station") ? "WLAN" : "Hotspot";
-
-    const char* dotColor;
-    if (connected) dotColor = "#4caf50";
-    else if (modeStr == "ap") dotColor = "#f0a030";
-    else dotColor = "#d42a2a";
-
-    auto [rssi, rssiLabel] = wifi.getRSSI();
-    String rssiText;
-    if (rssiLabel.length() > 0) {
-        rssiText = " (" + rssiLabel + ", " + String(rssi) + "dBm)";
-    }
+    (void)wifi;
+    (void)hw;
 
     // Discover games from LittleFS
     std::vector<GameEntry> games;
@@ -237,81 +193,27 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
 
     // Build game buttons
     String btns;
-    if (games.empty()) {
-        btns = F("<p style=\"color:#78909c\">Noch keine Spiele. Lade HTML in <code>www/</code></p>");
-    } else {
-        for (const auto& g : games) {
-            btns += "<a href=\"/www/" + g.filename + "\" class=\"g\">" + g.label + "</a>";
-        }
+    for (const auto& g : games) {
+        btns += "<a href=\"/www/" + g.filename + "\" class=\"g\">" + g.label + "</a>";
     }
-
-    // Free heap in KB
-    uint32_t heapKB = ESP.getFreeHeap() / 1024;
 
     // ---- Assemble HTML ----
     String html;
-    html.reserve(6144);
+    html.reserve(4096);
 
     // Head + title
     html += FPSTR(PORTAL_HEAD);
-
-    // Subtitle
-    html += F("<p class=\"sub\">Assistive Gaming Controller v");
-    html += Config::VERSION;
-    html += F("</p>");
 
     // Game buttons
     html += F("<div class=\"gs\">");
     html += btns;
     html += F("</div>");
 
-    // Settings link
-    html += FPSTR(PORTAL_SETTINGS_LINK);
-
-    // Update section
+    // Update section (hidden by default, shown by JS if updates available)
     html += FPSTR(PORTAL_UPDATE_SECTION);
 
-    // WiFi form
-    html += F("<div class=\"wf\">");
-    html += F("<h2><span class=\"wd\" style=\"width:10px;height:10px;border-radius:50%;background:");
-    html += dotColor;
-    html += F(";flex-shrink:0\"></span> ");
-    html += modeLabel;
-    html += F(": ");
-    html += ssidStr;
-    html += F(" - ");
-    html += wifi.ip;
-    html += rssiText;
-    html += F("</h2>");
-    html += FPSTR(PORTAL_WIFI_FORM_BOTTOM);
-
-    // Reboot button
-    html += FPSTR(PORTAL_REBOOT_BTN);
-
-    // Info bar with HW chips
-    html += F("<div class=\"i\" style=\"display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center\">");
-    html += wifi.ip;
-    html += F(" | ");
-    html += BOARD_NAME;
-    html += F(" | v");
-    html += Config::VERSION;
-    html += F(" | RAM: ");
-    html += String(heapKB);
-    html += F("KB ");
-
-    appendHwChip(html, "Joystick", hw.joystick);
-    appendHwChip(html, "Puff", hw.puff);
-
-    // WS connectivity chip (starts disconnected, JS updates it)
-    html += F("<span id=\"ws-chip\" title=\"Geraet erreichbar\" style=\"display:inline-flex;align-items:center;gap:4px;"
-              "background:rgba(212,42,42,.15);border:1px solid #d42a2a;border-radius:12px;padding:2px 10px;"
-              "font-size:.8em\"><span id=\"ws-dot\" style=\"width:6px;height:6px;border-radius:50%;"
-              "background:#d42a2a\"></span><span id=\"ws-text\">&#10007;</span></span>");
-
-    html += F("</div>");
-
-    // Keyboard hint
-    html += FPSTR(PORTAL_KEYBOARD_HINT);
+    // Settings gear (fixed bottom-right)
+    html += FPSTR(PORTAL_SETTINGS_LINK);
 
     // Script
     html += FPSTR(PORTAL_SCRIPT);
