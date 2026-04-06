@@ -342,13 +342,21 @@ void loop() {
         server->checkReboot();
     }
 
-    // I6: WiFi reconnect (check every 30s)
+    // I6: WiFi reconnect (check every 30s, non-blocking background task)
+    // connectStation() can block up to 49s (3x15s + backoff) which exceeds
+    // the 30s WDT timeout. Running it in a background task prevents WDT panic.
     static unsigned long lastWifiCheck = 0;
-    if (millis() - lastWifiCheck > 30000) {
+    static volatile bool wifiReconnecting = false;
+    if (millis() - lastWifiCheck > 30000 && !wifiReconnecting) {
         lastWifiCheck = millis();
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
-            Serial.println("  WiFi lost, reconnecting...");
-            wifi.connectStation();  // default 15s + retries
+            wifiReconnecting = true;
+            xTaskCreate([](void* param) {
+                Serial.println("  WiFi lost, reconnecting...");
+                static_cast<WiFiManager*>(param)->connectStation();
+                wifiReconnecting = false;
+                vTaskDelete(nullptr);
+            }, "wifi_recon", 4096, &wifi, 1, nullptr);
         }
     }
 

@@ -669,6 +669,7 @@ function initGame(seed) {
   tableau = [[], [], [], [], [], [], [], []];
   moves = 0; score = 0; undoStack = []; selectedCard = null; gameWon = false;
   autoCompleteRunning = false; hintSource = null; hintDest = null;
+  document.getElementById('message').className = '';
 
   // Deal: 4 columns of 7, 4 columns of 6
   let idx = 0;
@@ -1193,9 +1194,10 @@ function getSelCards() {
 }
 
 function isSamePos(sel, zone, col) {
-  if (sel.zone !== zone || sel.col !== col) return false;
-  if (zone === 'tableau') return resolveNavCardIdx(col) === sel.cardIdx;
-  return true;
+  // Same zone + same column = always deselect.
+  // Previously compared cardIdx which could mismatch after navigation
+  // (navCardIdx resets to -1 on left/right), trapping the user.
+  return sel.zone === zone && sel.col === col;
 }
 
 function selectCurrentCard() {
@@ -1635,6 +1637,7 @@ document.addEventListener('keyup', (e) => {
 
 let ws = null;
 let wsBackoff = 3000;
+let wsReconnectTimer = null;
 
 function connectWebSocket() {
   const host = location.hostname === '' || location.hostname === 'localhost' ? 'localhost' : location.hostname;
@@ -1674,7 +1677,8 @@ function connectWebSocket() {
     } catch(err) { console.log('WS parse error', err); } };
     ws.onclose = () => {
       console.log('WS disconnected'); updateWs(false);
-      setTimeout(connectWebSocket, wsBackoff);
+      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = setTimeout(() => { wsReconnectTimer = null; connectWebSocket(); }, wsBackoff);
       wsBackoff = Math.min(wsBackoff * 2, 30000);
     };
     ws.onerror = () => ws.close();

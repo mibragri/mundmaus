@@ -1690,6 +1690,14 @@ function action() {
   }
 
   if (ui.selected) {
+    // Clicking same piece = deselect
+    if (ui.selected[0] === r && ui.selected[1] === c) {
+      ui.selected = null;
+      ui.legalForSelected = [];
+      sndNav();
+      renderBoard();
+      return;
+    }
     // Try to move
     const move = ui.legalForSelected.find(m => m.tr === r && m.tc === c);
     if (move) {

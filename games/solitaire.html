@@ -651,6 +651,8 @@ function initGame() {
   const deck = shuffle(makeDeck());
   stock=[]; waste=[]; foundations=[[],[],[],[]]; tableau=[[],[],[],[],[],[],[]];
   moves=0; score=0; undoStack=[]; selectedCard=null; gameWon=false;
+  if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
+  document.getElementById('message').className='';
   for(let col=0;col<7;col++) for(let row=0;row<=col;row++){const c=deck.pop();c.faceUp=(row===col);tableau[col].push(c);}
   stock=deck.reverse(); stock.forEach(c=>c.faceUp=false);
   navZone='tableau'; navCol=0; navCardIdx=-1;
@@ -734,14 +736,15 @@ function getFaceUpRange(ci) {
 }
 function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉','win');} }
 function canAutoComplete() { return stock.length===0&&waste.length===0&&tableau.every(col=>col.every(c=>c.faceUp)); }
+let autoCompleteIv=null;
 function autoComplete() {
-  if(!canAutoComplete())return;
-  const iv=setInterval(()=>{
+  if(!canAutoComplete()||autoCompleteIv)return;
+  autoCompleteIv=setInterval(()=>{
     let moved=false;
     for(let ti=0;ti<7;ti++){if(!tableau[ti].length)continue;const c=tableau[ti][tableau[ti].length-1];
       for(let fi=0;fi<4;fi++){if(canPlaceOnFoundation(c,fi)){tableau[ti].pop();foundations[fi].push(c);score+=10;moved=true;break;}}if(moved)break;}
     moves++;render();updateStatus();sndPlace();
-    if(!moved||foundations.every(f=>f.length===13)){clearInterval(iv);checkWin();}
+    if(!moved||foundations.every(f=>f.length===13)){clearInterval(autoCompleteIv);autoCompleteIv=null;checkWin();}
   },150);
 }
 function showMessage(text,cls='') {
@@ -923,7 +926,7 @@ function computeTarget(dir) {
   if(dir==='down'&&z==='top'){
     z='tableau';if(c>=2)c=Math.min(c+1,6);else c=Math.min(c,6);ci=-1;
   }
-  if(dir==='down'&&navZone==='tableau'){
+  if(dir==='down'&&z==='tableau'){
     if(c===7){if(ci<3)ci++;else return null;}
     else{
       const{start,end,count}=getFaceUpRange(c);
@@ -1092,9 +1095,12 @@ function doPuff() {
 }
 
 function isSamePos(sel,zone,col) {
-  if(sel.zone!==zone||sel.col!==col)return false;
-  if(zone==='tableau')return resolveNavCardIdx(col)===resolveCardIdx('tableau',col,sel.cardIdx);
-  return true;
+  // Same zone + same column = always deselect.
+  // Previous code also compared cardIdx within tableau columns, but after
+  // horizontal navigation navCardIdx defaults to -1 (bottom card) which
+  // often differs from selectedCard.cardIdx — trapping the user with a
+  // card selected that can't be deselected by going back to the column.
+  return sel.zone===zone && sel.col===col;
 }
 
 function selectCurrentCard() {
@@ -1118,7 +1124,13 @@ function placeSelectedCard() {
   if(!moved&&navZone==='tableau'){
     if(canPlaceOnTableau(cards[0],navCol)){saveUndo();const src=getSrc(fz,fc);removeCards(src,fz,fc,cards.length);tableau[navCol].push(...cards);moves++;if(src==='foundation')score=Math.max(0,score-10);flipAfterRemove(fz,fc);sndPlace();moved=true;}
   }
-  if(!moved){sndError();render();updateStatus();return;}
+  if(!moved){
+    // If placement failed on the SOURCE column, deselect instead of error
+    // (prevents user getting stuck with unplaceable selection)
+    if(navZone===fz&&navCol===fc){selectedCard=null;sndNav();}
+    else sndError();
+    render();updateStatus();return;
+  }
   selectedCard=null;render();updateStatus();checkWin();
   if(canAutoComplete())setTimeout(()=>{showMessage('✨...','');setTimeout(autoComplete,800);},400);
 }
