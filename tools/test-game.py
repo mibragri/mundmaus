@@ -192,8 +192,10 @@ class StaticChecker:
                 self.warnings.append("ws-status exists but may not be inline in header")
 
     def _check_idle_overlay(self):
-        if "idle-overlay" not in self.content and "idle_overlay" not in self.content:
-            self.warnings.append("No idle overlay — screen may burn in on OLED/plasma if left unattended")
+        # Idle overlays are NOT wanted — they confuse non-technical caretakers.
+        # The patient or caretaker cannot dismiss them reliably.
+        if "idle-overlay" in self.content and "IDLE_TIMEOUT" in self.content:
+            self.warnings.append("Idle overlay present — may confuse caretakers. Consider removing or disabling.")
 
     def _check_kiosk_mode(self):
         if "toggleKiosk" not in self.content and "kiosk" not in self.content.lower():
