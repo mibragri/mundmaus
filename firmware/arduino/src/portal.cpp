@@ -54,28 +54,39 @@ function showUpd(d){
     btn.style.display='none';
   }
 }
+var _updating=false;
 function connectWS(){
   var ws=new WebSocket('ws://'+location.hostname+':81');
   ws.onopen=function(){
+    if(_updating){location.reload();return;}
     fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
   };
-  ws.onclose=function(){setTimeout(connectWS,3000)};
+  ws.onclose=function(){
+    if(_updating){
+      document.getElementById('upd-status').textContent='\u23f3 Neustart l\u00e4uft...';
+    }
+    setTimeout(connectWS,3000);
+  };
   ws.onmessage=function(e){
     var d=JSON.parse(e.data);
     if(d.type==='update_status') showUpd(d);
     else if(d.type==='update_progress'){
+      _updating=true;
       document.getElementById('upd-btn').style.display='none';
       document.getElementById('upd-bar-wrap').style.display='block';
       document.getElementById('upd-fill').style.width=(d.current/d.total*100)+'%';
       document.getElementById('upd-status').style.display='block';
-      document.getElementById('upd-status').textContent=d.current+'/'+d.total;
+      document.getElementById('upd-status').textContent='Datei '+d.current+' von '+d.total+'...';
     }
     else if(d.type==='update_complete'){
-      document.getElementById('upd-status').textContent='Fertig \u2014 Neustart...';
+      document.getElementById('upd-fill').style.width='100%';
+      document.getElementById('upd-status').textContent='\u2713 Fertig \u2014 Neustart...';
+      _updating=true;
       setTimeout(function(){fetch('/api/reboot').catch(function(){})},1000);
     }
     else if(d.type==='update_error'){
-      document.getElementById('upd-status').textContent='Fehler: '+d.file;
+      document.getElementById('upd-status').textContent='\u2717 Fehler: '+d.file;
+      _updating=false;
     }
     else if(d.type==='nav'&&_navItems.length){
       if(d.dir==='right'||d.dir==='down') _navIdx=Math.min(_navItems.length-1,_navIdx+1);
