@@ -320,14 +320,13 @@
 
   /* ── WS Status ──────────────────────────────── */
   #ws-status {
-    position: fixed;
-    top: 1vh;
-    right: calc(1 * var(--vw));
-    width: 10px;
-    height: 10px;
+    display: inline-block;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: #666;
-    z-index: 200;
+    margin: 0 calc(0.8 * var(--vw));
+    vertical-align: middle;
     transition: background 0.3s;
   }
   #ws-status.connected { background: #76ff03; box-shadow: 0 0 6px #76ff03; }
@@ -544,10 +543,8 @@
 </head>
 <body>
 
-<div id="ws-status" title="ESP32 ✗"></div>
-
 <div id="header">
-  <h1>Mund<span>Maus</span> Solitär</h1>
+  <h1>Mund<span>Maus</span> <span id="ws-status" title="ESP32"></span> Solitär</h1>
   <div id="puff-indicator"><span id="puff-icon">💨</span><div id="puff-track"><div id="puff-bar"></div></div></div>
   <div class="stat-bar">
     <div class="stat"><span class="label">#</span> <span class="value" id="moves">0</span></div>
