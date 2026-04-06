@@ -24,7 +24,7 @@ h1{font-size:clamp(2em,5vw,3.5em);color:#76FF03;margin-bottom:.2em}
 background:linear-gradient(135deg,#1a1a1a,#111111);border:2px solid rgba(118,255,3,.3);border-radius:16px;
 color:#76FF03;font-size:1.3em;font-weight:600;text-decoration:none;transition:all .2s}
 .g:hover{border-color:#76FF03;transform:scale(1.05);box-shadow:0 0 20px rgba(118,255,3,.3)}
-.upd-btn{display:none;width:100%;max-width:500px;padding:16px;margin-bottom:2em;
+.upd-btn{display:none;width:100%;max-width:500px;padding:16px;margin-bottom:1.5em;margin-top:0.5em;
 background:#76FF03;color:#000;border:none;border-radius:12px;font-size:1.2em;
 font-weight:700;cursor:pointer;text-align:center}
 .upd-btn:hover{background:#a0ff50}
@@ -204,13 +204,14 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     // Head + title
     html += FPSTR(PORTAL_HEAD);
 
+    // Update section (hidden by default, shown by JS if updates available)
+    // Placed ABOVE the game grid so it's the first thing the user sees
+    html += FPSTR(PORTAL_UPDATE_SECTION);
+
     // Game buttons
     html += F("<div class=\"gs\">");
     html += btns;
     html += F("</div>");
-
-    // Update section (hidden by default, shown by JS if updates available)
-    html += FPSTR(PORTAL_UPDATE_SECTION);
 
     // Settings gear (fixed bottom-right)
     html += FPSTR(PORTAL_SETTINGS_LINK);
