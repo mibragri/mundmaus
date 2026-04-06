@@ -810,7 +810,36 @@ function getSelCards() {
 
 function renderTableau() {
   const cont=document.getElementById('tableau');cont.innerHTML='';
-  const CARD_H=14.5,FDO=1.0,FUO=3.8;
+  const CARD_H=14.5,FDO=1.0;
+  // Dynamic FUO: shrink face-up offset so the tallest column + cursor bar
+  // fit into the available viewport height without scrolling.
+  const vw=window.innerWidth/100;
+  const gameEl=document.getElementById('game');
+  const topRowEl=document.getElementById('top-row');
+  const footerEl=document.getElementById('footer');
+  const headerEl=document.getElementById('header');
+  const usedPx=(headerEl?headerEl.offsetHeight:0)+(topRowEl?topRowEl.offsetHeight:0)+(footerEl?footerEl.offsetHeight:0)+20; // +20 for padding+cursor bar
+  const availVw=(window.innerHeight-usedPx)/vw;
+  // Find tallest column
+  let tallestH=CARD_H;
+  for(let ci=0;ci<7;ci++){
+    const col=tableau[ci];
+    const fd=col.filter(c=>!c.faceUp).length, fu=col.filter(c=>c.faceUp).length;
+    const h=fd*FDO+fu*3.8+CARD_H;
+    if(h>tallestH)tallestH=h;
+  }
+  // Scale FUO down if tallest column exceeds available space
+  let FUO=3.8;
+  if(tallestH>availVw){
+    // Find tallest column's face-up count for scaling
+    let maxFU=0, maxFD=0;
+    for(let ci=0;ci<7;ci++){
+      const col=tableau[ci];
+      const fd=col.filter(c=>!c.faceUp).length, fu=col.filter(c=>c.faceUp).length;
+      if(fd*FDO+fu*3.8+CARD_H>=tallestH){maxFU=fu;maxFD=fd;}
+    }
+    if(maxFU>0) FUO=Math.max(1.2,Math.min(3.8,(availVw-maxFD*FDO-CARD_H)/maxFU));
+  }
   let maxBottom=CARD_H; // minimum: one card height (empty slot)
   for(let ci=0;ci<7;ci++){
     const cd=document.createElement('div');cd.className='tableau-col';
