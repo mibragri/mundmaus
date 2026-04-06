@@ -54,6 +54,12 @@ class StaticChecker:
         self._check_idle_overlay()
         self._check_kiosk_mode()
         self._check_portal_link()
+        self._check_error_flash()
+        self._check_no_blue_rgba()
+        self._check_ultrawide_cap()
+        self._check_vw_cap()
+        self._check_colorblind_safe()
+        self._check_escape_key()
         return len(self.errors) == 0
 
     def _check_charge_nav(self):
@@ -196,6 +202,41 @@ class StaticChecker:
     def _check_portal_link(self):
         if "location.href='/'" not in self.content and "location.href = '/'" not in self.content:
             self.warnings.append("No portal link (P key) — user cannot navigate back to game selection")
+
+    def _check_error_flash(self):
+        # From fix d5bed9e: red error flash must be visible on invalid puff
+        if "sndError" in self.content:
+            if "flashError" not in self.content and "error-flash" not in self.content and "red" not in self.content.lower()[:self.content.lower().find("sndError")]:
+                self.warnings.append("sndError exists but no visual error flash — invalid actions may be silent")
+
+    def _check_no_blue_rgba(self):
+        # From fixes caf006b, df004fe: no blue backgrounds anywhere
+        matches = re.findall(r'rgba\(15,\s*52,\s*96[^)]*\)', self.content)
+        if matches:
+            self.errors.append(f"Blue rgba(15,52,96) still present ({len(matches)}x) — should be black")
+
+    def _check_ultrawide_cap(self):
+        # From fix 4f4e028: max-width 1920px prevents ultrawide stretching
+        if "max-width" not in self.content and "1920" not in self.content:
+            self.warnings.append("No max-width cap — layout may stretch on ultrawide monitors (34\" patient TV)")
+
+    def _check_vw_cap(self):
+        # From feedback_ultrawide_vw: --vw must use min(1vw, 19.2px)
+        if "--vw" in self.content:
+            if "min(1vw" not in self.content:
+                self.errors.append("--vw not capped with min(1vw, 19.2px) — will stretch on ultrawide")
+
+    def _check_colorblind_safe(self):
+        # From fix 75633eb: don't rely solely on red/green color distinction
+        # Check if selected state uses shape cues (badge, outline) not just color
+        if "selected" in self.content.lower():
+            if "badge" not in self.content.lower() and "outline" not in self.content.lower() and "border" not in self.content.lower():
+                self.warnings.append("Selection may rely only on color — add shape cues (badge/outline) for colorblind users")
+
+    def _check_escape_key(self):
+        # Every game should support Escape to go back to portal
+        if "'Escape'" not in self.content and '"Escape"' not in self.content:
+            self.warnings.append("No Escape key handler — user cannot exit to portal with Escape")
 
 
 # ══════════════════════════════════════════════════════════════
