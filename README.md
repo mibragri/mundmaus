@@ -20,7 +20,7 @@ Kosten: ~25 EUR | Aufbauzeit: ~30 Minuten | Nur der Drucksensor muss geloetet we
 ```
    Joystick ──┐
                ├── ESP32 ──── WiFi ──── Browser (TV/Monitor)
-Drucksensor ──┘                          Solitaire / Schach / Memo / ...
+Drucksensor ──┘                          6 Spiele (Solitaer, Schach, Freecell, Memo, Muehle, Vier gewinnt)
 ```
 
 ## Spiele
