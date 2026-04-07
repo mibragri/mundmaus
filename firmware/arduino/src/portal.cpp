@@ -31,7 +31,7 @@ font-weight:700;cursor:pointer;text-align:center}
 .upd-bar{background:#333;border-radius:4px;height:20px;margin:8px 0;max-width:500px;width:100%;display:none}
 .upd-fill{background:#FFD700;height:100%;border-radius:4px;width:0%;transition:width .3s}
 .upd-status{font-size:.85em;color:#aaa;margin-bottom:1em;display:none}
-.settings-gear{position:fixed;bottom:1.5em;right:1.5em;color:rgba(255,255,255,0.3);
+.settings-gear{position:fixed;bottom:1.5em;right:1.5em;color:#76FF03;
 font-size:1.5em;text-decoration:none;transition:color .2s}
 .settings-gear:hover{color:rgba(255,255,255,0.6)}
 </style></head><body>
@@ -227,9 +227,10 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     html += F("</div>");
 
     // Settings gear + version (fixed bottom-right)
-    html += F("<div class=\"settings-gear\"><span style=\"font-size:.55em;opacity:.5;margin-right:8px\">v");
+    html += F("<div class=\"settings-gear\"><span style=\"font-size:.6em;opacity:.6;margin-right:8px\">v");
     html += Config::VERSION;
-    html += F("</span><a href=\"/www/settings.html\" style=\"color:inherit;text-decoration:none\">&#9881;</a></div>");
+    html += F("</span><a href=\"/www/settings.html\" style=\"color:inherit;text-decoration:none\">&#9881;</a>"
+              " <span onclick=\"location.reload()\" style=\"cursor:pointer;margin-left:8px\">&#8635;</span></div>");
 
     // Script
     html += FPSTR(PORTAL_SCRIPT);

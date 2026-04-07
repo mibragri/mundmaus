@@ -75,7 +75,7 @@ void CalibratedJoystick::_readCentered(int& dx, int& dy) {
 // Axis hysteresis: once an axis becomes dominant, it must stay dominant
 // by at least HYSTERESIS_FACTOR (1.4x) to give up dominance. This prevents
 // rapid X/Y flipping on diagonal joystick holds due to ADC noise.
-static constexpr float HYSTERESIS_FACTOR = 1.4f;
+static constexpr float HYSTERESIS_FACTOR = 1.15f;
 
 const char* CalibratedJoystick::_getDirection() {
     int dx, dy;
@@ -98,7 +98,8 @@ const char* CalibratedJoystick::_getDirection() {
         if (dy < -Config::NAV_THRESHOLD) { _lastAxis = 'y'; return "up"; }
         if (dy >  Config::NAV_THRESHOLD) { _lastAxis = 'y'; return "down"; }
     }
-    if (abs(dx) == 0 && abs(dy) == 0) _lastAxis = 0;
+    // No direction detected — clear axis lock so next direction starts fresh
+    _lastAxis = 0;
     return nullptr;
 }
 
@@ -145,7 +146,8 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
         return dir;
     }
 
-    if (abs(dx) == 0 && abs(dy) == 0) _lastAxis = 0;
+    // No direction detected — clear axis lock so next direction starts fresh
+    _lastAxis = 0;
     _lastIntensity = 0;
     outIntensity = 0;
     return nullptr;
