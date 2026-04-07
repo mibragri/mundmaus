@@ -76,7 +76,7 @@ function connectWS(){
       document.getElementById('upd-bar-wrap').style.display='block';
       document.getElementById('upd-fill').style.width=(d.current/d.total*100)+'%';
       document.getElementById('upd-status').style.display='block';
-      document.getElementById('upd-status').textContent='Datei '+d.current+' von '+d.total+'...';
+      document.getElementById('upd-status').textContent='Aktualisierung l\u00e4uft...';
     }
     else if(d.type==='update_complete'){
       document.getElementById('upd-fill').style.width='100%';
