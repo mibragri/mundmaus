@@ -657,6 +657,7 @@ function initGame() {
   stock=[]; waste=[]; foundations=[[],[],[],[]]; tableau=[[],[],[],[],[],[],[]];
   moves=0; score=0; undoStack=[]; selectedCard=null; gameWon=false;
   if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
+  if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
   document.getElementById('message').className='';
   for(let col=0;col<7;col++) for(let row=0;row<=col;row++){const c=deck.pop();c.faceUp=(row===col);tableau[col].push(c);}
   stock=deck.reverse(); stock.forEach(c=>c.faceUp=false);
@@ -741,7 +742,7 @@ function getFaceUpRange(ci) {
 }
 function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉','win');} }
 function canAutoComplete() { return stock.length===0&&waste.length===0&&tableau.every(col=>col.every(c=>c.faceUp)); }
-let autoCompleteIv=null;
+let autoCompleteIv=null,autoCompleteTimer=null;
 function autoComplete() {
   if(!canAutoComplete()||autoCompleteIv)return;
   autoCompleteIv=setInterval(()=>{
@@ -1167,7 +1168,7 @@ function placeSelectedCard() {
     render();updateStatus();return;
   }
   selectedCard=null;render();updateStatus();checkWin();
-  if(canAutoComplete())setTimeout(()=>{showMessage('✨...','');setTimeout(autoComplete,800);},400);
+  if(canAutoComplete())autoCompleteTimer=setTimeout(()=>{showMessage('✨...','');autoCompleteTimer=setTimeout(autoComplete,800);},400);
 }
 
 function getSrc(z,c) { if(z==='top'&&c===1)return'waste';if(z==='top'&&c>=2)return'foundation';return'tableau'; }

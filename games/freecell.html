@@ -651,7 +651,7 @@ let lastNavTime = 0, navCooldown = 1000, kbSimMode = false;
 let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
 fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 let dealNumber = 1;
-let autoCompleteRunning = false;
+let autoCompleteRunning = false, autoCompleteIv = null, autoCompleteTimer = null;
 let hintSource = null, hintDest = null;
 const IDLE_TIMEOUT = 120000;
 const ACTION_COUNT = 5;
@@ -675,6 +675,8 @@ function initGame(seed) {
   tableau = [[], [], [], [], [], [], [], []];
   moves = 0; score = 0; undoStack = []; selectedCard = null; gameWon = false;
   autoCompleteRunning = false; hintSource = null; hintDest = null;
+  if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
+  if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
   document.getElementById('message').className = '';
 
   // Deal: 4 columns of 7, 4 columns of 6
@@ -804,7 +806,7 @@ function canAutoComplete() {
 function autoComplete() {
   if (autoCompleteRunning) return;
   autoCompleteRunning = true;
-  const iv = setInterval(() => {
+  autoCompleteIv = setInterval(() => {
     let moved = false;
     // Try free cells first
     for (let fi = 0; fi < 4; fi++) {
@@ -834,7 +836,8 @@ function autoComplete() {
     }
     moves++; render(); updateStatus(); sndPlace();
     if (!moved || foundations.every(f => f.length === 13)) {
-      clearInterval(iv);
+      clearInterval(autoCompleteIv);
+      autoCompleteIv = null;
       autoCompleteRunning = false;
       checkWin();
     }
@@ -1300,7 +1303,7 @@ function placeSelectedCard() {
   hintSource = null; hintDest = null;
   render(); updateStatus(); checkWin();
   if (!gameWon && canAutoComplete()) {
-    setTimeout(() => { showMessage('✨...', ''); setTimeout(autoComplete, 800); }, 400);
+    autoCompleteTimer = setTimeout(() => { showMessage('✨...', ''); autoCompleteTimer = setTimeout(autoComplete, 800); }, 400);
   }
 }
 
