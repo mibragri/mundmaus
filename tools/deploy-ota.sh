@@ -52,17 +52,13 @@ if missing:
 print('  All source files present')
 "
 
-# --- ESP32 test gate (skip with --skip-test) ---
+# --- Game quality gate (skip with --skip-test) ---
 if [[ "${1:-}" != "--skip-test" ]]; then
-    if [[ -f "$SCRIPT_DIR/test-esp32.sh" ]]; then
-        echo -e "\n${YELLOW}--- Running ESP32 tests ---${NC}"
-        bash "$SCRIPT_DIR/test-esp32.sh" || {
-            echo -e "${RED}ESP32 tests failed. Aborting deploy.${NC}"
-            exit 1
-        }
-    else
-        echo -e "${YELLOW}  test-esp32.sh not found, skipping hardware test${NC}"
-    fi
+    echo -e "\n${YELLOW}--- Running game quality gate ---${NC}"
+    python3 "$SCRIPT_DIR/test-game.py" --all || {
+        echo -e "${RED}Quality gate failed. Aborting deploy.${NC}"
+        exit 1
+    }
 fi
 
 # --- Deploy ---
