@@ -517,6 +517,9 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
     } else if (strcmp(type, "calibrate") == 0) {
         // I3: Don't block async handler -- set flag, sensor task handles it
         calibrateRequested = true;
+    } else if (strcmp(type, "debug_joy") == 0) {
+        debugJoystick = !debugJoystick;
+        Serial.printf("  Debug joystick: %s\n", debugJoystick ? "ON" : "OFF");
     }
 }
 
@@ -637,6 +640,14 @@ void MundMausServer::processSensorQueue() {
             doc["type"]  = "update_error";
             doc["file"]  = ev.data;
             doc["error"] = ev.data;  // error detail in data field
+            break;
+        case SensorEvent::DEBUG_JOYSTICK:
+            doc["type"]  = "debug_joy";
+            doc["rawX"]  = ev.intVal;
+            doc["rawY"]  = ev.intVal2;
+            doc["dx"]    = ev.intVal3;
+            // dy, dir, axis stored in data as "dy,dir,axis"
+            doc["info"]  = ev.data;
             break;
         case SensorEvent::UPDATE_RESULT:
             // Result was already set by the caller (OTA task or periodic check).

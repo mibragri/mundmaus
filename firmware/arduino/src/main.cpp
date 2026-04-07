@@ -105,6 +105,27 @@ static void sensorTask(void* param) {
             }
         }
 
+        // -- Debug joystick stream (10Hz, toggled via WS "debug_joy") --
+        if (joystick && server && server->debugJoystick) {
+            static unsigned long lastDebug = 0;
+            if ((now - lastDebug) >= 100) {
+                lastDebug = now;
+                int dx = joystick->rawX - joystick->centerX;
+                int dy = joystick->rawY - joystick->centerY;
+                SensorEvent ev;
+                ev.type = SensorEvent::DEBUG_JOYSTICK;
+                ev.intVal  = joystick->rawX;
+                ev.intVal2 = joystick->rawY;
+                ev.intVal3 = dx;
+                // Pack dy, direction, axis into data string
+                snprintf(ev.data, sizeof(ev.data), "%d,%s,%c",
+                    dy,
+                    holdState ? holdState : "none",
+                    joystick->lastAxis() ? joystick->lastAxis() : '-');
+                xQueueSend(server->sensorQueue(), &ev, 0);
+            }
+        }
+
         // -- Puff sensor --
         if (puffSensor) {
             puffSensor->poll();

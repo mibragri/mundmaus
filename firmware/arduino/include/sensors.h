@@ -30,6 +30,9 @@ public:
     /// Last sampled raw values (valid after sampleRaw())
     int rawX = 0, rawY = 0;
 
+    /// Current dominant axis for debug ('x', 'y', or 0)
+    char lastAxis() const { return _lastAxis; }
+
     /// Continuous state: direction + intensity (0-1). Returns nullptr if idle.
     const char* getState(float& outIntensity);
 

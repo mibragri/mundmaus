@@ -17,7 +17,8 @@ class PuffSensor;
 // Thread-safe event for sensor->WS bridge (I1)
 struct SensorEvent {
     enum Type { NAV, NAV_HOLD, NAV_RELEASE, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
-                UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT } type;
+                UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT,
+                DEBUG_JOYSTICK } type;
     char data[64];   // direction string, action kind, or filename/message
     float value;     // for puff_level
     int intVal;      // for progress current/total, calibrate centerX
@@ -56,6 +57,9 @@ public:
 
     /// Set by WS handler, checked by sensor task (I3: non-blocking calibrate)
     volatile bool calibrateRequested = false;
+
+    /// ADC debug stream — toggled via WS command "debug_joy", sends raw values at 10Hz
+    volatile bool debugJoystick = false;
 
     /// Hardware status (set by main before start)
     struct HwStatus {
