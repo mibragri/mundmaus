@@ -99,10 +99,13 @@ function connectWS(){
 connectWS();
 fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
 async function startUpdate(){
+  _updating=true;
   document.getElementById('upd-btn').textContent='\u231b...';
   document.getElementById('upd-btn').disabled=true;
+  document.getElementById('upd-status').style.display='block';
+  document.getElementById('upd-status').textContent='Starte...';
   try{await fetch('/api/update/start',{method:'POST'})}
-  catch(e){document.getElementById('upd-status').textContent='Fehler'}
+  catch(e){document.getElementById('upd-status').textContent='Fehler';_updating=false;}
 }
 var _navIdx=0;
 var _navItems=document.querySelectorAll('.g');
