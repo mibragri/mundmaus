@@ -111,4 +111,5 @@ private:
     void _startAsyncScan();
     static void _wifiScanTaskWrapper(void* param);
     std::atomic<bool> _wifiScanRunning{false};
+    std::atomic<bool> _checkRunning{false};
 };

@@ -306,15 +306,19 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
 
         // Spawn one-shot task to re-check manifest and broadcast result
+        bool expected = false;
+        if (!_checkRunning.compare_exchange_strong(expected, true)) {
+            return;  // check already in progress
+        }
         xTaskCreate([](void* param) {
             auto* srv = static_cast<MundMausServer*>(param);
             Updater::CheckResult result = Updater::checkManifest();
             srv->setUpdateResult(result);
-            // Push UPDATE_RESULT so processSensorQueue broadcasts to WS clients
             SensorEvent ev;
             ev.type = SensorEvent::UPDATE_RESULT;
             ev.data[0] = '\0';
             xQueueSend(srv->sensorQueue(), &ev, 0);
+            srv->_checkRunning = false;
             vTaskDelete(nullptr);
         }, "upd_check", 8192, this, 1, nullptr);
     });
