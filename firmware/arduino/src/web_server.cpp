@@ -298,13 +298,25 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
     });
 
-    // --- POST /api/updates/check --- I4: reboot to re-check (matches MicroPython)
+    // --- POST /api/updates/check --- Fresh manifest check (non-blocking background task)
     _httpServer.on("/api/updates/check", HTTP_POST, [this](AsyncWebServerRequest* req) {
         JsonDocument doc;
         doc["ok"]      = true;
-        doc["message"] = "Neustart fuer Update-Pruefung...";
+        doc["message"] = "Pruefe...";
         _sendJson200(req, doc);
-        _pendingReboot = millis() | 1;  // I3: ensure nonzero; OTA check runs automatically on boot
+
+        // Spawn one-shot task to re-check manifest and broadcast result
+        xTaskCreate([](void* param) {
+            auto* srv = static_cast<MundMausServer*>(param);
+            Updater::CheckResult result = Updater::checkManifest();
+            srv->setUpdateResult(result);
+            // Push UPDATE_RESULT so processSensorQueue broadcasts to WS clients
+            SensorEvent ev;
+            ev.type = SensorEvent::UPDATE_RESULT;
+            ev.data[0] = '\0';
+            xQueueSend(srv->sensorQueue(), &ev, 0);
+            vTaskDelete(nullptr);
+        }, "upd_check", 8192, this, 1, nullptr);
     });
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)

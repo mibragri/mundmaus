@@ -59,7 +59,7 @@ function connectWS(){
   var ws=new WebSocket('ws://'+location.hostname+':81');
   ws.onopen=function(){
     if(_updating){location.reload();return;}
-    fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
+    fetch('/api/updates/check',{method:'POST'}).catch(function(){});
   };
   ws.onclose=function(){
     if(_updating){
@@ -97,7 +97,7 @@ function connectWS(){
   };
 }
 connectWS();
-fetch('/api/updates').then(function(r){return r.json()}).then(function(d){showUpd(d)}).catch(function(){});
+// Initial check triggered via WS onopen → /api/updates/check
 async function startUpdate(){
   _updating=true;
   document.getElementById('upd-btn').textContent='\u231b...';
