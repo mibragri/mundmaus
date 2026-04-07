@@ -3,11 +3,14 @@
   "private": true,
   "scripts": {
     "test": "npx playwright test",
+    "test:local": "npx playwright test charge consistency solitaire ota-manifest",
     "test:portal": "npx playwright test portal",
     "test:chess": "npx playwright test chess",
     "test:memo": "npx playwright test memo",
     "test:solitaire": "npx playwright test solitaire",
-    "test:consistency": "npx playwright test consistency"
+    "test:consistency": "npx playwright test consistency",
+    "test:charge": "npx playwright test charge",
+    "test:ota": "npx playwright test ota-manifest ota-files"
   },
   "devDependencies": {
     "@playwright/test": "^1.50.0"

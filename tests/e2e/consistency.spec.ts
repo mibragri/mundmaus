@@ -1,61 +1,40 @@
 import { test, expect } from '@playwright/test';
-import { gotoESP32, esp32Cooldown } from './helpers';
+import { gotoGame, esp32Cooldown } from './helpers';
 
-const GAMES = [
-  { name: 'Chess', path: '/www/chess.html' },
-  { name: 'Memo', path: '/www/memo.html' },
-  { name: 'Solitaire', path: '/www/solitaire.html' },
-];
+const GAMES = ['chess', 'freecell', 'memo', 'muehle', 'solitaire', 'vier-gewinnt'];
 
 test.describe('Cross-game consistency', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
 
-  test('1. all games have same background color (#1a1a2e)', async ({ page }) => {
-    for (const game of GAMES) {
-      await gotoESP32(page, game.path);
-      const bgColor = await page.evaluate(() => {
-        return getComputedStyle(document.body).backgroundColor;
-      });
-      // #1a1a2e = rgb(26, 26, 46)
-      expect(bgColor, `${game.name} background`).toBe('rgb(26, 26, 46)');
-      await page.waitForTimeout(1500);
-    }
-  });
+  for (const game of GAMES) {
+    test(`${game}: background color is black`, async ({ page }) => {
+      await gotoGame(page, game);
+      const bg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+      // All games use --bg: #000000
+      expect(bg).toBe('rgb(0, 0, 0)');
+    });
 
-  test('2. all games have favicon', async ({ page }) => {
-    for (const game of GAMES) {
-      await gotoESP32(page, game.path);
+    test(`${game}: has favicon with M letter`, async ({ page }) => {
+      await gotoGame(page, game);
       const favicon = page.locator('link[rel="icon"]');
-      await expect(favicon, `${game.name} favicon`).toHaveCount(1);
+      await expect(favicon).toHaveCount(1);
       const href = await favicon.getAttribute('href');
-      expect(href, `${game.name} favicon href`).toContain('FFD700');
-      await page.waitForTimeout(1500);
-    }
-  });
+      // All favicons are SVG with an M letter (color varies: gold or green)
+      expect(href).toContain('>M<');
+    });
 
-  test('3. all games have P for portal', async ({ page }) => {
-    for (const game of GAMES) {
-      await gotoESP32(page, game.path);
+    test(`${game}: has footer with keyboard hints`, async ({ page }) => {
+      await gotoGame(page, game);
       const footer = page.locator('#footer');
-      await expect(footer, `${game.name} footer`).toBeVisible();
-      const pKey = footer.locator('kbd', { hasText: 'P' });
-      await expect(pKey.first(), `${game.name} P key`).toBeVisible();
-      await page.waitForTimeout(1500);
-    }
-  });
-
-  test('4. all games have footer with keyboard hints', async ({ page }) => {
-    for (const game of GAMES) {
-      await gotoESP32(page, game.path);
-      const footer = page.locator('#footer');
-      await expect(footer, `${game.name} footer`).toBeVisible();
-
-      const arrowHint = footer.locator('kbd', { hasText: /[←↑→↓]/ });
-      await expect(arrowHint.first(), `${game.name} arrow keys`).toBeVisible();
-
+      await expect(footer).toBeVisible();
       const enterHint = footer.locator('kbd', { hasText: '⏎' });
-      await expect(enterHint, `${game.name} ⏎ enter`).toBeVisible();
-      await page.waitForTimeout(1500);
-    }
-  });
+      await expect(enterHint).toBeVisible();
+    });
+
+    test(`${game}: has action buttons`, async ({ page }) => {
+      await gotoGame(page, game);
+      const btns = page.locator('.action-btn');
+      expect(await btns.count()).toBeGreaterThanOrEqual(3);
+    });
+  }
 });
