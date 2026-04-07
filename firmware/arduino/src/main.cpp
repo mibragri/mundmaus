@@ -27,8 +27,6 @@ static volatile unsigned long sensorHeartbeat = 0;
 static void sensorTask(void* param) {
     (void)param;
 
-    unsigned long idleStart = millis();
-    unsigned long lastRecal = millis();
     unsigned long lastPuffSend = 0;
 
     for (;;) {
@@ -66,13 +64,11 @@ static void sensorTask(void* param) {
             const char* nav = joystick->pollNavigation();
             if (nav) {
                 server->sendNav(nav);
-                idleStart = now;
             }
 
             // -- Joystick button --
             if (joystick->pollButton()) {
                 server->sendAction("press");
-                idleStart = now;
             }
         }
 
@@ -90,8 +86,6 @@ static void sensorTask(void* param) {
                     lastHoldSend = now;
                 }
                 wasNavigating = true;
-                idleStart = now;  // CRITICAL: reset idle timer so auto-recal
-                                  // doesn't fire while joystick is held
             } else if (wasNavigating) {
                 // 100ms release debounce -- prevents brief deadzone crossings
                 // (joystick jitter) from firing premature nav_release events
@@ -105,10 +99,10 @@ static void sensorTask(void* param) {
             }
         }
 
-        // -- Debug joystick stream (10Hz, toggled via WS "debug_joy") --
+        // -- Debug joystick stream (5Hz, toggled via WS "debug_joy") --
         if (joystick && server && server->debugJoystick) {
             static unsigned long lastDebug = 0;
-            if ((now - lastDebug) >= 100) {
+            if ((now - lastDebug) >= 200) {
                 lastDebug = now;
                 int dx = joystick->rawX - joystick->centerX;
                 int dy = joystick->rawY - joystick->centerY;
@@ -142,57 +136,7 @@ static void sensorTask(void* param) {
             // Detect puff event
             if (puffSensor->detectPuff()) {
                 server->sendAction("puff");
-                idleStart = now;
             }
-        }
-
-        // -- Auto-recalibrate joystick when idle > 10s (max once per 60s) --
-        if (joystick) {
-            if (joystick->isIdle()) {
-                if ((now - idleStart) > (unsigned long)Config::DEFAULT_RECAL_IDLE_MS) {
-                    if ((now - lastRecal) > 60000) {
-                        joystick->calibrate(20);
-                        lastRecal = now;
-                        idleStart = now;
-                    }
-                }
-            } else {
-                idleStart = now;
-            }
-        }
-
-        // -- Drift guard (stability-based): if raw ADC readings are
-        // extremely stable for >30s while the stick sits outside the deadzone
-        // but below the navigation threshold, the calibrated center likely
-        // drifted. We explicitly avoid recalibrating while a real direction is
-        // active; false recalibration during an intentional hold is worse than
-        // waiting for the normal idle/manual calibration path.
-        if (joystick) {
-            static int prevRawX = 0, prevRawY = 0;
-            static unsigned long stableStart = 0;
-
-            // Use cached ADC values from sampleRaw() (single read per iteration)
-            int rawX = joystick->rawX;
-            int rawY = joystick->rawY;
-            bool isStable = abs(rawX - prevRawX) < 20 && abs(rawY - prevRawY) < 20;
-            bool belowNavThreshold = (holdState == nullptr) && !joystick->isIdle();
-
-            if (isStable) {
-                if (stableStart == 0) stableStart = now;
-                if (belowNavThreshold &&
-                    (now - stableStart) > 30000 &&
-                    (now - lastRecal) > 60000) {
-                    Serial.printf("  Drift detected (stable %lus): recalibrating\n",
-                                  (now - stableStart) / 1000);
-                    joystick->calibrate(20);
-                    lastRecal = now;
-                    stableStart = 0;
-                }
-            } else {
-                stableStart = 0;
-            }
-            prevRawX = rawX;
-            prevRawY = rawY;
         }
 
         // Update heartbeat for WDT check in loop()

@@ -518,8 +518,11 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         // I3: Don't block async handler -- set flag, sensor task handles it
         calibrateRequested = true;
     } else if (strcmp(type, "debug_joy") == 0) {
-        debugJoystick = !debugJoystick;
-        Serial.printf("  Debug joystick: %s\n", debugJoystick ? "ON" : "OFF");
+        bool enable = msg["enable"] | !debugJoystick;  // explicit or toggle
+        debugJoystick = enable;
+        debugJoystickClientId = enable ? client->id() : 0;
+        Serial.printf("  Debug joystick: %s (client %lu)\n",
+                      debugJoystick ? "ON" : "OFF", (unsigned long)debugJoystickClientId);
     }
 }
 
@@ -641,14 +644,24 @@ void MundMausServer::processSensorQueue() {
             doc["file"]  = ev.data;
             doc["error"] = ev.data;  // error detail in data field
             break;
-        case SensorEvent::DEBUG_JOYSTICK:
+        case SensorEvent::DEBUG_JOYSTICK: {
+            // Print to Serial for remote diagnostics (always available)
+            Serial.printf("JOY %d,%d dx=%d %s\n",
+                          ev.intVal, ev.intVal2, ev.intVal3, ev.data);
+            // Send only to the requesting client, not broadcast
             doc["type"]  = "debug_joy";
             doc["rawX"]  = ev.intVal;
             doc["rawY"]  = ev.intVal2;
             doc["dx"]    = ev.intVal3;
-            // dy, dir, axis stored in data as "dy,dir,axis"
             doc["info"]  = ev.data;
-            break;
+            String dbgBuf;
+            serializeJson(doc, dbgBuf);
+            AsyncWebSocketClient* dbgClient = _ws.client(debugJoystickClientId);
+            if (dbgClient && dbgClient->status() == WS_CONNECTED) {
+                dbgClient->text(dbgBuf);
+            }
+            continue;  // skip generic broadcast below
+        }
         case SensorEvent::UPDATE_RESULT:
             // Result was already set by the caller (OTA task or periodic check).
             // Broadcast update_status to all WS clients so portal refreshes.

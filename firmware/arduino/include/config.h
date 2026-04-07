@@ -60,6 +60,7 @@ constexpr int DEFAULT_DEADZONE          = 150;
 constexpr int DEFAULT_NAV_THRESHOLD     = 450;
 constexpr int DEFAULT_NAV_REPEAT_MS     = 400;
 constexpr int DEFAULT_NAV_COOLDOWN_MS   = 1000;
+constexpr int DEFAULT_CURSOR_SPEED      = 150;
 constexpr int DEFAULT_CALIBRATION_SAMPLES = 50;
 
 // Puff
@@ -79,6 +80,7 @@ extern volatile int DEADZONE;
 extern volatile int NAV_THRESHOLD;
 extern volatile int NAV_REPEAT_MS;
 extern volatile int NAV_COOLDOWN_MS;
+extern volatile int CURSOR_SPEED;
 extern volatile int PUFF_COOLDOWN_MS;
 extern volatile int PUFF_RAW_THRESHOLD;
 extern volatile int SENSOR_POLL_MS;
@@ -87,7 +89,7 @@ extern volatile int SENSOR_POLL_MS;
 // CONFIGURABLE KEYS (for settings UI)
 // ============================================================
 
-constexpr int NUM_CONFIGURABLE = 7;
+constexpr int NUM_CONFIGURABLE = 8;
 
 extern const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE];
 

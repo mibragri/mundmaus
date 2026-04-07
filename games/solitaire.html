@@ -96,12 +96,13 @@
     transition: border-color 0.2s, box-shadow 0.2s;
   }
 
-  /* Navigation: solid blue border */
+  /* Navigation: gold pulsing border (high contrast on dark AND light backgrounds) */
   .pile-slot.nav-active {
-    border-color: var(--nav-color);
+    border-color: #FFD700;
     border-style: solid;
-    border-width: 5px;
-    box-shadow: 0 0 16px rgba(118,255,3,0.4);
+    border-width: 6px;
+    box-shadow: 0 0 28px rgba(255, 215, 0, 0.8);
+    animation: focusPulse 1.5s ease-in-out infinite;
   }
 
   /* Selected pile slot: orange background */
@@ -167,13 +168,14 @@
     outline-offset: -1px;
   }
 
-  /* Nav cursor: card turns LIGHT BLUE - clearly visible on white cards */
+  /* Nav cursor: gold glow + scale — clearly visible on white cards AND dark bg */
   .card.face-up.nav-cursor {
-    background: #A5F5A0 !important;
-    outline: 5px solid #76FF03;
-    outline-offset: -5px;
-    box-shadow: 0 0 20px rgba(118,255,3,0.5), var(--card-shadow);
-    z-index: 899 !important;
+    outline: 6px solid #FFD700;
+    outline-offset: -3px;
+    box-shadow: 0 0 28px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 215, 0, 0.2), var(--card-shadow);
+    transform: scale(1.05);
+    animation: focusPulse 1.5s ease-in-out infinite;
+    z-index: 850 !important;
   }
 
   /* SELECTED card: turns BRIGHT ORANGE - impossible to miss, clearly different from blue cursor */
@@ -429,6 +431,12 @@
     opacity: 1;
   }
 
+  /* ===== FOCUS PULSE (accessibility research: Xbox XAG 113, WCAG 2.4.13) ===== */
+  @keyframes focusPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.6); }
+    50% { box-shadow: 0 0 28px rgba(255, 215, 0, 1.0); }
+  }
+
   /* ===== ACTION COLUMN (right of tableau) ===== */
   .action-col {
     width: calc(10.2 * var(--vw));
@@ -460,10 +468,10 @@
 
   .action-btn.nav-cursor {
     background: rgba(255,255,255,0.2);
-    border-color: var(--nav-color);
-    border-style: solid;
+    border: 6px solid #FFD700;
     color: var(--text);
-    box-shadow: 0 0 12px rgba(255,255,255,0.3);
+    box-shadow: 0 0 28px rgba(255, 215, 0, 0.8);
+    animation: focusPulse 1.5s ease-in-out infinite;
   }
 
   .action-btn.active {
@@ -616,6 +624,7 @@ function flashError() {
   o.style.opacity = "0";
 }
 function sndUndo() { beep(400,0.1); }
+function sndZone() { beep(400,0.08); setTimeout(()=>beep(800,0.08),80); }
 function sndWin() { [523,659,784,1047].forEach((f,i) => setTimeout(()=>beep(f,0.3,0.2), i*200)); }
 function sndTalon() { beep(500,0.08); }
 
@@ -636,14 +645,14 @@ let stock=[], waste=[], foundations=[[],[],[],[]], tableau=[[],[],[],[],[],[],[]
 let moves=0, score=0, undoStack=[];
 let navZone='tableau', navCol=0, navCardIdx=-1, selectedCard=null, gameWon=false;
 let kioskMode=false, idleTimer=null;
-let lastNavTime=0, navCooldown=300, kbSimMode=false;
+let lastNavTime=0, navCooldown=1000, kbSimMode=false;
 let charge={active:false,dir:null,intensity:1.0,startTime:0,progress:0,target:null,source:null,animFrameId:null,wsSupported:false};
 fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 let hintsEnabled = localStorage.getItem('solitaire-hints') === 'true'; // default OFF
 const IDLE_TIMEOUT = 120000;
 
 function initGame() {
-  if(typeof cancelCharge==='function')cancelCharge();
+  cancelCharge();
   const deck = shuffle(makeDeck());
   stock=[]; waste=[]; foundations=[[],[],[],[]]; tableau=[[],[],[],[],[],[],[]];
   moves=0; score=0; undoStack=[]; selectedCard=null; gameWon=false;
@@ -950,8 +959,7 @@ function computeTarget(dir) {
   }
   if(dir==='down'&&z==='top'){
     z='tableau';if(c>=2)c=Math.min(c+1,6);else c=Math.min(c,6);ci=-1;
-  }
-  if(dir==='down'&&z==='tableau'){
+  } else if(dir==='down'&&z==='tableau'){
     if(c===7){if(ci<3)ci++;else return null;}
     else{
       const{start,end,count}=getFaceUpRange(c);
@@ -987,6 +995,10 @@ function getTargetElement(t) {
   return null;
 }
 
+// ============================================================
+// CHARGE NAVIGATION — hold joystick, target border fills, jump when full
+// ============================================================
+
 function renderChargePreview() {
   let pv = document.getElementById('charge-preview');
   if (!pv) {
@@ -995,7 +1007,7 @@ function renderChargePreview() {
     pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     rect.setAttribute('fill', 'none');
-    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke', '#FFD700');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
     pv.appendChild(rect);
@@ -1005,7 +1017,7 @@ function renderChargePreview() {
   if (!el) { pv.style.display = 'none'; return; }
   const r = el.getBoundingClientRect();
   const g = (document.getElementById('game') || document.body).getBoundingClientRect();
-  const pad = 8;
+  const pad = 10;
   const w = r.width + pad * 2;
   const h = r.height + pad * 2;
   pv.style.display = 'block';
@@ -1015,7 +1027,7 @@ function renderChargePreview() {
   pv.setAttribute('height', h);
   pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const rect = pv.querySelector('rect');
-  const sw = 7;
+  const sw = 8;
   const inset = sw / 2;
   const rw = w - sw;
   const rh = h - sw;
@@ -1026,13 +1038,11 @@ function renderChargePreview() {
   rect.setAttribute('height', rh);
   rect.setAttribute('rx', rr);
   rect.setAttribute('stroke-width', sw);
-  // Perimeter approximation (accounting for rounded corners)
   const perimeter = 2 * (rw + rh) - 8 * rr + 2 * Math.PI * rr;
   const o = charge.progress;
   rect.setAttribute('stroke-dasharray', perimeter);
-  // Start drawing from top-middle, offset shrinks as progress grows
   rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
-  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+  rect.setAttribute('filter', `drop-shadow(0 0 ${12 * o}px rgba(255,215,0,${o * 0.9}))`);
 }
 
 function clearChargePreview() {
@@ -1082,7 +1092,7 @@ function chargeLoop(ts) {
 }
 
 function navigate(dir) {
-  if(typeof cancelCharge==='function'&&charge.active)cancelCharge();
+  cancelCharge();
   if(gameWon)return; const now=Date.now();if(now-lastNavTime<120)return;lastNavTime=now; resetIdleTimer();
   if(dir==='left'||dir==='right'){
     const d=dir==='left'?-1:1;
@@ -1092,12 +1102,12 @@ function navigate(dir) {
   }
   if(dir==='up'||dir==='down'){
     if(dir==='up'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndNav();render();return;}
+      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndZone();render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur>start){navCardIdx=cur-1;sndNav();render();return;}}
-      navZone='top';if(navCol>1)navCol=Math.min(navCol-1,5);navCardIdx=-1;sndNav();
+      navZone='top';if(navCol>1)navCol=Math.min(navCol-1,5);navCardIdx=-1;sndZone();
     } else if(dir==='down'&&navZone==='top'){
-      navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndNav();
+      navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndZone();render();return;
     } else if(dir==='down'&&navZone==='tableau'){
       if(navCol===7){if(navCardIdx<3){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
@@ -1231,7 +1241,7 @@ function connectWebSocket() {
       }
       else if(m.type==='nav_release'){if(charge.active&&charge.source==='ws')cancelCharge();}
       else if(m.type==='nav'){if(!charge.wsSupported)navigate(m.dir);}
-      else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':doPuff();break;case'press':doUndo();render();updateStatus();break;case'new_game':initGame();break;}}
+      else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':case'press':doPuff();break;case'new_game':initGame();break;}}
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
     ws.onclose=()=>{

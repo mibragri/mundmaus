@@ -27,9 +27,9 @@
     --intersection: #3a2a15;
     --intersection-border: #d8b26b;
 
-    /* Cursor: Green */
-    --cursor-color: #76FF03;
-    --cursor-glow: rgba(118, 255, 3, 0.4);
+    /* Cursor: Gold */
+    --cursor-color: #FFD700;
+    --cursor-glow: rgba(255, 215, 0, 0.4);
 
     /* Selektion: Orange */
     --selected-color: #FF8F00;
@@ -206,7 +206,7 @@
 
   .intersection.cursor {
     r: 6.5;
-    fill: rgba(118, 255, 3, 0.15);
+    fill: rgba(255, 215, 0, 0.15);
     stroke: var(--cursor-color);
     stroke-width: 1.2;
     filter: drop-shadow(0 0 4px var(--cursor-glow));
@@ -311,7 +311,7 @@
   }
 
   #mode-indicator {
-    background: rgba(118, 255, 3, 0.15);
+    background: rgba(255, 215, 0, 0.15);
     padding: 2px 8px;
     border-radius: 4px;
     color: var(--cursor-color);
@@ -407,7 +407,7 @@
   .menu-opt .md { font-size: 1.7vh; color: var(--text-dim); }
   .menu-opt.mode-opt {
     margin-top: 1vh;
-    border-color: rgba(118, 255, 3, 0.3);
+    border-color: rgba(255, 215, 0, 0.3);
   }
   .menu-opt.mode-opt .mt { color: var(--cursor-color); }
 
@@ -443,6 +443,11 @@
     50% { opacity: 1; transform: scale(1.2); }
   }
 
+  @keyframes focusPulse {
+    0%, 100% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.6); }
+    50% { box-shadow: 0 0 28px rgba(255, 215, 0, 1.0); }
+  }
+
   /* ── Action Button Column (right of board) ──── */
   #action-col {
     display: flex;
@@ -471,10 +476,11 @@
   }
 
   .action-btn.cursor {
-    background: rgba(118, 255, 3, 0.2);
-    border: 2px solid #76FF03;
-    box-shadow: 0 0 8px rgba(118, 255, 3, 0.4);
+    background: rgba(255, 215, 0, 0.2);
+    border: 2px solid #FFD700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
     color: #fff;
+    animation: focusPulse 1.5s ease-in-out infinite;
   }
 
   .action-btn.active {
@@ -1121,7 +1127,7 @@ function aiPickRemoval() {
 }
 
 // ── UI State ─────────────────────────────────────────────
-let lastNavTime = 0, navCooldown = 1200, kbSimMode = false;
+let lastNavTime = 0, navCooldown = 1000, kbSimMode = false;
 let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
 fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 
@@ -1952,7 +1958,7 @@ function renderChargePreview() {
     pv.style.cssText = 'position:absolute;pointer-events:none;z-index:850;display:none;overflow:visible';
     const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
     rect.setAttribute('fill', 'none');
-    rect.setAttribute('stroke', '#76FF03');
+    rect.setAttribute('stroke', '#FFD700');
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
     pv.appendChild(rect);
@@ -1962,7 +1968,7 @@ function renderChargePreview() {
   if (!el) { pv.style.display = 'none'; return; }
   const r = el.getBoundingClientRect();
   const g = (document.getElementById('game') || document.body).getBoundingClientRect();
-  const pad = 8;
+  const pad = 10;
   const w = r.width + pad * 2;
   const h = r.height + pad * 2;
   pv.style.display = 'block';
@@ -1972,7 +1978,7 @@ function renderChargePreview() {
   pv.setAttribute('height', h);
   pv.setAttribute('viewBox', `0 0 ${w} ${h}`);
   const rect = pv.querySelector('rect');
-  const sw = 7;
+  const sw = 8;
   const inset = sw / 2;
   const rw = w - sw;
   const rh = h - sw;
@@ -1989,7 +1995,7 @@ function renderChargePreview() {
   rect.setAttribute('stroke-dasharray', perimeter);
   // Start drawing from top-middle, offset shrinks as progress grows
   rect.setAttribute('stroke-dashoffset', perimeter * (1 - o));
-  rect.setAttribute('filter', `drop-shadow(0 0 ${8 * o}px rgba(118,255,3,${o * 0.9}))`);
+  rect.setAttribute('filter', `drop-shadow(0 0 ${12 * o}px rgba(255,215,0,${o * 0.9}))`);
 }
 
 function clearChargePreview() {

@@ -58,8 +58,10 @@ public:
     /// Set by WS handler, checked by sensor task (I3: non-blocking calibrate)
     volatile bool calibrateRequested = false;
 
-    /// ADC debug stream — toggled via WS command "debug_joy", sends raw values at 10Hz
+    /// ADC debug stream — toggled via WS command "debug_joy", sends raw values at 5Hz.
+    /// Data goes ONLY to the requesting client (tracked by ID) + Serial.
     volatile bool debugJoystick = false;
+    volatile uint32_t debugJoystickClientId = 0;
 
     /// Hardware status (set by main before start)
     struct HwStatus {

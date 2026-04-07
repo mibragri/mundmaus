@@ -46,17 +46,48 @@ void CalibratedJoystick::calibrate(int samples) {
         delay(5);
     }
 
-    // Average N samples (10ms each)
+    // Collect samples and track min/max to detect movement during calibration
     long sx = 0, sy = 0;
+    int minX = 4095, maxX = 0, minY = 4095, maxY = 0;
     for (int i = 0; i < samples; i++) {
-        sx += analogRead(_pinX);
-        sy += analogRead(_pinY);
+        int x = analogRead(_pinX);
+        int y = analogRead(_pinY);
+        sx += x;
+        sy += y;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
         delay(10);
     }
-    centerX = (int)(sx / samples);
-    centerY = (int)(sy / samples);
 
-    Serial.printf("  Center=(%d,%d) dz=+/-%d\n", centerX, centerY, Config::DEADZONE);
+    int newCenterX = (int)(sx / samples);
+    int newCenterY = (int)(sy / samples);
+    int spreadX = maxX - minX;
+    int spreadY = maxY - minY;
+
+    // Reject calibration if samples vary too much (joystick was moved)
+    // or if center is outside plausible range (200-3900 for 12-bit ADC)
+    bool valid = true;
+    if (spreadX > 300 || spreadY > 300) {
+        Serial.printf("  Kalibrierung VERWORFEN: Spread=(%d,%d) > 300 (Stick bewegt?)\n",
+                      spreadX, spreadY);
+        valid = false;
+    }
+    if (newCenterX < 200 || newCenterX > 3900 || newCenterY < 200 || newCenterY > 3900) {
+        Serial.printf("  Kalibrierung VERWORFEN: Center=(%d,%d) ausserhalb 200-3900\n",
+                      newCenterX, newCenterY);
+        valid = false;
+    }
+
+    if (valid) {
+        centerX = newCenterX;
+        centerY = newCenterY;
+        Serial.printf("  Center=(%d,%d) spread=(%d,%d) dz=+/-%d\n",
+                      centerX, centerY, spreadX, spreadY, Config::DEADZONE);
+    } else {
+        Serial.printf("  Behalte alten Center=(%d,%d)\n", centerX, centerY);
+    }
 }
 
 void CalibratedJoystick::sampleRaw() {

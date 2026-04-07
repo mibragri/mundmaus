@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
+#include <esp_task_wdt.h>
 #include <algorithm>
 
 // ============================================================
@@ -82,17 +83,21 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
         while (!WiFi.isConnected()) {
             if (millis() - start > timeoutMs) {
                 Serial.printf("  Timeout (%lums)\n", timeoutMs);
-                WiFi.disconnect(false);  // keep credentials in ESP32 internal storage
+                WiFi.disconnect(false);
                 break;
             }
             delay(250);
+            esp_task_wdt_reset();  // keep WDT happy during long connect attempts
         }
 
         if (WiFi.isConnected()) break;
 
         if (attempt < 3) {
             Serial.printf("  Warte %ds vor naechstem Versuch...\n", attempt * 2);
-            delay(attempt * 2000);
+            for (int w = 0; w < attempt * 8; w++) {
+                delay(250);
+                esp_task_wdt_reset();
+            }
         }
     }
 
