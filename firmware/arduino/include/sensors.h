@@ -17,9 +17,6 @@ public:
     /// Poll button (debounced, active LOW). Returns true on press edge.
     bool pollButton();
 
-    /// True if both axes remain strictly within the configured deadzone.
-    bool isIdle();
-
     /// Store raw ADC readings for this frame (call once per iteration).
     /// All other methods use these cached values instead of re-reading ADC.
     void sampleRaw();

@@ -423,6 +423,12 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
 
     } else if (type == WS_EVT_DISCONNECT) {
         Serial.printf("  WS client #%lu disconnected\n", (unsigned long)client->id());
+        // Stop debug stream if the requesting client disconnected
+        if (debugJoystick && client->id() == debugJoystickClientId) {
+            debugJoystick = false;
+            debugJoystickClientId = 0;
+            Serial.println("  Debug joystick: OFF (client disconnected)");
+        }
 
     } else if (type == WS_EVT_DATA) {
         AwsFrameInfo* info = static_cast<AwsFrameInfo*>(arg);

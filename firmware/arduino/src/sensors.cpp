@@ -238,15 +238,6 @@ bool CalibratedJoystick::pollButton() {
     return false;
 }
 
-bool CalibratedJoystick::isIdle() {
-    // Use cached raw values (pre-deadzone) so we check strictly within deadzone.
-    // Previously used DEADZONE*2 which created a gap between "idle" and "active"
-    // where held joystick could trigger auto-recalibration while being used.
-    int rawDx = rawX - centerX;
-    int rawDy = rawY - centerY;
-    return abs(rawDx) < Config::DEADZONE && abs(rawDy) < Config::DEADZONE;
-}
-
 // ============================================================
 // PuffSensor (HX710B 24-bit ADC)
 // ============================================================

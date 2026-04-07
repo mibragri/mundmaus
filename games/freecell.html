@@ -1590,6 +1590,7 @@ function navigate(dir) {
 // ============================================================
 
 function doPuff() {
+  cancelCharge();
   resetIdleTimer();
   if (document.getElementById('idle-overlay').classList.contains('visible')) { hideIdle(); initGame(dealNumber); return; }
   if (gameWon) { initGame(); return; }

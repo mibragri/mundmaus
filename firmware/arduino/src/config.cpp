@@ -16,7 +16,6 @@ volatile int NAV_COOLDOWN_MS  = DEFAULT_NAV_COOLDOWN_MS;
 volatile int PUFF_COOLDOWN_MS  = DEFAULT_PUFF_COOLDOWN_MS;
 volatile int PUFF_RAW_THRESHOLD = DEFAULT_PUFF_RAW_THRESHOLD;
 volatile int SENSOR_POLL_MS    = DEFAULT_SENSOR_POLL_MS;
-volatile int CURSOR_SPEED      = DEFAULT_CURSOR_SPEED;
 
 // ============================================================
 // KEY TABLES
@@ -30,7 +29,6 @@ const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE] = {
     "PUFF_COOLDOWN_MS",
     "PUFF_RAW_THRESHOLD",
     "SENSOR_POLL_MS",
-    "CURSOR_SPEED",
 };
 
 const Range RANGES[NUM_CONFIGURABLE] = {
@@ -41,7 +39,6 @@ const Range RANGES[NUM_CONFIGURABLE] = {
     {  50,   5000 },   // PUFF_COOLDOWN_MS
     { 10000, 200000 }, // PUFF_RAW_THRESHOLD
     {   5,    500 },   // SENSOR_POLL_MS
-    {  50,   1000 },   // CURSOR_SPEED
 };
 
 // ============================================================
@@ -58,7 +55,6 @@ static volatile int* _globalPtr(int idx) {
         case 4: return &PUFF_COOLDOWN_MS;
         case 5: return &PUFF_RAW_THRESHOLD;
         case 6: return &SENSOR_POLL_MS;
-        case 7: return &CURSOR_SPEED;
         default: return nullptr;
     }
 }
@@ -72,7 +68,6 @@ static int _defaultVal(int idx) {
         case 4: return DEFAULT_PUFF_COOLDOWN_MS;
         case 5: return DEFAULT_PUFF_RAW_THRESHOLD;
         case 6: return DEFAULT_SENSOR_POLL_MS;
-        case 7: return DEFAULT_CURSOR_SPEED;
         default: return 0;
     }
 }

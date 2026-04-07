@@ -1,4 +1,4 @@
-// main.cpp -- MundMaus ESP32 Firmware v3.2 (Arduino)
+// main.cpp -- MundMaus ESP32 Firmware (Arduino)
 // Phases 1-7: Boot + WiFi + HTTP/WS + Sensors + LittleFS + Config + OTA
 
 #include <Arduino.h>
