@@ -37,8 +37,7 @@ font-size:1.5em;text-decoration:none;transition:color .2s}
 </style></head><body>
 <h1>MundMaus</h1>)==";
 
-static const char PORTAL_SETTINGS_LINK[] PROGMEM =
-    R"==(<a href="/www/settings.html" class="settings-gear">&#9881;</a>)==";
+// Settings gear + version — assembled dynamically in generatePortal()
 
 static const char PORTAL_UPDATE_SECTION[] PROGMEM =
     R"==(<button class="upd-btn" id="upd-btn" onclick="startUpdate()">&#128260; Aktualisieren</button>)=="
@@ -227,8 +226,10 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     html += btns;
     html += F("</div>");
 
-    // Settings gear (fixed bottom-right)
-    html += FPSTR(PORTAL_SETTINGS_LINK);
+    // Settings gear + version (fixed bottom-right)
+    html += F("<div class=\"settings-gear\"><span style=\"font-size:.55em;opacity:.5;margin-right:8px\">v");
+    html += Config::VERSION;
+    html += F("</span><a href=\"/www/settings.html\" style=\"color:inherit;text-decoration:none\">&#9881;</a></div>");
 
     // Script
     html += FPSTR(PORTAL_SCRIPT);
