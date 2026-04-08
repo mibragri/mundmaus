@@ -1252,7 +1252,7 @@ function completeCharge() {
 }
 
 function chargeLoop(ts) {
-  if (!charge.active || ui.phase !== 'playing' || ui.aiThinking) { cancelCharge(); return; }
+  if (!charge.active || ui.aiThinking) { cancelCharge(); return; }
   const elapsed = ts - charge.startTime;
   if (elapsed > 5000) { cancelCharge(); return; }
   const ei = Math.max(charge.intensity, 0.3);
@@ -1362,7 +1362,7 @@ function action() {
     return;
   }
 
-  if (ui.phase !== 'playing' || ui.aiThinking) return;
+  if (ui.phase !== 'playing' || ui.aiThinking || !gameActive) return;
   // In single-player mode only PLAYER may act (AI drops via scheduleAI).
   // In multiplayer both sides act through the same input handlers.
   if (!multiplayerMode && currentPlayer !== PLAYER) return;
@@ -1515,7 +1515,7 @@ function scheduleAI() {
 
 // ── Undo ────────────────────────────────────────────────
 function undo() {
-  if (ui.phase !== 'playing' || ui.aiThinking) return;
+  if (ui.phase !== 'playing' || ui.aiThinking || !gameActive) return;
 
   if (multiplayerMode) {
     // Single-step undo — simply rewind the last move

@@ -834,7 +834,8 @@ function autoComplete() {
         if (moved) break;
       }
     }
-    moves++; render(); updateStatus(); sndPlace();
+    if (moved) { moves++; sndPlace(); }
+    render(); updateStatus();
     if (!moved || foundations.every(f => f.length === 13)) {
       clearInterval(autoCompleteIv);
       autoCompleteIv = null;

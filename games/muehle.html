@@ -2054,7 +2054,7 @@ function completeCharge() {
 }
 
 function chargeLoop(ts) {
-  if (!charge.active || ui.phase !== 'playing' || aiInProgress) { cancelCharge(); return; }
+  if (!charge.active || aiInProgress) { cancelCharge(); return; }
   const elapsed = ts - charge.startTime;
   if (elapsed > 5000) { cancelCharge(); return; }
   const ei = Math.max(charge.intensity, 0.3);

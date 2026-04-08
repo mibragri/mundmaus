@@ -749,7 +749,8 @@ function autoComplete() {
     let moved=false;
     for(let ti=0;ti<7;ti++){if(!tableau[ti].length)continue;const c=tableau[ti][tableau[ti].length-1];
       for(let fi=0;fi<4;fi++){if(canPlaceOnFoundation(c,fi)){tableau[ti].pop();foundations[fi].push(c);score+=10;moved=true;break;}}if(moved)break;}
-    moves++;render();updateStatus();sndPlace();
+    if(moved){moves++;sndPlace();}
+    render();updateStatus();
     if(!moved||foundations.every(f=>f.length===13)){clearInterval(autoCompleteIv);autoCompleteIv=null;checkWin();}
   },150);
 }
