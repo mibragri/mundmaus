@@ -422,6 +422,25 @@
     <button class="action-btn danger" id="btn-reset" onclick="doReset()">↩ Reset</button>
   </div>
 
+  <!-- WiFi Configuration -->
+  <div class="slider-card" id="wifi-card">
+    <div class="slider-label">
+      <span class="de">WLAN-Verbindung</span>
+      <span class="en">WiFi Connection</span>
+    </div>
+    <div id="wifi-status" style="margin:8px 0;font-size:1.4vh;color:var(--text-dim)"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+      <select id="wifi-ssid" style="flex:1;padding:8px;border-radius:6px;background:var(--bg);color:var(--text);border:1px solid var(--card-border);font-size:1.4vh">
+        <option value="">WLAN wählen...</option>
+      </select>
+      <button class="action-btn" onclick="doWifiScan()" style="white-space:nowrap;padding:8px 12px">🔍 Scan</button>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
+      <input type="password" id="wifi-pw" placeholder="Passwort" style="flex:1;padding:8px;border-radius:6px;background:var(--bg);color:var(--text);border:1px solid var(--card-border);font-size:1.4vh">
+      <button class="action-btn primary" onclick="doWifiConnect()" style="white-space:nowrap;padding:8px 12px">Verbinden</button>
+    </div>
+  </div>
+
   <!-- Expert Section -->
   <button id="expert-toggle" onclick="toggleExpert()">
     <span class="arrow">▶</span> ⚙ Erweitert / Advanced
@@ -788,6 +807,19 @@ function wsConnect() {
           if (msg.saved !== undefined) configSaved = msg.saved || {};
           applyFullConfig(configCurrent);
           showToast('✓ Zurückgesetzt / Reset done', 'success');
+        } else if (msg.type === 'wifi_networks') {
+          const sel = document.getElementById('wifi-ssid');
+          const current = sel.value;
+          sel.innerHTML = '<option value="">WLAN wählen...</option>';
+          (msg.networks || []).forEach(n => {
+            const opt = document.createElement('option');
+            opt.value = n;
+            opt.textContent = n;
+            if (n === current) opt.selected = true;
+            sel.appendChild(opt);
+          });
+        } else if (msg.type === 'wifi_scan_started') {
+          // scan is running, results arrive as wifi_networks
         } else if (msg.type === 'calibrate_done') {
           const cx = msg.joy_center ? msg.joy_center.join(', ') : '?';
           const pb = msg.puff_baseline !== undefined ? msg.puff_baseline : '?';
@@ -845,8 +877,53 @@ async function loadSettings() {
   }
 }
 
+// ── WiFi ──────────────────────────────────────────────────
+function loadWifiStatus() {
+  fetch('/api/wifi').then(r=>r.json()).then(d => {
+    const el = document.getElementById('wifi-status');
+    if (d.connected) {
+      el.innerHTML = '✅ Verbunden mit <b>' + d.ssid + '</b> (IP: ' + d.ip + ', ' + d.rssi_label + ' ' + d.rssi + 'dBm)';
+    } else if (d.mode === 'ap') {
+      el.innerHTML = '📡 Hotspot-Modus: <b>' + d.ap_ssid + '</b> (IP: ' + d.ip + ')';
+    } else {
+      el.innerHTML = '❌ Nicht verbunden';
+    }
+  }).catch(() => {
+    document.getElementById('wifi-status').textContent = '? Status unbekannt';
+  });
+}
+
+function doWifiScan() {
+  const sel = document.getElementById('wifi-ssid');
+  sel.innerHTML = '<option value="">Scanne...</option>';
+  // Send scan request via WebSocket (async, result comes as wifi_networks broadcast)
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({type: 'wifi_scan'}));
+  }
+}
+
+function doWifiConnect() {
+  const ssid = document.getElementById('wifi-ssid').value;
+  const pw = document.getElementById('wifi-pw').value;
+  if (!ssid) { showToast('SSID wählen', 'error'); return; }
+  showToast('Verbinde mit ' + ssid + '...', '');
+  fetch('/api/wifi', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ssid: ssid, password: pw})
+  }).then(r => r.json()).then(d => {
+    if (d.ok) {
+      showToast('Gespeichert — Neustart...', 'success');
+      setTimeout(() => { location.reload(); }, 10000);
+    } else {
+      showToast('Fehler: ' + (d.error || 'unbekannt'), 'error');
+    }
+  }).catch(() => showToast('Verbindungsfehler', 'error'));
+}
+
 // ── Boot ─────────────────────────────────────────────────
 loadSettings();
+loadWifiStatus();
 wsConnect();
 </script>
 </body>
