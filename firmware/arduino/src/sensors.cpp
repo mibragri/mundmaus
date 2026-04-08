@@ -337,6 +337,15 @@ void PuffSensor::poll() {
     int32_t raw = _readRawNonblocking();
     if (raw != 0) {
         _lastRaw = raw;
+
+        // Baseline tracking: slowly adapt to thermal drift.
+        // Only adjust when the reading is close to baseline (no puff active).
+        // Shift baseline by 1/256th of the delta per sample (~50Hz = full
+        // correction in ~5 seconds for small drift).
+        int32_t drift = raw - baseline;
+        if (abs(drift) < Config::PUFF_RAW_THRESHOLD / 2) {
+            baseline += drift / 256;
+        }
     }
 }
 

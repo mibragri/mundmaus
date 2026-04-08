@@ -1976,12 +1976,12 @@ function renderChargePreview() {
     rect.setAttribute('stroke-linecap', 'round');
     rect.setAttribute('stroke-linejoin', 'round');
     pv.appendChild(rect);
-    (document.getElementById('game') || document.body).appendChild(pv);
+    (document.getElementById('board-area') || document.body).appendChild(pv);
   }
   const el = getTargetElement(charge.target);
   if (!el) { pv.style.display = 'none'; return; }
   const r = el.getBoundingClientRect();
-  const g = (document.getElementById('game') || document.body).getBoundingClientRect();
+  const g = (document.getElementById('board-area') || document.body).getBoundingClientRect();
   const pad = 10;
   const w = r.width + pad * 2;
   const h = r.height + pad * 2;
