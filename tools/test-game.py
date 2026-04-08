@@ -403,6 +403,27 @@ def main():
         print(f"  ✗ SOME GAMES FAILED — fix errors before deploying")
     print(f"{'=' * 60}")
 
+    # Settings page WiFi config check
+    settings_path = PROJECT / "games" / "settings.html"
+    if settings_path.exists():
+        settings_html = settings_path.read_text()
+        wifi_checks = [
+            ("wifi-card", "WiFi config card (#wifi-card)"),
+            ("wifi-ssid", "WiFi SSID dropdown (#wifi-ssid)"),
+            ("wifi-pw", "WiFi password input (#wifi-pw)"),
+            ("doWifiScan", "WiFi scan function"),
+            ("doWifiConnect", "WiFi connect function"),
+            ("/api/wifi", "WiFi API endpoint"),
+        ]
+        wifi_ok = True
+        for token, desc in wifi_checks:
+            if token not in settings_html:
+                print(f"  FAIL  Settings missing: {desc}")
+                wifi_ok = False
+                all_pass = False
+        if wifi_ok:
+            print(f"  OK    Settings WiFi config present")
+
     # Also run check-games.sh
     print(f"\n  --- check-games.sh ---")
     result = subprocess.run(["bash", str(PROJECT / "tools/check-games.sh")],
