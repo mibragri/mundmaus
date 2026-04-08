@@ -146,6 +146,12 @@ bool update(const char* key, int value) {
     // Clamp to valid range
     int clamped = constrain(value, RANGES[idx].min, RANGES[idx].max);
     *ptr = clamped;
+
+    // Cross-validate: NAV_THRESHOLD must exceed DEADZONE by at least 50
+    if (NAV_THRESHOLD <= DEADZONE + 50) {
+        NAV_THRESHOLD = DEADZONE + 100;
+    }
+
     return true;
 }
 

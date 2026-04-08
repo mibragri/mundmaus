@@ -946,6 +946,7 @@ let game = {
   history: [],
   capturedW: [], // pieces captured from white
   capturedB: [], // pieces captured from black
+  positionCounts: {},
 };
 
 function newGame() {
@@ -958,6 +959,7 @@ function newGame() {
   game.history = [];
   game.capturedW = [];
   game.capturedB = [];
+  game.positionCounts = {};
 }
 
 function updateCastling(move) {
@@ -989,6 +991,7 @@ function execMove(move, promoType) {
     halfmove: game.halfmove,
     capturedW: [...game.capturedW],
     capturedB: [...game.capturedB],
+    positionCounts: {...game.positionCounts},
   });
 
   updateCastling(move);
@@ -1015,6 +1018,10 @@ function execMove(move, promoType) {
 
   if (game.turn === B) game.moveNum++;
   game.turn = game.turn === W ? B : W;
+
+  // Track position for threefold repetition
+  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling;
+  game.positionCounts[posKey] = (game.positionCounts[posKey] || 0) + 1;
 }
 
 function undoMove() {
@@ -1024,17 +1031,17 @@ function undoMove() {
     const prev = game.history.pop(); // undo computer's
     Object.assign(game, {board: prev.board, turn: prev.turn, castling: prev.castling,
       enPassant: prev.enPassant, moveNum: prev.moveNum, halfmove: prev.halfmove,
-      capturedW: prev.capturedW, capturedB: prev.capturedB});
+      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: prev.positionCounts});
     const prev2 = game.history.pop(); // undo player's
     Object.assign(game, {board: prev2.board, turn: prev2.turn, castling: prev2.castling,
       enPassant: prev2.enPassant, moveNum: prev2.moveNum, halfmove: prev2.halfmove,
-      capturedW: prev2.capturedW, capturedB: prev2.capturedB});
+      capturedW: prev2.capturedW, capturedB: prev2.capturedB, positionCounts: prev2.positionCounts});
     return true;
   } else if (game.turn === B && game.history.length >= 1) {
     const prev = game.history.pop();
     Object.assign(game, {board: prev.board, turn: prev.turn, castling: prev.castling,
       enPassant: prev.enPassant, moveNum: prev.moveNum, halfmove: prev.halfmove,
-      capturedW: prev.capturedW, capturedB: prev.capturedB});
+      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: prev.positionCounts});
     return true;
   }
   return false;
@@ -1109,8 +1116,10 @@ function evaluate(board) {
 }
 
 let aiDepth = 3;
+let searchNodes = 0, searchStart = 0;
 
 function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
+  if (++searchNodes % 500 === 0 && performance.now() - searchStart > 2000) return evaluate(board);
   const color = maximizing ? W : B;
   const moves = legalMoves(board, color, enPassant, castling);
 
@@ -1177,6 +1186,7 @@ function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
 }
 
 function aiMove() {
+  searchNodes = 0; searchStart = performance.now();
   const moves = legalMoves(game.board, B, game.enPassant, game.castling);
   if (moves.length === 0) return null;
 
@@ -1346,6 +1356,14 @@ function renderBoard() {
 }
 
 function updateStatus() {
+  // Threefold repetition check
+  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling;
+  if ((game.positionCounts[posKey] || 0) >= 3) {
+    showGameOver('Unentschieden', 'Stellungswiederholung');
+    sndError();
+    return;
+  }
+
   const moves = legalMoves(game.board, game.turn, game.enPassant, game.castling);
   const inCheck = isInCheck(game.board, game.turn);
 
