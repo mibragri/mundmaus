@@ -86,7 +86,14 @@ void CalibratedJoystick::calibrate(int samples) {
         Serial.printf("  Center=(%d,%d) spread=(%d,%d) dz=+/-%d\n",
                       centerX, centerY, spreadX, spreadY, Config::DEADZONE);
     } else {
-        Serial.printf("  Behalte alten Center=(%d,%d)\n", centerX, centerY);
+        // Use raw center values even if "invalid" — a stuck pin at 0 or 4095
+        // with center=2048 (default) would produce permanent nav_hold, which
+        // is worse than accepting an edge center. The deadzone + threshold
+        // prevent navigation if the pin is truly stuck (no movement = no nav).
+        centerX = newCenterX;
+        centerY = newCenterY;
+        Serial.printf("  Center ERZWUNGEN=(%d,%d) (ungueltig, aber besser als 2048)\n",
+                      centerX, centerY);
     }
 }
 
