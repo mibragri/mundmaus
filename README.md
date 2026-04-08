@@ -92,12 +92,14 @@ ESP32 DevKitC V4          KY-023 Joystick         HX710B + Drucksensor
 │                 │   │   └─────────────┘    │    │             │
 │  GPIO32 ────────┼───┼──────────────────────┼────┤ DATA        │
 │  GPIO25 ────────┼───┼──────────────────────┼────┤ CLK         │
-│  5V/VIN ────────┼───┼──────────────────────┼────┤ VCC         │
+│  3V3 ──────────┼───┼──────────────────────┼────┤ VCC         │
 │                 │   └──────────────────────┘    │             │
 │       USB ──────┤                               │   Schlauch  │
 │  (Strom+Daten)  │                               │   zum Mund  │
 └─────────────────┘                               └─────────────┘
 ```
+
+**Wichtig: Beide Sensoren an 3V3 anschliessen, NICHT an 5V!** Der ESP32 ADC vertraegt maximal 3.3V. Bei 5V-Versorgung koennen die Sensorausgaenge die ADC-Pins stoeren und falsche Joystick-Eingaben verursachen.
 
 **Schlauch-Anschluss:** Silikonschlauch auf den Barb (Nippel) des Drucksensors stecken. Das andere Ende haelt der Patient im Mund. Leichtes Pusten = Klick.
 
