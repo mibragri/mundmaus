@@ -190,4 +190,93 @@ test.describe('Solitaire', () => {
     await page.keyboard.press('p');
     await page.waitForURL('**/', { timeout: 15_000 });
   });
+
+  // === GAMEPLAY ===
+  test('place card on foundation', async ({ page }) => {
+    // Set up: Ace of spades on top of tableau col 0, navigate there and place on foundation
+    await page.evaluate(`
+      tableau = [
+        [{rank:'A', suit:'\\u2660', faceUp:true}],
+        [{rank:'2', suit:'\\u2660', faceUp:true}],
+        [], [], [], [], []
+      ];
+      foundations = [[], [], [], []];
+      stock = []; waste = [];
+      selectedCard = null; gameWon = false;
+      navZone = 'tableau'; navCol = 0; navCardIdx = -1;
+      render();
+    `);
+
+    // Select the Ace
+    await navPress(page, 'Space');
+    const sel = await getState(page);
+    expect(sel.selectedCard).not.toBeNull();
+
+    // Navigate up to top row, then to foundation slot (col 2 = foundation index 0)
+    await navPress(page, 'ArrowUp');
+    await navPress(page, 'ArrowRight');
+    await navPress(page, 'ArrowRight');
+
+    // Place on foundation
+    await navPress(page, 'Space');
+
+    // Verify foundation has the Ace
+    const fLen = await page.evaluate('foundations[0].length');
+    expect(fLen).toBe(1);
+    const fCard = await page.evaluate('foundations[0][0].rank');
+    expect(fCard).toBe('A');
+  });
+
+  test('move card between tableau columns', async ({ page }) => {
+    // Set up: red 6 on col 0, black 7 on col 1
+    await page.evaluate(`
+      tableau = [
+        [{rank:'6', suit:'\\u2665', faceUp:true}],
+        [{rank:'7', suit:'\\u2660', faceUp:true}],
+        [], [], [], [], []
+      ];
+      foundations = [[], [], [], []];
+      stock = []; waste = [];
+      selectedCard = null; gameWon = false;
+      navZone = 'tableau'; navCol = 0; navCardIdx = -1;
+      render();
+    `);
+
+    // Select red 6 on col 0
+    await navPress(page, 'Space');
+    expect((await getState(page)).selectedCard).not.toBeNull();
+
+    // Navigate right to col 1 (black 7)
+    await navPress(page, 'ArrowRight');
+
+    // Place
+    await navPress(page, 'Space');
+
+    // Verify col 1 now has 2 cards with red 6 on top
+    const col1Len = await page.evaluate('tableau[1].length');
+    expect(col1Len).toBe(2);
+    const topRank = await page.evaluate('tableau[1][tableau[1].length - 1].rank');
+    expect(topRank).toBe('6');
+    // Col 0 should be empty
+    const col0Len = await page.evaluate('tableau[0].length');
+    expect(col0Len).toBe(0);
+  });
+
+  test('charge completes and moves cursor', async ({ page }) => {
+    // Switch to sim mode
+    await page.keyboard.press('j');
+    const simText = await page.locator('#kb-mode').textContent();
+    expect(simText).toContain('Sim');
+
+    const before = await getState(page);
+
+    // Hold ArrowRight long enough for charge to complete
+    await page.keyboard.down('ArrowRight');
+    await page.waitForTimeout(1300); // navCooldown default=1000, add margin
+    await page.keyboard.up('ArrowRight');
+    await page.waitForTimeout(200);
+
+    const after = await getState(page);
+    expect(after.navCol).toBeGreaterThan(before.navCol);
+  });
 });
