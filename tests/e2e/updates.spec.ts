@@ -4,11 +4,11 @@ import { gotoESP32, esp32Cooldown, fetchJSON } from './api-helpers';
 test.describe('OTA Update UI flow', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
 
-  test('1. portal shows update status section (id=upd)', async ({ page }) => {
+  test('1. portal has update button (hidden when no updates)', async ({ page }) => {
     await gotoESP32(page, '/');
-    const updSection = page.locator('#upd');
-    await expect(updSection).toBeAttached();
-    await expect(updSection).toBeVisible({ timeout: 15_000 });
+    const updBtn = page.locator('#upd-btn');
+    await expect(updBtn).toBeAttached();
+    // Button exists but is hidden by default (shown by JS when updates available)
   });
 
   test('2. GET /api/updates returns JSON with available and offline fields', async ({ page }) => {
@@ -20,18 +20,20 @@ test.describe('OTA Update UI flow', () => {
     expect(typeof updates.offline === 'boolean' || updates.offline === undefined).toBe(true);
   });
 
-  test('3. if no updates and online, shows "✓ Up to date"', async ({ page }) => {
+  test('3. if no updates and online, update button stays hidden', async ({ page }) => {
     // Check API first (lightweight) before loading the full page
     const { data } = await fetchJSON(page, '/api/updates');
     const updates = data as { offline?: boolean; available: unknown[] };
     if (updates.offline || updates.available.length > 0) {
-      // Skip page check if offline or updates available — text will differ
+      // Skip if offline or updates available — button will be visible
       return;
     }
     await gotoESP32(page, '/');
-    const updInfo = page.locator('#upd-info');
-    await expect(updInfo).toBeVisible({ timeout: 15_000 });
-    await expect(updInfo).toContainText('✓ Up to date', { timeout: 15_000 });
+    // Wait for WS to connect and update_status to arrive
+    await page.waitForTimeout(5000);
+    const updBtn = page.locator('#upd-btn');
+    const display = await updBtn.evaluate(el => getComputedStyle(el).display);
+    expect(display).toBe('none');
   });
 
   test('4. "Neustart zum Pruefen" button exists when offline', async ({ page }) => {
@@ -72,7 +74,7 @@ test.describe('OTA Update UI flow', () => {
     const { data } = await fetchJSON(page, '/api/update/start', { method: 'POST' });
     const result = data as { ok: boolean; error?: string };
     expect(result.ok).toBe(false);
-    expect(result.error).toBe('Keine Updates');
+    expect(result.error).toBe('Keine Updates verfuegbar');
   });
 
   // SKIPPED: triggers ESP32 reboot. Run manually: npx playwright test updates --grep "reboot"

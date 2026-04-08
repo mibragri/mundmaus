@@ -8,7 +8,8 @@ test.describe('Chess Gameplay', () => {
     // Chess starts with a difficulty menu; select easiest (random) and start
     await page.waitForSelector('#diff-menu', { timeout: 15_000 });
     await page.keyboard.press('Space'); // select difficulty
-    await page.waitForTimeout(300);
+    // Wait for game to enter playing phase (ESP32 may be slow)
+    await page.waitForFunction(`typeof ui !== 'undefined' && ui.phase === 'playing'`, { timeout: 10_000 });
   });
 
   test('loads with 32 pieces', async ({ page }) => {
@@ -63,7 +64,7 @@ test.describe('Chess Gameplay', () => {
     await navPress(page, 'Space'); // place at e4
 
     // Wait for AI to respond (300ms delay for easy + thinking time)
-    await page.waitForFunction(`game.turn === 'w'`, { timeout: 5000 });
+    await page.waitForFunction(`game.turn === 'w'`, { timeout: 15_000 });
 
     // Verify a black piece moved: move count should be 2 (1 white + 1 black)
     const histLen = await page.evaluate('game.history.length');
@@ -78,7 +79,7 @@ test.describe('Chess Gameplay', () => {
     await navPress(page, 'Space');
 
     // Wait for AI
-    await page.waitForFunction(`game.turn === 'w'`, { timeout: 5000 });
+    await page.waitForFunction(`game.turn === 'w'`, { timeout: 15_000 });
 
     const histAfterMove = await page.evaluate('game.history.length');
     expect(histAfterMove).toBe(2);

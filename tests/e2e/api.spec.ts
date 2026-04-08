@@ -10,11 +10,11 @@ test.describe('API endpoints', () => {
     expect(html).toContain('<title>MundMaus</title>');
   });
 
-  test('2. GET /api/info — valid JSON, version=3.1', async ({ page }) => {
+  test('2. GET /api/info — valid JSON, version=4.1', async ({ page }) => {
     const { status, data } = await fetchJSON(page, '/api/info');
     expect(status).toBe(200);
     const info = data as Record<string, unknown>;
-    expect(info.version).toBe('3.1');
+    expect(info.version).toBe('4.1');
     expect(info.board).toBeTruthy();
     expect(typeof info.mem_free).toBe('number');
     expect(info.mode).toBeTruthy();
@@ -32,12 +32,12 @@ test.describe('API endpoints', () => {
     expect(wifi).toHaveProperty('rssi');
   });
 
-  test('4. GET /api/scan — valid JSON with networks array', async ({ page }) => {
+  test('4. GET /api/scan — returns scan_started (async scan)', async ({ page }) => {
     const { status, data } = await fetchJSON(page, '/api/scan');
     expect(status).toBe(200);
     const scan = data as Record<string, unknown>;
-    expect(scan).toHaveProperty('networks');
-    expect(Array.isArray(scan.networks)).toBe(true);
+    expect(scan.ok).toBe(true);
+    expect(scan.status).toBe('scan_started');
   });
 
   test('5. GET /api/updates — valid JSON', async ({ page }) => {

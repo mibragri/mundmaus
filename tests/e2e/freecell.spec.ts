@@ -74,7 +74,11 @@ test.describe('Freecell Gameplay', () => {
 
   test('move card between columns', async ({ page }) => {
     // Set up: red 6 on col 0, black 7 on col 1
+    // Cancel any running auto-complete from previous random deal
     await page.evaluate(`
+      if (autoCompleteIv) { clearInterval(autoCompleteIv); autoCompleteIv = null; }
+      if (autoCompleteTimer) { clearTimeout(autoCompleteTimer); autoCompleteTimer = null; }
+      autoCompleteRunning = false;
       tableau = [
         [{rank:'6', suit:'\u2665', faceUp:true}],
         [{rank:'7', suit:'\u2660', faceUp:true}],
@@ -87,6 +91,28 @@ test.describe('Freecell Gameplay', () => {
       render();
     `);
 
+    // Wait for render and state to settle on ESP32
+    await page.waitForTimeout(1000);
+
+    // Verify setup — retry once if auto-complete or initGame overwrote state
+    let setupOk = await page.evaluate(`
+      tableau[0].length === 1 && tableau[1].length === 1 &&
+      navCol === 0 && navZone === 'tableau' && !selectedCard
+    `);
+    if (!setupOk) {
+      // Re-apply setup
+      await page.evaluate(`
+        if (autoCompleteIv) { clearInterval(autoCompleteIv); autoCompleteIv = null; }
+        autoCompleteRunning = false;
+        tableau = [[{rank:'6',suit:'\u2665',faceUp:true}],[{rank:'7',suit:'\u2660',faceUp:true}],[],[],[],[],[],[]];
+        freeCells = [null,null,null,null]; foundations = [[],[],[],[]];
+        selectedCard = null; gameWon = false;
+        navZone = 'tableau'; navCol = 0; navCardIdx = -1;
+        render();
+      `);
+      await page.waitForTimeout(500);
+    }
+
     // Select red 6
     await navPress(page, 'Space');
     expect((await getState(page)).selectedCard).not.toBeNull();
@@ -96,6 +122,7 @@ test.describe('Freecell Gameplay', () => {
 
     // Place
     await navPress(page, 'Space');
+    await page.waitForTimeout(200);
 
     // Verify col 1 has 2 cards with red 6 on top
     const col1Len = await page.evaluate('tableau[1].length');

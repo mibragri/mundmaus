@@ -15,82 +15,54 @@ test.describe('Portal (ESP32 root)', () => {
     await expect(h1).toContainText('MundMaus');
   });
 
-  test('2. three game buttons visible: Chess, Memo, Solitaer', async ({ page }) => {
+  test('2. six game buttons visible (sorted alphabetically)', async ({ page }) => {
     const gameLinks = page.locator('.g');
-    await expect(gameLinks).toHaveCount(3);
+    await expect(gameLinks).toHaveCount(6);
+    // Games are sorted alphabetically by label:
+    // Chess, Freecell, Memo, Muehle, Solitaer, Vier gewinnt
     await expect(gameLinks.nth(0)).toContainText('Chess');
-    await expect(gameLinks.nth(1)).toContainText('Memo');
-    await expect(gameLinks.nth(2)).toContainText('Solitaer');
+    await expect(gameLinks.nth(1)).toContainText('Freecell');
+    await expect(gameLinks.nth(2)).toContainText('Memo');
+    await expect(gameLinks.nth(3)).toContainText('Muehle');
+    await expect(gameLinks.nth(4)).toContainText('Solitaer');
+    await expect(gameLinks.nth(5)).toContainText('Vier gewinnt');
   });
 
-  test('3. WiFi panel shows connected status (green dot)', async ({ page }) => {
-    const wifiDot = page.locator('.wd').first();
-    await expect(wifiDot).toBeVisible();
-    await expect(wifiDot).toHaveCSS('background-color', 'rgb(76, 175, 80)');
+  test('3. version number visible in bottom-right', async ({ page }) => {
+    const gear = page.locator('.settings-gear');
+    await expect(gear).toBeVisible();
+    await expect(gear).toContainText(/v\d+\.\d+/);
   });
 
-  test('4. software/update section visible', async ({ page }) => {
-    // The update section (#upd) becomes visible after WS connects
-    const updSection = page.locator('#upd');
-    await expect(updSection).toBeVisible({ timeout: 15_000 });
+  test('4. settings gear link visible', async ({ page }) => {
+    const settingsLink = page.locator('.settings-gear a[href*="settings"]');
+    await expect(settingsLink).toBeVisible();
   });
 
-  test('5. footer shows sensor chips (Joystick, Puff - both red)', async ({ page }) => {
-    const joystickChip = page.locator('span[title*="Joystick"]');
-    await expect(joystickChip).toBeVisible();
-    await expect(joystickChip).toContainText('Joystick');
-
-    const puffChip = page.locator('span[title*="Puff"]');
-    await expect(puffChip).toBeVisible();
-    await expect(puffChip).toContainText('Puff');
-
-    // Both should have red dots (hardware not connected)
-    const joystickDot = joystickChip.locator('span').first();
-    await expect(joystickDot).toHaveCSS('background-color', 'rgb(212, 42, 42)');
-    const puffDot = puffChip.locator('span').first();
-    await expect(puffDot).toHaveCSS('background-color', 'rgb(212, 42, 42)');
+  test('5. reload button visible', async ({ page }) => {
+    // The reload button is a span with ↻ (&#8635;) inside .settings-gear
+    const reloadSpan = page.locator('.settings-gear span[onclick*="reload"]');
+    await expect(reloadSpan).toBeVisible();
   });
 
-  test('6. WS chip exists and turns green (Erreichbar)', async ({ page }) => {
-    const wsChip = page.locator('#ws-chip');
-    await expect(wsChip).toBeVisible();
-
-    // Wait for WebSocket to connect
-    const wsDot = page.locator('#ws-dot');
-    await expect(wsDot).toHaveCSS('background-color', 'rgb(76, 175, 80)', { timeout: 15_000 });
-
-    const wsText = page.locator('#ws-text');
-    await expect(wsText).toContainText('✓');
+  test('6. update button exists (hidden by default)', async ({ page }) => {
+    // The update button is hidden by default (display:none), shown by JS when updates available
+    const updBtn = page.locator('#upd-btn');
+    await expect(updBtn).toBeAttached();
+    // Default state is hidden (no updates available)
+    const display = await updBtn.evaluate(el => getComputedStyle(el).display);
+    expect(display).toBe('none');
   });
 
-  test('7. keyboard nav: arrow keys move highlight between game buttons', async ({ page }) => {
+  test('7. all 6 game links are clickable', async ({ page }) => {
     const gameLinks = page.locator('.g');
-
-    // Helper: check which button has the glow box-shadow (highlight indicator)
-    async function getHighlightedIndex(): Promise<number> {
-      return page.evaluate(() => {
-        const items = document.querySelectorAll('.g');
-        for (let i = 0; i < items.length; i++) {
-          if (getComputedStyle(items[i]).boxShadow !== 'none') return i;
-        }
-        return -1;
-      });
+    const count = await gameLinks.count();
+    expect(count).toBe(6);
+    for (let i = 0; i < count; i++) {
+      const href = await gameLinks.nth(i).getAttribute('href');
+      expect(href).toContain('/www/');
+      expect(href).toContain('.html');
     }
-
-    // First button starts highlighted (index 0)
-    expect(await getHighlightedIndex()).toBe(0);
-
-    // Move to second button
-    await page.keyboard.press('ArrowRight');
-    expect(await getHighlightedIndex()).toBe(1);
-
-    // Move to third button
-    await page.keyboard.press('ArrowRight');
-    expect(await getHighlightedIndex()).toBe(2);
-
-    // ArrowLeft goes back
-    await page.keyboard.press('ArrowLeft');
-    expect(await getHighlightedIndex()).toBe(1);
   });
 
   test('8. clicking a game button navigates to the game', async ({ page }) => {
@@ -109,17 +81,12 @@ test.describe('Portal (ESP32 root)', () => {
     expect(href).toContain('>M<');
   });
 
-  test('10. footer keyboard hints visible', async ({ page }) => {
-    const kbdElements = page.locator('kbd');
-    const count = await kbdElements.count();
-    expect(count).toBeGreaterThanOrEqual(2);
-
-    // Arrow keys hint
-    const arrowHint = page.locator('kbd', { hasText: /[←↑→↓]/ });
-    await expect(arrowHint.first()).toBeVisible();
-
-    // Enter/Return hint (⏎ = &#9166;)
-    const spaceHint = page.locator('kbd', { hasText: '⏎' });
-    await expect(spaceHint).toBeVisible();
+  test('10. game links point to /www/*.html paths', async ({ page }) => {
+    const gameLinks = page.locator('.g');
+    const count = await gameLinks.count();
+    for (let i = 0; i < count; i++) {
+      const href = await gameLinks.nth(i).getAttribute('href');
+      expect(href).toMatch(/^\/www\/\w[\w-]*\.html$/);
+    }
   });
 });

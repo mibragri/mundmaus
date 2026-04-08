@@ -23,8 +23,22 @@ export async function gotoGame(page: Page, name: string, retries = 4): Promise<v
   }
 }
 
-// Keep old name for backward compat
-export const gotoESP32 = gotoGame;
+/** Navigate to a raw path (e.g. '/') — used by portal/resilience tests */
+export async function gotoESP32(page: Page, path: string, retries = 4): Promise<void> {
+  if (LOCAL) {
+    await page.goto(path, { waitUntil: 'domcontentloaded' });
+    return;
+  }
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 30_000 });
+      return;
+    } catch (err) {
+      if (attempt === retries) throw err;
+      await page.waitForTimeout(3000 * attempt);
+    }
+  }
+}
 
 export async function esp32Cooldown(page: Page): Promise<void> {
   if (!LOCAL) await page.waitForTimeout(3000);
