@@ -1031,17 +1031,17 @@ function undoMove() {
     const prev = game.history.pop(); // undo computer's
     Object.assign(game, {board: prev.board, turn: prev.turn, castling: prev.castling,
       enPassant: prev.enPassant, moveNum: prev.moveNum, halfmove: prev.halfmove,
-      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: prev.positionCounts});
+      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: {...prev.positionCounts}});
     const prev2 = game.history.pop(); // undo player's
     Object.assign(game, {board: prev2.board, turn: prev2.turn, castling: prev2.castling,
       enPassant: prev2.enPassant, moveNum: prev2.moveNum, halfmove: prev2.halfmove,
-      capturedW: prev2.capturedW, capturedB: prev2.capturedB, positionCounts: prev2.positionCounts});
+      capturedW: prev2.capturedW, capturedB: prev2.capturedB, positionCounts: {...prev2.positionCounts}});
     return true;
   } else if (game.turn === B && game.history.length >= 1) {
     const prev = game.history.pop();
     Object.assign(game, {board: prev.board, turn: prev.turn, castling: prev.castling,
       enPassant: prev.enPassant, moveNum: prev.moveNum, halfmove: prev.halfmove,
-      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: prev.positionCounts});
+      capturedW: prev.capturedW, capturedB: prev.capturedB, positionCounts: {...prev.positionCounts}});
     return true;
   }
   return false;

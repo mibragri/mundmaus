@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
+#include <atomic>
 
 #include "config.h"
 #include "wifi_manager.h"
@@ -315,7 +316,7 @@ void loop() {
     // connectStation() can block up to 49s (3x15s + backoff) which exceeds
     // the 30s WDT timeout. Running it in a background task prevents WDT panic.
     static unsigned long lastWifiCheck = 0;
-    static volatile bool wifiReconnecting = false;
+    static std::atomic<bool> wifiReconnecting{false};
     if (millis() - lastWifiCheck > 30000 && !wifiReconnecting) {
         lastWifiCheck = millis();
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
@@ -325,13 +326,13 @@ void loop() {
                 static_cast<WiFiManager*>(param)->connectStation();
                 wifiReconnecting = false;
                 vTaskDelete(nullptr);
-            }, "wifi_recon", 4096, &wifi, 1, nullptr);
+            }, "wifi_recon", 6144, &wifi, 1, nullptr);
         }
     }
 
     // Periodic OTA check (every 3 hours, non-blocking)
     static unsigned long lastOtaCheck = 0;
-    static volatile bool otaCheckRunning = false;
+    static std::atomic<bool> otaCheckRunning{false};
     if (wifi.mode == "station" && !otaCheckRunning &&
         (millis() - lastOtaCheck > 3UL * 60 * 60 * 1000)) {
         lastOtaCheck = millis();

@@ -817,11 +817,19 @@ function getLegalMoves(board, player, phase, toPlace) {
       if (board[i] === null) moves.push({type:'place', to: i});
     }
   } else {
-    // zug: move each own piece to adjacent empty
+    // zug: move each own piece to adjacent empty (or any empty if flying)
+    const canFly = countOnBoard(board, player) === 3;
     for (let i = 0; i < 24; i++) {
       if (board[i] === player) {
-        for (const adj of ADJ[i]) {
-          if (board[adj] === null) moves.push({type:'move', from: i, to: adj});
+        if (canFly) {
+          // Flying: can move to any empty square
+          for (let j = 0; j < 24; j++) {
+            if (board[j] === null) moves.push({type:'move', from: i, to: j});
+          }
+        } else {
+          for (const adj of ADJ[i]) {
+            if (board[adj] === null) moves.push({type:'move', from: i, to: adj});
+          }
         }
       }
     }
@@ -904,9 +912,15 @@ function countPotentialMills(board, player) {
 
 function countMobility(board, player) {
   let n = 0;
+  const canFly = countOnBoard(board, player) === 3;
   for (let i = 0; i < 24; i++) {
     if (board[i] === player) {
-      for (const adj of ADJ[i]) if (board[adj] === null) n++;
+      if (canFly) {
+        // Flying: every empty square is reachable from every piece
+        for (let j = 0; j < 24; j++) if (board[j] === null) n++;
+      } else {
+        for (const adj of ADJ[i]) if (board[adj] === null) n++;
+      }
     }
   }
   return n;
