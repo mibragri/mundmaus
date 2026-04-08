@@ -54,6 +54,15 @@ function showUpd(d){
   }
 }
 var _updating=false;
+function _fadeOut(){
+  var o=document.getElementById('fade-overlay');
+  if(!o){o=document.createElement('div');o.id='fade-overlay';
+    o.style.cssText='position:fixed;top:0;left:0;width:100%;height:100%;background:#000;opacity:0;transition:opacity 0.8s;z-index:9999;display:flex;align-items:center;justify-content:center;color:#FFD700;font-size:3vh;font-family:system-ui';
+    o.textContent='\u23f3 Neustart...';document.body.appendChild(o);}
+  requestAnimationFrame(function(){o.style.opacity='1';});
+  // Fallback: force reload after 15s in case WS reconnect fails
+  setTimeout(function(){location.reload();},15000);
+}
 function connectWS(){
   var ws=new WebSocket('ws://'+location.hostname+':81');
   ws.onopen=function(){
@@ -61,9 +70,7 @@ function connectWS(){
     fetch('/api/updates/check',{method:'POST'}).catch(function(){});
   };
   ws.onclose=function(){
-    if(_updating){
-      document.getElementById('upd-status').textContent='\u23f3 Neustart l\u00e4uft...';
-    }
+    if(_updating) _fadeOut();
     setTimeout(connectWS,3000);
   };
   ws.onmessage=function(e){
@@ -79,9 +86,9 @@ function connectWS(){
     }
     else if(d.type==='update_complete'){
       document.getElementById('upd-fill').style.width='100%';
-      document.getElementById('upd-status').textContent='\u2713 Fertig \u2014 Neustart...';
       _updating=true;
-      setTimeout(function(){fetch('/api/reboot').catch(function(){})},1000);
+      _fadeOut();
+      setTimeout(function(){fetch('/api/reboot').catch(function(){})},1500);
     }
     else if(d.type==='update_error'){
       document.getElementById('upd-status').textContent='\u2717 Fehler: '+d.file;
