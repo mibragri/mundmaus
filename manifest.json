@@ -9,7 +9,7 @@
       "version": 21
     },
     "www/freecell.html.gz": {
-      "version": 22
+      "version": 23
     },
     "www/memo.html.gz": {
       "version": 18
@@ -21,10 +21,10 @@
       "version": 10
     },
     "www/solitaire.html.gz": {
-      "version": 34
+      "version": 35
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 18
+      "version": 19
     }
   }
 }
