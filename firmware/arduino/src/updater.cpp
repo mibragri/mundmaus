@@ -10,6 +10,8 @@
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
 #include <Update.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 
 #include <map>
 
@@ -22,43 +24,68 @@ namespace Updater {
 // filename -> version number, persisted in Preferences namespace "ota_ver"
 static std::map<String, int> _versions;
 
-static const char* OTA_MARKER = "/.ota_marker";
+// Bug 2: replace LittleFS .ota_marker file with an NVS schema key so a
+// transient LittleFS full condition (or any LittleFS corruption) cannot
+// silently wipe all version tracking on the next boot.
+static constexpr int SCHEMA_VERSION = 1;
 
-void loadVersions() {
-    _versions.clear();
+// Bug 5: Serialize all access to the "ota_ver" NVS namespace and _versions.
+// checkManifest() can be invoked from multiple contexts (boot task, periodic
+// check task, post-install refresh, HTTP handler callback) and all paths
+// mutate the same backing store. Without a mutex concurrent writers can
+// observe half-written state and corrupt the JSON blob.
+static SemaphoreHandle_t _versionsMutex = nullptr;
 
-    // If marker is missing, LittleFS was overwritten by USB flash.
-    // Clear NVS so fresh-flash seeding can re-detect installed versions.
-    if (!LittleFS.exists(OTA_MARKER)) {
-        Preferences prefs;
-        prefs.begin("ota_ver", false);
-        prefs.clear();
-        prefs.end();
-        Serial.println("  OTA: fresh flash detected, cleared version tracking");
-        return;
+static void _ensureMutex() {
+    if (_versionsMutex == nullptr) {
+        _versionsMutex = xSemaphoreCreateMutex();
     }
+}
+
+// Internal: load versions into _versions. Caller must hold _versionsMutex.
+static void _loadVersionsLocked() {
+    _versions.clear();
 
     Preferences prefs;
     prefs.begin("ota_ver", true);  // read-only
-
-    // Preferences doesn't support iteration, so we store a JSON blob
-    // under key "json" containing {"filename": version, ...}
-    String json = prefs.getString("json", "{}");
+    int schema = prefs.getInt("schema_version", 0);
     prefs.end();
+
+    if (schema != SCHEMA_VERSION) {
+        // Fresh flash or schema upgrade — wipe NVS and set schema version.
+        // This is the ONLY place that can clear NVS, and it only fires when
+        // the schema key is missing (brand new NVS partition) or differs
+        // (future migration). A transiently-full LittleFS can no longer
+        // trigger this path.
+        Serial.println("  OTA: fresh flash detected, cleared version tracking");
+        prefs.begin("ota_ver", false);
+        prefs.clear();
+        prefs.putInt("schema_version", SCHEMA_VERSION);
+        prefs.end();
+        return;
+    }
+
+    // Normal path: load versions blob
+    prefs.begin("ota_ver", true);
+    String json = prefs.getString("json", "");
+    prefs.end();
+
+    if (json.length() == 0) return;
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, json);
     if (err) return;
 
-    for (JsonPair kv : doc.as<JsonObject>()) {
+    for (JsonPairConst kv : doc.as<JsonObjectConst>()) {
         _versions[String(kv.key().c_str())] = kv.value().as<int>();
     }
 }
 
-void saveVersions() {
+// Internal: save _versions to NVS. Caller must hold _versionsMutex.
+static void _saveVersionsLocked() {
     JsonDocument doc;
     for (const auto& kv : _versions) {
-        doc[kv.first] = kv.second;
+        doc[kv.first.c_str()] = kv.second;
     }
     String json;
     serializeJson(doc, json);
@@ -66,19 +93,24 @@ void saveVersions() {
     Preferences prefs;
     prefs.begin("ota_ver", false);  // read-write
     prefs.putString("json", json);
+    // Keep schema version up to date — a rolled-back firmware that
+    // downgraded NVS would otherwise look like a fresh flash next boot.
+    prefs.putInt("schema_version", SCHEMA_VERSION);
     prefs.end();
+}
 
-    // Write marker so next boot knows NVS versions are valid.
-    // P2-2: Log on failure — a missing marker silently triggers a full
-    // version-tracking reset on the next boot, making OTA offer every file
-    // as an update. That is confusing and wastes bandwidth.
-    File f = LittleFS.open(OTA_MARKER, "w");
-    if (f) {
-        f.print("1");
-        f.close();
-    } else {
-        Serial.println("  OTA: WARNING could not create .ota_marker (LittleFS full?)");
-    }
+void loadVersions() {
+    _ensureMutex();
+    if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
+    _loadVersionsLocked();
+    xSemaphoreGive(_versionsMutex);
+}
+
+void saveVersions() {
+    _ensureMutex();
+    if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
+    _saveVersionsLocked();
+    xSemaphoreGive(_versionsMutex);
 }
 
 // ============================================================
@@ -155,8 +187,17 @@ CheckResult checkManifest() {
     // Successfully fetched manifest
     result.offline = false;
 
-    // Load current local versions
-    loadVersions();
+    // Bug 5: Hold the versions mutex for the ENTIRE load/compare/save cycle.
+    // Otherwise two concurrent manifest checks can both read the same stale
+    // state, seed overlapping entries, and race on saveVersions() — the
+    // JSON blob write is not atomic and the loser corrupts the namespace.
+    _ensureMutex();
+    if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) {
+        return result;
+    }
+
+    // Load current local versions (under the same lock)
+    _loadVersionsLocked();
 
     // Compare remote files against local versions
     JsonObject files = manifest["files"].as<JsonObject>();
@@ -224,7 +265,9 @@ CheckResult checkManifest() {
     }
 
     // Persist any seeded versions from fresh-flash detection
-    saveVersions();
+    _saveVersionsLocked();
+
+    xSemaphoreGive(_versionsMutex);
 
     Serial.printf("  OTA: %d updates available\n", result.available.size());
     return result;
@@ -380,8 +423,12 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             continue;  // do NOT update _versions
         }
 
-        // Update version tracking
-        _versions[uf->name] = uf->remoteVer;
+        // Update version tracking (Bug 5: lock around _versions mutation)
+        _ensureMutex();
+        if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) == pdTRUE) {
+            _versions[uf->name] = uf->remoteVer;
+            xSemaphoreGive(_versionsMutex);
+        }
         Serial.printf("  OTA: installed %s v%d\n", uf->name.c_str(), uf->remoteVer);
     }
 
@@ -393,11 +440,16 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         }
         String path = "/" + uf->name;
         LittleFS.remove(path);
-        _versions.erase(uf->name);
+        // Bug 5: lock around _versions mutation
+        _ensureMutex();
+        if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) == pdTRUE) {
+            _versions.erase(uf->name);
+            xSemaphoreGive(_versionsMutex);
+        }
         Serial.printf("  OTA: deleted %s\n", uf->name.c_str());
     }
 
-    // Persist version tracking
+    // Persist version tracking (saveVersions() takes the mutex internally)
     saveVersions();
 
     return allOk;
@@ -487,22 +539,37 @@ bool installFirmwareUpdate(const UpdateFile& fw,
         return false;
     }
 
-    if (!Update.end(true)) {
-        Serial.printf("  OTA: end failed: %s\n", Update.errorString());
-        return false;
-    }
-
-    // P1-5: Firmware version is NOT updated here anymore. Storing it now means
-    // a rollback (bootloader reverts due to crash) leaves NVS claiming the new
-    // version is installed — the manifest check will not re-offer the update,
-    // stranding the device on broken firmware. Instead we stash the pending
-    // version in a separate NVS key; markBootOk() promotes it to _versions
-    // only after the new firmware successfully completes boot.
+    // Bug 1: Write pending_fw BEFORE calling Update.end(true).
+    // Update.end(true) commits the partition flag flip — from that point on
+    // the next boot will run the new firmware. If power is lost between
+    // end(true) and the putInt() that used to follow it, the new firmware
+    // boots successfully, but markBootOk() finds no pending_fw entry and
+    // cannot promote the version — the manifest check then re-offers the
+    // same update forever, causing an infinite update loop.
+    //
+    // By writing pending_fw first we guarantee the NVS entry is durable
+    // before the partition flip. If Update.end(true) then fails, we remove
+    // the entry again so we don't claim a pending update that never shipped.
+    //
+    // Context: Firmware version is NOT committed to _versions here — the
+    // bootloader might still roll back. markBootOk() promotes pending_fw
+    // only after the new image successfully completes its first boot.
     {
         Preferences prefs;
         prefs.begin("ota_ver", false);
         prefs.putInt("pending_fw", fw.remoteVer);
         prefs.end();
+    }
+
+    if (!Update.end(true)) {
+        Serial.printf("  OTA: end failed: %s\n", Update.errorString());
+        // Commit failed — remove the pending marker we just wrote, otherwise
+        // next boot would try to promote a version that never installed.
+        Preferences prefs;
+        prefs.begin("ota_ver", false);
+        prefs.remove("pending_fw");
+        prefs.end();
+        return false;
     }
 
     Serial.printf("  OTA: firmware installed (%d bytes)\n", written);
@@ -565,16 +632,28 @@ void markBootOk() {
         }
     }
 
-    // Mark current OTA partition as valid, cancelling any pending rollback.
-    // Safe to call even on factory partition (no-op).
-    esp_ota_mark_app_valid_cancel_rollback();
-
     // Promote pending firmware version only after a confirmed first boot of
     // a new image. If bootloader rolled back, the OLD firmware is running
     // and its partition is already VALID, so isFirstBootAfterOta == false
     // and pending_fw stays untouched — the next manifest check correctly
     // re-offers the update.
     if (!isFirstBootAfterOta) {
+        // Regular boot — mark partition valid (no-op on factory) and exit.
+        esp_ota_mark_app_valid_cancel_rollback();
+        return;
+    }
+
+    // First boot after OTA: promote pending_fw in _versions.
+    // Bug 4: DO NOT unconditionally call loadVersions() here. The previous
+    // version re-entered the fresh-flash-detection path, which with an
+    // LittleFS-based marker could wipe all NVS version tracking. Even with
+    // the schema_version fix (Bug 2), re-loading is unnecessary work and
+    // stomps on any entries the boot sequence already populated. Instead,
+    // load ONLY if _versions has not been loaded yet this boot.
+    _ensureMutex();
+    if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) {
+        // Shouldn't happen — fall back to cancelling rollback and return.
+        esp_ota_mark_app_valid_cancel_rollback();
         return;
     }
 
@@ -587,13 +666,14 @@ void markBootOk() {
     }
 
     if (pending > 0) {
-        // loadVersions() reopens the prefs handle; call it only after we
-        // closed our own read-only handle above. loadVersions() may itself
-        // clear the namespace if OTA_MARKER is missing, but in that case
-        // `pending_fw` is irrelevant anyway (fresh flash).
-        loadVersions();
+        if (_versions.empty()) {
+            // Only load when we haven't already — avoids re-entering the
+            // fresh-flash path and avoids clobbering an in-memory state
+            // that may already reflect the current manifest check.
+            _loadVersionsLocked();
+        }
         _versions["firmware.bin"] = pending;
-        saveVersions();  // rewrites the "json" blob with the promoted version
+        _saveVersionsLocked();
 
         // Clear the pending marker so we don't re-promote on the next boot.
         Preferences prefs;
@@ -602,6 +682,12 @@ void markBootOk() {
         prefs.end();
         Serial.printf("  OTA: firmware v%d promoted to installed\n", pending);
     }
+
+    xSemaphoreGive(_versionsMutex);
+
+    // Cancel rollback timer — firmware is now validated.
+    esp_ota_mark_app_valid_cancel_rollback();
+    Serial.println("  OTA: boot validated, rollback cancelled");
 }
 
 }  // namespace Updater

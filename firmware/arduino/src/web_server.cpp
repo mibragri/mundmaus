@@ -693,6 +693,15 @@ void MundMausServer::processSensorQueue() {
 
 void MundMausServer::checkReboot() {
     if (_pendingReboot > 0 && (millis() - _pendingReboot) > 2000) {
+        // Bug 3: Never reboot while an OTA update is in progress. A stale
+        // _pendingReboot can be left over from a save-settings handler that
+        // scheduled a reboot seconds before the user clicked "Install" on
+        // the updates page. Rebooting mid-download aborts Update.begin/write,
+        // may half-flip the partition flag, and at best wastes an OTA cycle.
+        if (_updateRunning.load()) {
+            Serial.println("  Reboot deferred — OTA update in progress");
+            return;
+        }
         Serial.println("  Reboot...");
         ESP.restart();
     }
@@ -864,6 +873,16 @@ void MundMausServer::_updateTaskWrapper(void* param) {
         ev.data[sizeof(ev.data) - 1] = '\0';
         xQueueSend(q, &ev, 0);
     }
+
+    // Bug 3: Clear any stale _pendingReboot that was scheduled BEFORE the
+    // install ran (e.g. user saved settings, then started the update).
+    // checkReboot() defers while _updateRunning is true, so without this
+    // clear the deferred reboot would fire the instant we release the flag
+    // below — potentially interrupting the post-install UI state. For the
+    // firmware-reboot path, ESP.restart() below takes over anyway, but
+    // clearing is still correct so the state is consistent if the restart
+    // is itself preempted for some reason.
+    self->_pendingReboot = 0;
 
     // Reboot after firmware update
     if (needsReboot) {
