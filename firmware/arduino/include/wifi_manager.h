@@ -13,8 +13,10 @@ public:
     /// Load SSID/password from NVS. Returns true if credentials found.
     bool loadCredentials();
 
-    /// Save SSID/password to NVS.
-    void saveCredentials(const String& ssid, const String& password);
+    /// Save SSID/password to NVS. Returns true on success, false if the NVS
+    /// write failed or was incomplete (in which case in-RAM state is NOT
+    /// updated — callers must surface the error and not assume success).
+    bool saveCredentials(const String& ssid, const String& password);
 
     /// Delete stored credentials from NVS.
     void deleteCredentials();

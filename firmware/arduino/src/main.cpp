@@ -193,8 +193,11 @@ void setup() {
                 if (sep > 0) {
                     String ssid = line.substring(0, sep);
                     String pass = line.substring(sep + 1);
-                    wifi.saveCredentials(ssid, pass);
-                    Serial.printf("  WiFi gespeichert: %s\n", ssid.c_str());
+                    if (wifi.saveCredentials(ssid, pass)) {
+                        Serial.printf("  WiFi gespeichert: %s\n", ssid.c_str());
+                    } else {
+                        Serial.println("  FEHLER: WiFi-Speichern fehlgeschlagen (NVS)");
+                    }
                     break;
                 }
             }
@@ -320,18 +323,38 @@ void loop() {
     // I6: WiFi reconnect (check every 30s, non-blocking background task)
     // connectStation() can block up to 49s (3x15s + backoff) which exceeds
     // the 30s WDT timeout. Running it in a background task prevents WDT panic.
+    //
+    // BLOCKER 4: After 3 consecutive reconnect failures, fall back to AP mode
+    // so the patient's caregivers can reach the device (e.g. router down,
+    // password changed at patient's home). Without this fallback the device
+    // loops forever in disconnected STA mode with no usable interface.
     static unsigned long lastWifiCheck = 0;
     static std::atomic<bool> wifiReconnecting{false};
+    static std::atomic<int> wifiFailCount{0};
     if (millis() - lastWifiCheck > 30000 && !wifiReconnecting) {
         lastWifiCheck = millis();
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
             wifiReconnecting = true;
             xTaskCreate([](void* param) {
                 Serial.println("  WiFi lost, reconnecting...");
-                static_cast<WiFiManager*>(param)->connectStation();
+                WiFiManager* w = static_cast<WiFiManager*>(param);
+                String ip = w->connectStation();
+                if (ip.length() > 0) {
+                    wifiFailCount = 0;  // success — reset counter
+                } else {
+                    int c = wifiFailCount.fetch_add(1) + 1;
+                    Serial.printf("  WiFi reconnect failed (%d/3)\n", c);
+                    if (c >= 3) {
+                        Serial.println("  Max reconnect failures — falling back to AP mode");
+                        w->startAP();
+                        wifiFailCount = 0;
+                    }
+                }
                 wifiReconnecting = false;
                 vTaskDelete(nullptr);
             }, "wifi_recon", 6144, &wifi, 1, nullptr);
+        } else if (wifi.mode == "station" && WiFi.status() == WL_CONNECTED) {
+            wifiFailCount = 0;  // connection is fine
         }
     }
 

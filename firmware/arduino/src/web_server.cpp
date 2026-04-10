@@ -97,6 +97,27 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
     });
 
+    // --- POST /api/wifi/reset --- Clear saved WiFi credentials and reboot
+    // BLOCKER 5: Caregivers at the patient's home need an escape hatch when
+    // the WiFi password has changed or the router is replaced. This route
+    // wipes the NVS credentials so the device comes back up in AP mode and
+    // can be re-provisioned via the captive portal.
+    //
+    // NOTE: MUST be registered BEFORE the /api/wifi handlers. ESPAsyncWebServer
+    // matches in registration order, and because its URI matching is not strict
+    // exact-match for GET handlers, `/api/wifi` matches `/api/wifi/reset` and
+    // steals the request. Registering this handler first ensures first-match
+    // wins and the reset route works correctly.
+    _httpServer.on("/api/wifi/reset", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        Serial.println("  WiFi credentials cleared via API");
+        _wifi.deleteCredentials();
+        JsonDocument doc;
+        doc["ok"] = true;
+        doc["message"] = "Geloescht. Neustart...";
+        _sendJson(req, 200, doc);
+        _pendingReboot = millis() | 1;
+    });
+
     // --- GET /api/wifi ---
     _httpServer.on("/api/wifi", HTTP_GET, [this](AsyncWebServerRequest* req) {
         JsonDocument doc;
@@ -150,7 +171,16 @@ void MundMausServer::_setupHttpRoutes() {
                     return;
                 }
 
-                _wifi.saveCredentials(String(ssid), String(pw));
+                // BLOCKER 2: surface NVS write errors to the caller. A silent
+                // failure here would reboot into unconfigured AP mode and the
+                // user would assume success.
+                if (!_wifi.saveCredentials(String(ssid), String(pw))) {
+                    JsonDocument doc;
+                    doc["ok"]    = false;
+                    doc["error"] = "NVS Schreibfehler";
+                    _sendJson(req, 500, doc);
+                    return;
+                }
 
                 // Notify WS clients
                 JsonDocument wsMsg;
@@ -451,7 +481,19 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         const char* ssid = msg["ssid"] | "";
         const char* pw   = msg["password"] | "";
         if (strlen(ssid) > 0) {
-            _wifi.saveCredentials(String(ssid), String(pw));
+            // BLOCKER 2: Don't schedule a reboot on NVS failure — emit an
+            // error status instead so the portal can surface the problem.
+            if (!_wifi.saveCredentials(String(ssid), String(pw))) {
+                JsonDocument resp;
+                resp["type"]    = "wifi_status";
+                resp["status"]  = "error";
+                resp["error"]   = "NVS Schreibfehler";
+                resp["message"] = "WLAN-Speichern fehlgeschlagen";
+                String buf;
+                serializeJson(resp, buf);
+                client->text(buf);
+                return;
+            }
 
             JsonDocument resp;
             resp["type"]    = "wifi_status";
@@ -792,6 +834,13 @@ void MundMausServer::_updateTaskWrapper(void* param) {
     MundMausServer* self = static_cast<MundMausServer*>(param);
     QueueHandle_t q = self->_sensorQueue;
 
+    // BLOCKER 1: Snapshot any pre-existing reboot request so we can detect
+    // whether the OTA task itself scheduled the reboot or whether something
+    // else (e.g. a WiFi save from moments earlier) did it. Clearing blindly
+    // at the end of the task would clobber that prior request and the device
+    // would never pick up the new WiFi credentials.
+    unsigned long rebootBefore = self->_pendingReboot;
+
     // P1-2: Copy the update list into a local vector under the mutex, then
     // release. Downloads take tens of seconds and must not hold the mutex —
     // AsyncTCP handlers would stall waiting for _buildUpdateJson otherwise.
@@ -874,20 +923,25 @@ void MundMausServer::_updateTaskWrapper(void* param) {
         xQueueSend(q, &ev, 0);
     }
 
-    // Bug 3: Clear any stale _pendingReboot that was scheduled BEFORE the
-    // install ran (e.g. user saved settings, then started the update).
-    // checkReboot() defers while _updateRunning is true, so without this
-    // clear the deferred reboot would fire the instant we release the flag
-    // below — potentially interrupting the post-install UI state. For the
-    // firmware-reboot path, ESP.restart() below takes over anyway, but
-    // clearing is still correct so the state is consistent if the restart
-    // is itself preempted for some reason.
-    self->_pendingReboot = 0;
-
-    // Reboot after firmware update
+    // BLOCKER 1: Preserve any _pendingReboot that existed BEFORE this OTA
+    // task ran (e.g. a WiFi save scheduled a reboot seconds before the user
+    // clicked "Install"). The old "clear unconditionally" behaviour wiped
+    // that prior request and the device silently failed to pick up the new
+    // WiFi credentials. New policy:
+    //   - OTA needs reboot: take it over via ESP.restart() below (sets
+    //     _pendingReboot as a fallback in case restart is preempted).
+    //   - OTA does not need reboot: only clear if WE were the one who set it
+    //     during this task. Otherwise leave the prior request in place so
+    //     checkReboot() can honour it once _updateRunning drops to false.
     if (needsReboot) {
+        self->_pendingReboot = millis() | 1;  // fallback marker
         delay(3000);
         ESP.restart();
+    } else {
+        // Game-only install path: do not touch _pendingReboot — any value
+        // currently in it belongs to an earlier request (e.g. WiFi save) and
+        // must be allowed to fire once _updateRunning is released.
+        (void)rebootBefore;  // retained for clarity/debug if ever needed
     }
 
     // I1: Push UPDATE_RESULT so main core re-checks manifest (no direct write)

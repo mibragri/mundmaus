@@ -436,8 +436,13 @@
       <button class="action-btn" onclick="doWifiScan()" style="white-space:nowrap;padding:8px 12px">🔍 Scan</button>
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
-      <input type="password" id="wifi-pw" placeholder="Passwort" style="flex:1;padding:8px;border-radius:6px;background:var(--bg);color:var(--text);border:1px solid var(--card-border);font-size:1.4vh">
+      <input type="password" id="wifi-pw" placeholder="Passwort (leer = offenes Netz)" style="flex:1;padding:8px;border-radius:6px;background:var(--bg);color:var(--text);border:1px solid var(--card-border);font-size:1.4vh">
       <button class="action-btn primary" onclick="doWifiConnect()" style="white-space:nowrap;padding:8px 12px">Verbinden</button>
+    </div>
+    <div style="margin-top:12px;text-align:right">
+      <button class="action-btn danger" onclick="doWifiReset()" style="font-size:1.3vh;padding:6px 12px">
+        ⚠ WLAN zurücksetzen
+      </button>
     </div>
   </div>
 
@@ -919,6 +924,19 @@ function doWifiConnect() {
       showToast('Fehler: ' + (d.error || 'unbekannt'), 'error');
     }
   }).catch(() => showToast('Verbindungsfehler', 'error'));
+}
+
+function doWifiReset() {
+  if (!confirm('Wirklich alle WLAN-Daten löschen? Das Gerät startet dann im Hotspot-Modus neu.')) return;
+  showToast('WLAN wird zurückgesetzt...', 'info');
+  fetch('/api/wifi/reset', {method: 'POST'}).then(r => r.json()).then(d => {
+    if (d.ok) {
+      showToast('Gelöscht — Neustart. Verbinde mit WLAN "MundMaus"', 'success');
+      setTimeout(() => { window.location.href = '/'; }, 15000);
+    } else {
+      showToast('Fehler: ' + (d.error || 'unbekannt'), 'error');
+    }
+  }).catch(() => showToast('Fehler', 'error'));
 }
 
 // ── Boot ─────────────────────────────────────────────────

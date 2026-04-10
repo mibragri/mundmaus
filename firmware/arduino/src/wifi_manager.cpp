@@ -31,19 +31,37 @@ bool WiFiManager::loadCredentials() {
     return false;
 }
 
-void WiFiManager::saveCredentials(const String& newSsid, const String& newPassword) {
-    ssid     = newSsid;
-    password = newPassword;
-    ssid.trim();
-    password.trim();
+bool WiFiManager::saveCredentials(const String& newSsid, const String& newPassword) {
+    // BLOCKER 2: Verify every step of the NVS write. If the write fails (e.g.
+    // flash wear, corrupted namespace), the in-RAM state must NOT be updated —
+    // otherwise we'd try to connect with credentials that would be lost on the
+    // next reboot, leaving the device unreachable after the scheduled restart.
+    String trimmedSsid = newSsid;
+    String trimmedPw = newPassword;
+    trimmedSsid.trim();
+    trimmedPw.trim();
 
     Preferences prefs;
-    prefs.begin("wifi", false);  // read-write
-    prefs.putString("ssid", ssid);
-    prefs.putString("password", password);
+    if (!prefs.begin("wifi", false)) {
+        Serial.println("  ERROR: Failed to open NVS wifi namespace");
+        return false;
+    }
+    size_t ssidWritten = prefs.putString("ssid", trimmedSsid);
+    size_t pwWritten = prefs.putString("password", trimmedPw);
     prefs.end();
 
+    if (ssidWritten != trimmedSsid.length() || pwWritten != trimmedPw.length()) {
+        Serial.printf("  ERROR: NVS write incomplete (ssid: %u/%u, pw: %u/%u)\n",
+                      (unsigned)ssidWritten, (unsigned)trimmedSsid.length(),
+                      (unsigned)pwWritten, (unsigned)trimmedPw.length());
+        return false;
+    }
+
+    // Only update in-RAM state AFTER successful NVS write.
+    ssid = trimmedSsid;
+    password = trimmedPw;
     Serial.printf("  Credentials gespeichert: '%s'\n", ssid.c_str());
+    return true;
 }
 
 void WiFiManager::deleteCredentials() {
@@ -124,7 +142,10 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
 String WiFiManager::startAP() {
     WiFi.disconnect(true);
-    WiFi.mode(WIFI_AP);
+    // BLOCKER 3: Keep STA enabled permanently (WIFI_AP_STA) so network scans
+    // work without toggling the radio on/off. Toggling caused dropped WS
+    // connections and brief outages every time the settings page scanned.
+    WiFi.mode(WIFI_AP_STA);
 
     WiFi.softAP(Config::AP_SSID, Config::AP_PASS);
 
@@ -151,13 +172,10 @@ String WiFiManager::startAP() {
 // ============================================================
 
 std::vector<String> WiFiManager::scanNetworks() {
-    // Ensure STA interface is active for scanning
-    bool wasAP = (mode == "ap");
-    if (wasAP) {
-        WiFi.enableSTA(true);
-        delay(100);
-    }
-
+    // BLOCKER 3: STA interface is always enabled (WIFI_AP_STA from startAP,
+    // or WIFI_STA from connectStation), so no toggling is required. The old
+    // enableSTA(true)/enableSTA(false) toggle around the scan was the root
+    // cause of brief radio outages during scans while in AP mode.
     int n = WiFi.scanNetworks();
 
     // Build (rssi, ssid) pairs for sorting
@@ -192,10 +210,6 @@ std::vector<String> WiFiManager::scanNetworks() {
     }
 
     WiFi.scanDelete();
-
-    if (wasAP) {
-        WiFi.enableSTA(false);
-    }
 
     return result;
 }
