@@ -6,7 +6,7 @@
       "firmware": true
     },
     "www/chess.html.gz": {
-      "version": 20
+      "version": 21
     },
     "www/freecell.html.gz": {
       "version": 22
@@ -21,7 +21,7 @@
       "version": 10
     },
     "www/solitaire.html.gz": {
-      "version": 33
+      "version": 34
     },
     "www/vier-gewinnt.html.gz": {
       "version": 18
