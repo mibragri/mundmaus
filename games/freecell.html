@@ -738,7 +738,12 @@ function doUndo() {
   const s = undoStack.pop();
   freeCells = s.freeCells; foundations = s.foundations; tableau = s.tableau;
   moves = s.moves; score = s.score;
-  selectedCard = null; sndUndo(); render(); updateStatus();
+  selectedCard = null; gameWon = false;
+  if (autoCompleteIv) { clearInterval(autoCompleteIv); autoCompleteIv = null; }
+  if (autoCompleteTimer) { clearTimeout(autoCompleteTimer); autoCompleteTimer = null; }
+  autoCompleteRunning = false;
+  document.getElementById('message').className = '';
+  sndUndo(); render(); updateStatus();
 }
 
 // ============================================================

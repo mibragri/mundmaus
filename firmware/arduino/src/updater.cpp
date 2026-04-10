@@ -373,7 +373,12 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
 
         // Atomic install: remove old, rename .new -> final
         LittleFS.remove(path);
-        LittleFS.rename(tmpPath, path);
+        if (!LittleFS.rename(tmpPath, path)) {
+            Serial.printf("  OTA: rename FAILED for %s — file lost!\n", path.c_str());
+            LittleFS.remove(tmpPath);  // clean up orphan
+            allOk = false;
+            continue;  // do NOT update _versions
+        }
 
         // Update version tracking
         _versions[uf->name] = uf->remoteVer;

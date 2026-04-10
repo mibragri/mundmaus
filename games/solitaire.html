@@ -703,7 +703,11 @@ function saveUndo() {
 function doUndo() {
   if(!undoStack.length){sndError();return;} const s=undoStack.pop();
   stock=s.stock;waste=s.waste;foundations=s.foundations;tableau=s.tableau;moves=s.moves;score=s.score;
-  selectedCard=null;sndUndo();render();updateStatus();
+  selectedCard=null; gameWon=false;
+  if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
+  if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
+  document.getElementById('message').className='';
+  sndUndo();render();updateStatus();
 }
 
 function drawFromStock() {

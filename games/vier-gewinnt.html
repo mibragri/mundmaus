@@ -1023,16 +1023,25 @@ function renderBoard() {
     const r = +cell.dataset.row;
     const val = board[c][r];
 
-    // Reset
+    // Preserve a currently-animating (.dropping) piece so its CSS animation
+    // can run to completion. The next renderBoard call after the animation
+    // ends will replace it with the static piece.
+    const dropping = cell.querySelector('.piece.dropping');
+    const droppingMatches = dropping && val !== EMPTY &&
+      dropping.classList.contains(val === PLAYER ? 'player' : 'ai');
+
+    // Reset (but keep the animating piece if it matches current board state)
     cell.className = 'cell';
-    cell.innerHTML = '';
+    if (!droppingMatches) {
+      cell.innerHTML = '';
+    }
 
     // Column highlight when cursor is on it (and not in button column)
     if (ui.phase === 'playing' && !ui.inBtnCol && c === ui.cursorCol && !ui.aiThinking) {
       cell.classList.add('col-active');
     }
 
-    if (val !== EMPTY) {
+    if (val !== EMPTY && !droppingMatches) {
       const piece = document.createElement('div');
       piece.className = 'piece ' + (val === PLAYER ? 'player' : 'ai');
 
@@ -1047,6 +1056,14 @@ function renderBoard() {
       }
 
       cell.appendChild(piece);
+    } else if (droppingMatches && winLine) {
+      // Winning piece may need the win-piece class added to the animating element
+      for (const wp of winLine) {
+        if (wp.col === c && wp.row === r) {
+          dropping.classList.add('win-piece');
+          break;
+        }
+      }
     }
   });
 
@@ -1437,6 +1454,11 @@ function animateDrop(col, row, player) {
       const piece = document.createElement('div');
       piece.className = 'piece ' + (player === PLAYER ? 'player' : 'ai') + ' dropping';
       cell.appendChild(piece);
+      // Remove the dropping class after the CSS animation finishes so that
+      // the next renderBoard() call can replace it with the static piece.
+      piece.addEventListener('animationend', () => {
+        piece.classList.remove('dropping');
+      }, { once: true });
     }
   });
 }

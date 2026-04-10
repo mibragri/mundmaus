@@ -92,7 +92,7 @@ static void sensorTask(void* param) {
                 // (joystick jitter) from firing premature nav_release events
                 if (releaseStart == 0) {
                     releaseStart = now;
-                } else if ((now - releaseStart) > 100) {
+                } else if ((now - releaseStart) > 50) {
                     server->sendNavRelease();
                     wasNavigating = false;
                     releaseStart = 0;
@@ -128,8 +128,13 @@ static void sensorTask(void* param) {
             // Broadcast puff level periodically
             if ((now - lastPuffSend) > (unsigned long)Config::DEFAULT_PUFF_SEND_INTERVAL_MS) {
                 float level = puffSensor->getLevel();
+                static bool wasActive = false;
                 if (level > 0.02f) {
                     server->sendPuffLevel(level);
+                    wasActive = true;
+                } else if (wasActive) {
+                    server->sendPuffLevel(0.0f);  // reset bar to zero
+                    wasActive = false;
                 }
                 lastPuffSend = now;
             }
