@@ -222,10 +222,14 @@ CheckResult checkManifest() {
             }
         }
 
-        // After fresh flash: firmware.bin has no NVS entry. The running
-        // firmware knows its own version (MUNDMAUS_FW_VERSION build flag),
-        // so use that instead of offering a spurious "update to self".
-        if (localVer == 0 && isFirmware) {
+        // Firmware version reconciliation: MUNDMAUS_FW_VERSION (build flag)
+        // is the ground truth for the code currently running. If NVS has
+        // a stale value (e.g., USB-reflashed over an older OTA history,
+        // or factory-flashed while NVS retained entries from a previous
+        // install), reconcile upward. Without this, the device would loop
+        // offering "update to self" forever after any USB flash that
+        // skipped the NVS promotion path in markBootOk().
+        if (isFirmware && localVer < MUNDMAUS_FW_VERSION) {
             localVer = MUNDMAUS_FW_VERSION;
             _versions[fname] = localVer;
         }
