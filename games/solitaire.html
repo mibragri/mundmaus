@@ -707,8 +707,9 @@ function doUndo() {
 }
 
 function drawFromStock() {
+  if(!stock.length&&!waste.length){sndError();return;}
   saveUndo();
-  if(!stock.length){if(!waste.length){sndError();return;}stock=waste.reverse();stock.forEach(c=>c.faceUp=false);waste=[];score=Math.max(0,score-20);}
+  if(!stock.length){stock=waste.reverse();stock.forEach(c=>c.faceUp=false);waste=[];score=Math.max(0,score-20);}
   else{const c=stock.pop();c.faceUp=true;waste.push(c);}
   moves++;sndTalon();render();updateStatus();
 }
@@ -721,6 +722,16 @@ function canPlaceOnTableau(card,ci) {
   const col=tableau[ci];if(!col.length)return card.rank==='K';
   const top=col[col.length-1];if(!top.faceUp)return false;
   return isRed(card)!==isRed(top)&&rankVal(card.rank)===rankVal(top.rank)-1;
+}
+function isValidSequence(ci,startIdx) {
+  const p=tableau[ci];
+  for(let i=startIdx;i<p.length-1;i++){
+    const cur=p[i],nxt=p[i+1];
+    if(!cur.faceUp||!nxt.faceUp)return false;
+    if(rankVal(cur.rank)!==rankVal(nxt.rank)+1)return false;
+    if(isRed(cur)===isRed(nxt))return false;
+  }
+  return true;
 }
 
 function removeCards(src,zone,col,count) {
@@ -1144,7 +1155,14 @@ function selectCurrentCard() {
   let card=null;
   if(navZone==='top'&&navCol===1){if(waste.length)card=waste[waste.length-1];}
   else if(navZone==='top'&&navCol>=2){const fi=navCol-2;if(foundations[fi].length)card=foundations[fi][foundations[fi].length-1];}
-  else if(navZone==='tableau'){const col=tableau[navCol],idx=resolveNavCardIdx(navCol);if(idx>=0&&idx<col.length&&col[idx].faceUp)card=col[idx];}
+  else if(navZone==='tableau'){
+    const col=tableau[navCol],idx=resolveNavCardIdx(navCol);
+    if(idx>=0&&idx<col.length&&col[idx].faceUp){
+      // If selecting mid-column, sub-stack must be a valid descending-alternating-color sequence
+      if(idx<col.length-1&&!isValidSequence(navCol,idx)){selectedCard=null;sndError();render();return;}
+      card=col[idx];
+    }
+  }
   if(card){selectedCard={zone:navZone,col:navCol,cardIdx:navZone==='tableau'?resolveNavCardIdx(navCol):-1};sndSelect();}
   else sndError();
   render();

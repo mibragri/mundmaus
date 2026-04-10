@@ -1020,7 +1020,7 @@ function execMove(move, promoType) {
   game.turn = game.turn === W ? B : W;
 
   // Track position for threefold repetition
-  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling;
+  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling + '|' + (game.enPassant || '-');
   game.positionCounts[posKey] = (game.positionCounts[posKey] || 0) + 1;
 }
 
@@ -1153,6 +1153,10 @@ function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
       if (m.fr===7&&m.fc===7) nc=nc.replace('K','');
       if (m.fr===0&&m.fc===0) nc=nc.replace('q','');
       if (m.fr===0&&m.fc===7) nc=nc.replace('k','');
+      if (m.tr===7&&m.tc===0) nc=nc.replace('Q','');
+      if (m.tr===7&&m.tc===7) nc=nc.replace('K','');
+      if (m.tr===0&&m.tc===0) nc=nc.replace('q','');
+      if (m.tr===0&&m.tc===7) nc=nc.replace('k','');
 
       const val = minimax(nb, depth-1, alpha, beta, false, newEp, nc);
       best = Math.max(best, val);
@@ -1175,6 +1179,10 @@ function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
       if (m.fr===7&&m.fc===7) nc=nc.replace('K','');
       if (m.fr===0&&m.fc===0) nc=nc.replace('q','');
       if (m.fr===0&&m.fc===7) nc=nc.replace('k','');
+      if (m.tr===7&&m.tc===0) nc=nc.replace('Q','');
+      if (m.tr===7&&m.tc===7) nc=nc.replace('K','');
+      if (m.tr===0&&m.tc===0) nc=nc.replace('q','');
+      if (m.tr===0&&m.tc===7) nc=nc.replace('k','');
 
       const val = minimax(nb, depth-1, alpha, beta, true, newEp, nc);
       best = Math.min(best, val);
@@ -1212,6 +1220,10 @@ function aiMove() {
     if (game.board[m.fr][m.fc]?.type === KING) nc = nc.replace(/[kq]/g, '');
     if (m.fr===0&&m.fc===0) nc=nc.replace('q','');
     if (m.fr===0&&m.fc===7) nc=nc.replace('k','');
+    if (m.tr===7&&m.tc===0) nc=nc.replace('Q','');
+    if (m.tr===7&&m.tc===7) nc=nc.replace('K','');
+    if (m.tr===0&&m.tc===0) nc=nc.replace('q','');
+    if (m.tr===0&&m.tc===7) nc=nc.replace('k','');
 
     const val = minimax(nb, aiDepth - 1, -Infinity, Infinity, true, newEp, nc);
     if (val < bestVal) {
@@ -1357,7 +1369,7 @@ function renderBoard() {
 
 function updateStatus() {
   // Threefold repetition check
-  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling;
+  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling + '|' + (game.enPassant || '-');
   if ((game.positionCounts[posKey] || 0) >= 3) {
     showGameOver('Unentschieden', 'Stellungswiederholung');
     sndError();
@@ -1877,7 +1889,7 @@ function undo() {
   if (undoMove()) {
     ui.selected = null;
     ui.legalForSelected = [];
-    ui.lastMove = game.history.length > 0 ? null : null;
+    ui.lastMove = null;
     renderBoard();
     updateStatus();
     beep(400, 100);
