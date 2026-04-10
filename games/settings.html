@@ -437,7 +437,7 @@
     </div>
     <div style="display:flex;gap:8px;align-items:center;margin:8px 0">
       <input type="password" id="wifi-pw" placeholder="Passwort (leer = offenes Netz)" style="flex:1;padding:8px;border-radius:6px;background:var(--bg);color:var(--text);border:1px solid var(--card-border);font-size:1.4vh">
-      <button class="action-btn primary" onclick="doWifiConnect()" style="white-space:nowrap;padding:8px 12px">Verbinden</button>
+      <button class="action-btn primary" id="wifi-connect-btn" onclick="doWifiConnect()" style="white-space:nowrap;padding:8px 12px">Verbinden</button>
     </div>
     <div style="margin-top:12px;text-align:right">
       <button class="action-btn danger" onclick="doWifiReset()" style="font-size:1.3vh;padding:6px 12px">
@@ -911,6 +911,8 @@ function doWifiConnect() {
   const ssid = document.getElementById('wifi-ssid').value;
   const pw = document.getElementById('wifi-pw').value;
   if (!ssid) { showToast('SSID wählen', 'error'); return; }
+  const btn = document.getElementById('wifi-connect-btn');
+  if (btn) btn.disabled = true;  // prevent double-clicks during the save
   showToast('Verbinde mit ' + ssid + '...', '');
   fetch('/api/wifi', {
     method: 'POST',
@@ -918,12 +920,35 @@ function doWifiConnect() {
     body: JSON.stringify({ssid: ssid, password: pw})
   }).then(r => r.json()).then(d => {
     if (d.ok) {
-      showToast('Gespeichert — Neustart...', 'success');
-      setTimeout(() => { location.reload(); }, 10000);
+      // Do NOT auto-reload. After reboot the device is on a different IP
+      // (or still booting), so a reload shows a browser error page — the
+      // last thing the user sees looks like failure. Instead replace the
+      // wifi card with clear step-by-step instructions.
+      const selectedSsid = document.getElementById('wifi-ssid').value;
+      const wifiCard = document.getElementById('wifi-card');
+      if (wifiCard) {
+        wifiCard.innerHTML = `
+          <div style="text-align:center;padding:16px">
+            <h3 style="color:var(--gold);margin-bottom:12px">⏳ Neustart läuft...</h3>
+            <p style="margin:8px 0">Das Gerät verbindet sich mit dem WLAN:</p>
+            <p style="font-weight:bold;color:var(--gold);font-size:1.5em;margin:12px 0">${selectedSsid}</p>
+            <hr style="border-color:var(--card-border);margin:16px 0">
+            <p style="margin:8px 0">1. Warte ca. 30 Sekunden</p>
+            <p style="margin:8px 0">2. Verbinde dein Gerät mit dem WLAN <b>${selectedSsid}</b></p>
+            <p style="margin:8px 0">3. Öffne <a href="http://mundmaus.local" style="color:var(--gold)">mundmaus.local</a></p>
+            <hr style="border-color:var(--card-border);margin:16px 0">
+            <p style="color:var(--text-dim);font-size:0.9em">Bei Problemen: Das Gerät startet im Hotspot-Modus "<b>MundMaus</b>" neu (Passwort: <b>mundmaus1</b>)</p>
+          </div>
+        `;
+      }
     } else {
+      if (btn) btn.disabled = false;  // re-enable on error
       showToast('Fehler: ' + (d.error || 'unbekannt'), 'error');
     }
-  }).catch(() => showToast('Verbindungsfehler', 'error'));
+  }).catch(() => {
+    if (btn) btn.disabled = false;  // re-enable on network error
+    showToast('Verbindungsfehler', 'error');
+  });
 }
 
 function doWifiReset() {

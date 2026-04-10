@@ -91,6 +91,10 @@ private:
     Updater::CheckResult _updateResult;
     SemaphoreHandle_t _updateResultMutex = nullptr;
 
+    // Bug 5: One-shot orphan cleanup at boot — removes stale .new/.old files
+    // from interrupted OTA downloads before they fill the filesystem.
+    void _cleanupOrphans();
+
     void _setupHttpRoutes();
     void _setupWsRoutes();
     void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,

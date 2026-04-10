@@ -414,13 +414,32 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             continue;
         }
 
-        // Atomic install: remove old, rename .new -> final
-        LittleFS.remove(path);
+        // Atomic install with rollback: back up old -> install new -> restore on failure.
+        // Previous version did `remove(path); rename(tmpPath, path);` which could lose
+        // BOTH files if the rename failed, orphaning the game permanently.
+        String oldBackup = path + ".old";
+        bool hadOld = LittleFS.exists(path);
+        if (hadOld) {
+            // Clean any stale .old from a previous interrupted install before reusing the slot
+            LittleFS.remove(oldBackup);
+            if (!LittleFS.rename(path, oldBackup)) {
+                Serial.printf("  OTA: cannot backup %s, aborting install\n", path.c_str());
+                LittleFS.remove(tmpPath);
+                allOk = false;
+                continue;
+            }
+        }
         if (!LittleFS.rename(tmpPath, path)) {
-            Serial.printf("  OTA: rename FAILED for %s — file lost!\n", path.c_str());
-            LittleFS.remove(tmpPath);  // clean up orphan
+            Serial.printf("  OTA: rename FAILED for %s, rolling back\n", path.c_str());
+            LittleFS.remove(tmpPath);
+            if (hadOld) {
+                LittleFS.rename(oldBackup, path);  // restore old on best-effort basis
+            }
             allOk = false;
             continue;  // do NOT update _versions
+        }
+        if (hadOld) {
+            LittleFS.remove(oldBackup);  // cleanup backup on success
         }
 
         // Update version tracking (Bug 5: lock around _versions mutation)

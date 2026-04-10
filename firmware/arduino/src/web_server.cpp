@@ -62,6 +62,11 @@ void MundMausServer::start() {
         Serial.println("  LittleFS mount failed");
     }
 
+    // Bug 5: Remove orphan OTA temp files (.new / .old) from interrupted
+    // downloads. Over months of updates these would otherwise accumulate,
+    // fill LittleFS and brick subsequent OTA attempts.
+    _cleanupOrphans();
+
     _setupHttpRoutes();
     _setupWsRoutes();
 
@@ -70,6 +75,35 @@ void MundMausServer::start() {
 
     Serial.printf("  HTTP  :%d\n", Config::HTTP_PORT);
     Serial.printf("  WS    :%d\n", Config::WS_PORT);
+}
+
+void MundMausServer::_cleanupOrphans() {
+    File dir = LittleFS.open(Config::WWW_DIR);
+    if (!dir || !dir.isDirectory()) {
+        if (dir) dir.close();
+        return;
+    }
+    int removed = 0;
+    File entry = dir.openNextFile();
+    while (entry) {
+        // VFSFileImpl::name() returns the base name only (e.g. "solitaire.html.gz"),
+        // path() returns the full path. We use path() for LittleFS.remove() so we
+        // are robust against name() implementations that return something else.
+        bool isDir = entry.isDirectory();
+        String fullPath = entry.path();
+        String baseName = entry.name();
+        entry.close();  // must close before removing the underlying file
+
+        if (!isDir && (baseName.endsWith(".new") || baseName.endsWith(".old"))) {
+            Serial.printf("  Cleanup orphan: %s\n", fullPath.c_str());
+            if (LittleFS.remove(fullPath)) removed++;
+        }
+        entry = dir.openNextFile();
+    }
+    dir.close();
+    if (removed > 0) {
+        Serial.printf("  Removed %d orphan OTA files\n", removed);
+    }
 }
 
 // ============================================================

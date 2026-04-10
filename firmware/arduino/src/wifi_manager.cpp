@@ -9,22 +9,42 @@
 #include <algorithm>
 
 // ============================================================
+// MUTEX (Bug 4: protect credential string lifetime)
+// ============================================================
+
+void WiFiManager::_ensureMutex() {
+    if (_credMutex == nullptr) {
+        _credMutex = xSemaphoreCreateMutex();
+    }
+}
+
+// ============================================================
 // CREDENTIALS (NVS namespace "wifi")
 // ============================================================
 
 bool WiFiManager::loadCredentials() {
+    _ensureMutex();
+
     Preferences prefs;
     prefs.begin("wifi", true);  // read-only
 
-    ssid     = prefs.getString("ssid", "");
-    password = prefs.getString("password", "");
+    String loadedSsid = prefs.getString("ssid", "");
+    String loadedPw   = prefs.getString("password", "");
     prefs.end();
 
-    ssid.trim();
-    password.trim();
+    loadedSsid.trim();
+    loadedPw.trim();
 
-    if (ssid.length() > 0) {
-        Serial.printf("  Gespeicherte SSID: '%s'\n", ssid.c_str());
+    // Publish under lock so any concurrent reader sees a consistent snapshot.
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
+    ssid     = loadedSsid;
+    password = loadedPw;
+    xSemaphoreGive(_credMutex);
+
+    // Log from the local copy — reading ssid.c_str() here without the lock
+    // would re-introduce the use-after-free class of bug we just fixed.
+    if (loadedSsid.length() > 0) {
+        Serial.printf("  Gespeicherte SSID: '%s'\n", loadedSsid.c_str());
         return true;
     }
     Serial.println("  Keine WLAN-Daten gespeichert");
@@ -36,11 +56,16 @@ bool WiFiManager::saveCredentials(const String& newSsid, const String& newPasswo
     // flash wear, corrupted namespace), the in-RAM state must NOT be updated —
     // otherwise we'd try to connect with credentials that would be lost on the
     // next reboot, leaving the device unreachable after the scheduled restart.
+    _ensureMutex();
+
     String trimmedSsid = newSsid;
     String trimmedPw = newPassword;
     trimmedSsid.trim();
     trimmedPw.trim();
 
+    // NVS I/O happens outside the credential mutex — Preferences has its own
+    // synchronization and NVS writes are slow enough that blocking
+    // connectStation() on them would be wasteful.
     Preferences prefs;
     if (!prefs.begin("wifi", false)) {
         Serial.println("  ERROR: Failed to open NVS wifi namespace");
@@ -57,21 +82,29 @@ bool WiFiManager::saveCredentials(const String& newSsid, const String& newPasswo
         return false;
     }
 
-    // Only update in-RAM state AFTER successful NVS write.
+    // Bug 4: publish in-RAM state under the mutex so another task calling
+    // connectStation() cannot observe a freed String buffer.
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
     ssid = trimmedSsid;
     password = trimmedPw;
-    Serial.printf("  Credentials gespeichert: '%s'\n", ssid.c_str());
+    xSemaphoreGive(_credMutex);
+
+    Serial.printf("  Credentials gespeichert: '%s'\n", trimmedSsid.c_str());
     return true;
 }
 
 void WiFiManager::deleteCredentials() {
+    _ensureMutex();
+
     Preferences prefs;
     prefs.begin("wifi", false);
     prefs.clear();
     prefs.end();
 
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
     ssid     = "";
     password = "";
+    xSemaphoreGive(_credMutex);
 }
 
 // ============================================================
@@ -79,9 +112,33 @@ void WiFiManager::deleteCredentials() {
 // ============================================================
 
 String WiFiManager::connectStation(unsigned long timeoutMs) {
-    if (ssid.length() == 0) return "";
+    _ensureMutex();
 
-    WiFi.mode(WIFI_STA);
+    // Bug 4: Copy the credentials to locals under the mutex BEFORE starting
+    // the WiFi.begin retry loop. WiFi.begin() only latches the char* at the
+    // start of the attempt, so if saveCredentials() reassigns `ssid` mid-
+    // connect, the underlying buffer can be freed out from under WiFi.begin
+    // → use-after-free. By using locals we give the WiFi stack a buffer we
+    // own for the duration of the connect attempt.
+    String localSsid;
+    String localPw;
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
+    localSsid = ssid;
+    localPw   = password;
+    xSemaphoreGive(_credMutex);
+
+    if (localSsid.length() == 0) return "";
+
+    // Bug 3: Preserve AP mode if it is already up. Previously this forced
+    // WIFI_STA unconditionally, which tears down the softAP for ~49 seconds
+    // while the station connect attempt runs — caregivers lose the
+    // "MundMaus" hotspot mid-setup and panic-power-cycle the device.
+    wifi_mode_t currentMode = WiFi.getMode();
+    if (currentMode == WIFI_MODE_AP || currentMode == WIFI_MODE_APSTA) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_STA);
+    }
 
     if (WiFi.isConnected()) {
         ip   = WiFi.localIP().toString();
@@ -94,8 +151,8 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
     // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
     for (int attempt = 1; attempt <= 3; attempt++) {
-        Serial.printf("  Verbinde mit '%s' (Versuch %d/3)...\n", ssid.c_str(), attempt);
-        WiFi.begin(ssid.c_str(), password.c_str());
+        Serial.printf("  Verbinde mit '%s' (Versuch %d/3)...\n", localSsid.c_str(), attempt);
+        WiFi.begin(localSsid.c_str(), localPw.c_str());
 
         unsigned long start = millis();
         while (!WiFi.isConnected()) {
@@ -238,10 +295,18 @@ std::pair<int, String> WiFiManager::getRSSI() {
 // ============================================================
 
 void WiFiManager::getStatus(JsonDocument& doc) {
+    _ensureMutex();
     auto [rssi, rssiLabel] = getRSSI();
 
+    // Bug 4: snapshot ssid under the mutex. JsonDocument copies the value
+    // immediately, so we can release the lock before assigning.
+    String ssidSnapshot;
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
+    ssidSnapshot = ssid;
+    xSemaphoreGive(_credMutex);
+
     doc["mode"]       = mode.length() > 0 ? mode : "disconnected";
-    doc["ssid"]       = ssid;
+    doc["ssid"]       = ssidSnapshot;
     doc["ip"]         = ip;
     doc["ap_ssid"]    = Config::AP_SSID;
     doc["connected"]  = (mode == "station" && WiFi.isConnected());

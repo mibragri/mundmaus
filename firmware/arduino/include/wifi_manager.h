@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 #include <ArduinoJson.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/semphr.h>
 #include <vector>
 #include <utility>
 
@@ -41,8 +43,22 @@ public:
     std::pair<String, String> startup();
 
     // Public state
+    // NOTE: ssid and password are protected by _credMutex on all write paths
+    // and on all read paths that outlive the lock scope (e.g. WiFi.begin
+    // taking const char* that must not be freed mid-connect). Callers that
+    // only need a snapshot for display should copy under _credMutex.
     String ssid;
     String password;
     String mode;   // "station", "ap", or ""
     String ip;
+
+private:
+    // Bug 4: Protects concurrent credential changes (saveCredentials) against
+    // in-flight reads (connectStation, getStatus). Without this, reassigning
+    // `ssid = trimmed` frees the String buffer while another task may still
+    // hold a pointer from ssid.c_str(), causing use-after-free.
+    SemaphoreHandle_t _credMutex = nullptr;
+
+    /// Lazily create _credMutex on first use.
+    void _ensureMutex();
 };
