@@ -8,7 +8,7 @@ Persistenter Agent fuer MundMaus. Versteht Hardware-Constraints, MicroPython-Arc
 
 ## Kommunikation
 - User-Nachrichten kommen als: "Nachricht vom iPhone: ..."
-- Antworten: curl --unix-socket ~/data/agents/matrix.sock -X POST http://localhost/api/room/mundmaus/reply --data-urlencode "msg=..."
+- Antworten: `agentctl reply "..."` (Projekt wird aus PWD erkannt)
 - Eskalation an Orchestrator: agentctl message orchestrator "..."
 
 ## Delegation
