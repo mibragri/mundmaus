@@ -134,11 +134,6 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     // while the station connect attempt runs — caregivers lose the
     // "MundMaus" hotspot mid-setup and panic-power-cycle the device.
     wifi_mode_t currentMode = WiFi.getMode();
-    if (currentMode == WIFI_MODE_AP || currentMode == WIFI_MODE_APSTA) {
-        WiFi.mode(WIFI_AP_STA);
-    } else {
-        WiFi.mode(WIFI_STA);
-    }
 
     if (WiFi.isConnected()) {
         ip   = WiFi.localIP().toString();
@@ -146,13 +141,68 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
         return ip;
     }
 
+    // Clear any stale WiFi state before begin(). A cold boot can leave the
+    // radio partially initialized from the bootloader; WiFi.begin() then
+    // latches onto that state and the association silently fails.
+    WiFi.disconnect(true, true);
+    WiFi.mode(WIFI_OFF);
+    delay(100);
+    esp_task_wdt_reset();
+
+    if (currentMode == WIFI_MODE_AP || currentMode == WIFI_MODE_APSTA) {
+        WiFi.mode(WIFI_AP_STA);
+    } else {
+        WiFi.mode(WIFI_STA);
+    }
+
+    WiFi.setHostname("mundmaus");
+    WiFi.setAutoReconnect(true);
+    WiFi.persistent(true);
+
+    // Scan first so the strongest matching BSSID can be pinned on each
+    // attempt. Plain WiFi.begin(ssid, pw) in a Fritz-Repeater mesh lets
+    // ESP32 heuristics pick an AP — sometimes a weaker one that refuses
+    // the association.
+    struct BssMatch {
+        uint8_t bssid[6];
+        int32_t channel;
+        int     rssi;
+    };
+    std::vector<BssMatch> matches;
+    int scanCount = WiFi.scanNetworks();
+    if (scanCount > 0) {
+        for (int i = 0; i < scanCount; i++) {
+            if (WiFi.SSID(i) == localSsid) {
+                BssMatch m;
+                memcpy(m.bssid, WiFi.BSSID(i), 6);
+                m.channel = WiFi.channel(i);
+                m.rssi    = WiFi.RSSI(i);
+                matches.push_back(m);
+            }
+        }
+        std::sort(matches.begin(), matches.end(),
+                  [](const BssMatch& a, const BssMatch& b) { return a.rssi > b.rssi; });
+    }
+    WiFi.scanDelete();
+
     // Retry up to 3 times with exponential-ish backoff.
     // After firmware updates, router may need a moment to accept the new connection.
     // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
     // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
     for (int attempt = 1; attempt <= 3; attempt++) {
-        Serial.printf("  Verbinde mit '%s' (Versuch %d/3)...\n", localSsid.c_str(), attempt);
-        WiFi.begin(localSsid.c_str(), localPw.c_str());
+        int idx = attempt - 1;
+        if (idx < static_cast<int>(matches.size())) {
+            const BssMatch& m = matches[idx];
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/3: BSSID %02x:%02x:%02x:%02x:%02x:%02x Ch %d RSSI %d)...\n",
+                          localSsid.c_str(), attempt,
+                          m.bssid[0], m.bssid[1], m.bssid[2], m.bssid[3], m.bssid[4], m.bssid[5],
+                          static_cast<int>(m.channel), m.rssi);
+            WiFi.begin(localSsid.c_str(), localPw.c_str(), m.channel, m.bssid);
+        } else {
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/3: kein BSSID, plain)...\n",
+                          localSsid.c_str(), attempt);
+            WiFi.begin(localSsid.c_str(), localPw.c_str());
+        }
 
         unsigned long start = millis();
         while (!WiFi.isConnected()) {
@@ -182,6 +232,7 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
     ip   = WiFi.localIP().toString();
     mode = "station";
+    WiFi.setSleep(WIFI_PS_NONE);
     Serial.printf("  Verbunden: %s\n", ip.c_str());
 
     // mDNS: mundmaus.local
