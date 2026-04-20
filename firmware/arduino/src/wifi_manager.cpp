@@ -90,6 +90,10 @@ bool WiFiManager::saveCredentials(const String& newSsid, const String& newPasswo
     password = trimmedPw;
     xSemaphoreGive(_credMutex);
 
+    // Credentials changed — invalidate the cached BSSID so the next boot
+    // does not waste a cached-attempt timeout on an AP from the old network.
+    _clearLastBssid();
+
     Serial.printf("  Credentials gespeichert: '%s'\n", trimmedSsid.c_str());
     return true;
 }
@@ -106,6 +110,146 @@ void WiFiManager::deleteCredentials() {
     ssid     = "";
     password = "";
     xSemaphoreGive(_credMutex);
+}
+
+// ============================================================
+// LAST-KNOWN-GOOD BSSID CACHE (NVS namespace "wifi")
+// ============================================================
+
+bool WiFiManager::_loadLastBssid(uint8_t bssid[6], uint8_t& channel) {
+    Preferences prefs;
+    if (!prefs.begin("wifi", true)) return false;
+    size_t n   = prefs.getBytes("last_bssid", bssid, 6);
+    channel    = prefs.getUChar("last_chan", 0);
+    prefs.end();
+    if (n != 6 || channel == 0) return false;
+    // Reject all-zero / all-FF BSSIDs — either means the blob was never
+    // written or was wiped; we treat both as "no cache".
+    bool allZero = true, allFF = true;
+    for (int i = 0; i < 6; i++) {
+        if (bssid[i] != 0x00) allZero = false;
+        if (bssid[i] != 0xFF) allFF = false;
+    }
+    return !allZero && !allFF;
+}
+
+void WiFiManager::_saveLastBssid(const uint8_t bssid[6], uint8_t channel) {
+    Preferences prefs;
+    if (!prefs.begin("wifi", false)) return;
+    prefs.putBytes("last_bssid", bssid, 6);
+    prefs.putUChar("last_chan", channel);
+    prefs.end();
+}
+
+void WiFiManager::_clearLastBssid() {
+    Preferences prefs;
+    if (!prefs.begin("wifi", false)) return;
+    prefs.remove("last_bssid");
+    prefs.remove("last_chan");
+    prefs.end();
+}
+
+// ============================================================
+// ADAPTIVE TX POWER (steps down on brownout, persists in NVS)
+// ============================================================
+
+// Ordered from strongest to weakest. Index 0 (15 dBm) is the default —
+// well below the 19.5 dBm maximum, already reducing the worst-case TX
+// current peak by ~30% vs stock.
+static const wifi_power_t TX_LEVELS[] = {
+    WIFI_POWER_15dBm,
+    WIFI_POWER_13dBm,
+    WIFI_POWER_11dBm,
+    WIFI_POWER_8_5dBm,
+    WIFI_POWER_7dBm,
+};
+static constexpr int NUM_TX_LEVELS = sizeof(TX_LEVELS) / sizeof(TX_LEVELS[0]);
+
+static const char* _txLabel(wifi_power_t p) {
+    switch (p) {
+        case WIFI_POWER_15dBm:  return "15dBm";
+        case WIFI_POWER_13dBm:  return "13dBm";
+        case WIFI_POWER_11dBm:  return "11dBm";
+        case WIFI_POWER_8_5dBm: return "8.5dBm";
+        case WIFI_POWER_7dBm:   return "7dBm";
+        default:                return "?dBm";
+    }
+}
+
+uint8_t WiFiManager::txLevel() {
+    Preferences prefs;
+    if (!prefs.begin("wifi", true)) return 0;
+    uint8_t level = prefs.getUChar("tx_level", 0);
+    prefs.end();
+    return (level < NUM_TX_LEVELS) ? level : (NUM_TX_LEVELS - 1);
+}
+
+uint32_t WiFiManager::brownoutTotal() {
+    Preferences prefs;
+    if (!prefs.begin("wifi", true)) return 0;
+    uint32_t total = prefs.getUInt("bo_total", 0);
+    prefs.end();
+    return total;
+}
+
+String WiFiManager::powerHealthHint() {
+    uint8_t level = txLevel();
+    uint32_t brownouts = brownoutTotal();
+    // Fresh device, no brownouts seen, still at full default level: healthy.
+    if (level == 0 && brownouts == 0) return "";
+    if (level == 0 && brownouts > 0) {
+        return String("Einzelne Spannungsabfälle beobachtet (") + brownouts +
+               "). Kabel im Auge behalten.";
+    }
+    if (level == 1) {
+        return "USB-Spannung wackelig – kürzeres/dickeres Kabel empfohlen.";
+    }
+    if (level == 2) {
+        return "USB-Versorgung grenzwertig – Kabel oder Netzteil tauschen.";
+    }
+    if (level == 3) {
+        return "USB-Versorgung kritisch – Kabel/Netzteil jetzt tauschen.";
+    }
+    // level == 4 (floor)
+    return "USB-Versorgung am Limit (7 dBm Floor). Kabel und Netzteil müssen getauscht werden.";
+}
+
+int WiFiManager::_adaptiveTxPower() {
+    Preferences prefs;
+    if (!prefs.begin("wifi", false)) {
+        // NVS unavailable — fall back to default level without state.
+        return (int)TX_LEVELS[0];
+    }
+    uint8_t level = prefs.getUChar("tx_level", 0);
+    if (level >= NUM_TX_LEVELS) level = NUM_TX_LEVELS - 1;
+
+    // Step down one notch per brownout boot. We use esp_reset_reason() which
+    // returns the reason for *this* boot — if it is ESP_RST_BROWNOUT, the
+    // previous boot's TX activity drew too much current, so the next attempt
+    // at the current level would likely brown out again.
+    esp_reset_reason_t reason = esp_reset_reason();
+    if (reason == ESP_RST_BROWNOUT) {
+        // Count every brownout boot for the portal's cable-health indicator.
+        uint32_t total = prefs.getUInt("bo_total", 0) + 1;
+        prefs.putUInt("bo_total", total);
+        if (level < NUM_TX_LEVELS - 1) {
+            level++;
+            prefs.putUChar("tx_level", level);
+            WifiLog::log(String("event=tx_adapt level=") + _txLabel(TX_LEVELS[level]) +
+                         " reason=brownout total=" + total);
+        } else {
+            // Brownout but already at floor — hardware fix is required.
+            WifiLog::log(String("event=tx_floor level=") + _txLabel(TX_LEVELS[level]) +
+                         " total=" + total);
+        }
+    } else {
+        // Non-brownout boot at current level — level stays where it is.
+        // Deliberately no auto-increase: cold boots are rare and we would
+        // rather stay conservative than oscillate on a marginal supply.
+        WifiLog::log(String("event=tx_level level=") + _txLabel(TX_LEVELS[level]));
+    }
+    prefs.end();
+    return (int)TX_LEVELS[level];
 }
 
 // ============================================================
@@ -162,6 +306,53 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     WiFi.setAutoReconnect(true);
     WiFi.persistent(true);
 
+    // Adaptive TX-power: reduce peak TX current on long-cable/underpowered-PSU
+    // setups to stay below the brownout threshold. First call per boot consumes
+    // esp_reset_reason and steps down on each ESP_RST_BROWNOUT; subsequent calls
+    // just re-apply the stored level.
+    static bool txAdaptInitDone = false;
+    static wifi_power_t txPowerLevel = WIFI_POWER_15dBm;
+    if (!txAdaptInitDone) {
+        txPowerLevel = (wifi_power_t)_adaptiveTxPower();
+        txAdaptInitDone = true;
+    }
+    WiFi.setTxPower(txPowerLevel);
+
+    unsigned long beginMs = 0;
+
+    // Cached-BSSID fast-path: if the last successful connect recorded a BSSID,
+    // try it directly before scanning. Scan is a TX-burst producer (probe
+    // requests on every channel) and has been the root-cause window for
+    // brownouts on underpowered setups. Skipping the scan on the happy-path
+    // dramatically reduces TX exposure during cold-boot.
+    uint8_t cachedBssid[6];
+    uint8_t cachedChan = 0;
+    if (_loadLastBssid(cachedBssid, cachedChan)) {
+        char cachedBuf[20];
+        snprintf(cachedBuf, sizeof(cachedBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                 cachedBssid[0], cachedBssid[1], cachedBssid[2],
+                 cachedBssid[3], cachedBssid[4], cachedBssid[5]);
+        Serial.printf("  Versuche cached BSSID %s Ch %u...\n", cachedBuf, (unsigned)cachedChan);
+        WifiLog::log(String("event=cached_try bssid=") + cachedBuf +
+                     " ch=" + (int)cachedChan);
+        beginMs = millis();
+        WiFi.begin(localSsid.c_str(), localPw.c_str(), (int32_t)cachedChan, cachedBssid);
+        unsigned long start = millis();
+        while (!WiFi.isConnected() && millis() - start < timeoutMs) {
+            delay(250);
+            esp_task_wdt_reset();
+        }
+        if (WiFi.isConnected()) {
+            WifiLog::log("event=cached_ok");
+        } else {
+            Serial.println("  Cached BSSID fehlgeschlagen, fallback auf scan");
+            WifiLog::log("event=cached_fail");
+            WiFi.disconnect(false);
+        }
+    }
+
+    // Scan + retry loop only runs if the cached fast-path did not connect.
+    if (!WiFi.isConnected()) {
     // Scan first so the strongest matching BSSID can be pinned on each
     // attempt. Plain WiFi.begin(ssid, pw) in a Fritz-Repeater mesh lets
     // ESP32 heuristics pick an AP — sometimes a weaker one that refuses
@@ -211,7 +402,6 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
     // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
     constexpr int MAX_ATTEMPTS = 5;
-    unsigned long beginMs = 0;
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         int idx = attempt - 1;
         bool pinned = (idx < static_cast<int>(matches.size()));
@@ -269,6 +459,7 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
             }
         }
     }
+    }  // end of: if (!WiFi.isConnected())  — scan+retry fallback block
 
     if (!WiFi.isConnected()) {
         return "";
@@ -278,6 +469,14 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     mode = "station";
     WiFi.setSleep(WIFI_PS_NONE);
     Serial.printf("  Verbunden: %s\n", ip.c_str());
+
+    // Persist BSSID+channel of this successful connect so the next cold-boot
+    // can go straight to WiFi.begin() with the pinned BSSID and skip the
+    // scan phase entirely — which is the brownout-sensitive TX-burst window.
+    const uint8_t* connectedBssid = WiFi.BSSID();
+    if (connectedBssid) {
+        _saveLastBssid(connectedBssid, (uint8_t)WiFi.channel());
+    }
 
     // Trigger SNTP as soon as we have an IP. Non-blocking — subsequent
     // log lines may still print boot/ms until the first sync arrives.

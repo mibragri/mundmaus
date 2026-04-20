@@ -7,6 +7,7 @@
 #include "updater.h"
 #include "wifi_log.h"
 #include <LittleFS.h>
+#include <Preferences.h>
 #include <WiFi.h>
 
 // ============================================================
@@ -163,9 +164,46 @@ void MundMausServer::_setupHttpRoutes() {
             doc["bssid"]   = "";
             doc["channel"] = 0;
         }
-        doc["uptime_s"]   = (unsigned long)(millis() / 1000);
-        doc["ntp_synced"] = WifiLog::ntpSynced();
+        doc["uptime_s"]       = (unsigned long)(millis() / 1000);
+        doc["ntp_synced"]     = WifiLog::ntpSynced();
+        doc["tx_level"]       = _wifi.txLevel();
+        doc["brownout_total"] = _wifi.brownoutTotal();
+        doc["health_hint"]    = _wifi.powerHealthHint();
         _sendJson200(req, doc);
+    });
+
+    // --- POST /api/debug/tx-level?n=0..4 --- Force TX power level (test only)
+    // Writes tx_level into the NVS "wifi" namespace and applies immediately via
+    // WiFi.setTxPower(). Intended for verifying connect viability at each
+    // adaptive step (15 / 13 / 11 / 8.5 / 7 dBm) before rolling out a lower
+    // floor to a patient site that we can't re-flash over USB.
+    _httpServer.on("/api/debug/tx-level", HTTP_POST, [](AsyncWebServerRequest* req) {
+        if (!req->hasParam("n")) {
+            req->send(400, "text/plain", "missing ?n=0..4\n");
+            return;
+        }
+        int n = req->getParam("n")->value().toInt();
+        if (n < 0 || n > 4) {
+            req->send(400, "text/plain", "n out of range (0..4)\n");
+            return;
+        }
+        static const wifi_power_t levels[] = {
+            WIFI_POWER_15dBm, WIFI_POWER_13dBm, WIFI_POWER_11dBm,
+            WIFI_POWER_8_5dBm, WIFI_POWER_7dBm
+        };
+        static const char* names[] = {"15dBm","13dBm","11dBm","8.5dBm","7dBm"};
+        Preferences prefs;
+        bool nvsOk = prefs.begin("wifi", false);
+        if (!nvsOk) {
+            req->send(500, "text/plain", "nvs open failed\n");
+            return;
+        }
+        prefs.putUChar("tx_level", (uint8_t)n);
+        prefs.end();
+        WiFi.setTxPower(levels[n]);
+        String body = String("{\"tx_level\":") + n + ",\"dbm\":\"" + names[n] +
+                      "\",\"applied\":true,\"note\":\"reboot to re-run adaptive logic\"}\n";
+        req->send(200, "application/json", body);
     });
 
     // --- POST /api/wifi/reset --- Clear saved WiFi credentials and reboot

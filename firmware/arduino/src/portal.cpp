@@ -34,12 +34,17 @@ font-weight:700;cursor:pointer;text-align:center}
 .settings-gear{position:fixed;bottom:1.5em;right:1.5em;color:#76FF03;
 font-size:1.5em;text-decoration:none;transition:color .2s}
 .settings-gear:hover{color:rgba(255,255,255,0.6)}
+.health-alert{display:none;width:100%;max-width:500px;padding:12px 16px;margin-bottom:1em;
+background:linear-gradient(135deg,#4a2a00,#2a1a00);border:2px solid #ff9800;border-radius:12px;
+color:#ffcc80;font-size:.95em;line-height:1.4;text-align:center}
+.health-alert.crit{background:linear-gradient(135deg,#4a0000,#2a0000);border-color:#f44336;color:#ffcdd2}
 </style></head><body>
 <h1>MundMaus</h1>)==";
 
 // Settings gear + version — assembled dynamically in generatePortal()
 
 static const char PORTAL_UPDATE_SECTION[] PROGMEM =
+    R"==(<div class="health-alert" id="health-alert"></div>)=="
     R"==(<button class="upd-btn" id="upd-btn" onclick="startUpdate()">&#128260; Aktualisieren</button>)=="
     R"==(<div class="upd-bar" id="upd-bar-wrap"><div class="upd-fill" id="upd-fill"></div></div>)=="
     R"==(<div class="upd-status" id="upd-status"></div>)==";
@@ -104,6 +109,16 @@ function connectWS(){
 }
 connectWS();
 // Initial check triggered via WS onopen → /api/updates/check
+// Power-supply health: fetch once at load, show banner if firmware is
+// reporting brownouts or an adaptive TX-power stepdown.
+fetch('/api/wifi-status').then(function(r){return r.json();}).then(function(d){
+  if(d && d.health_hint){
+    var a=document.getElementById('health-alert');
+    a.textContent='\u26a0 '+d.health_hint+' (Brownouts gesamt: '+d.brownout_total+')';
+    if(d.tx_level>=3) a.classList.add('crit');
+    a.style.display='block';
+  }
+}).catch(function(){});
 async function startUpdate(){
   _updating=true;
   document.getElementById('upd-btn').textContent='\u231b...';
