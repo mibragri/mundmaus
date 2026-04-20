@@ -38,11 +38,13 @@ void init() {
         _mutex = xSemaphoreCreateMutex();
     }
 
-    // LittleFS may or may not have been mounted yet; begin() with format=true
-    // is idempotent — returns immediately if the FS is already up. Without
-    // this our first log() during connectStation() (well before
-    // MundMausServer::start()) would silently no-op.
-    LittleFS.begin(true);
+    // LittleFS may or may not have been mounted yet; begin(false) mounts an
+    // existing FS but does NOT reformat on a transient mount failure. A
+    // brownout during WiFi TX can produce such a transient failure, and
+    // format=true would silently wipe the diagnostic log we are trying to
+    // capture on exactly that boot. web_server.cpp's start() still mounts
+    // with format=true for game assets (those are reinstallable via OTA).
+    LittleFS.begin(false);
 
     Preferences prefs;
     if (prefs.begin("mundmaus", false)) {
@@ -58,10 +60,12 @@ void init() {
 
 void startNtp() {
     if (_ntpStarted) return;
-    // UTC (offset 0, dst 0). Fritzbox first so a stock home network without
-    // outbound DNS still gets time. pool.ntp.org as fallback for any other
-    // deployment.
-    configTime(0, 0, "192.168.178.1", "pool.ntp.org");
+    // UTC (offset 0, dst 0). pool.ntp.org as primary so any network with
+    // working outbound DNS/53 gets time. 192.168.178.1 as fallback for the
+    // stock-FritzBox home network at the patient site. Primary/fallback
+    // order was reversed — the previous arrangement cost 1-2 s per retry on
+    // any non-FritzBox deployment.
+    configTime(0, 0, "pool.ntp.org", "192.168.178.1");
     _ntpStarted = true;
     _ntpStartMs = millis();
 }

@@ -285,26 +285,33 @@ void setup() {
     // Mark firmware boot as valid (cancel OTA rollback)
     Updater::markBootOk();
 
-    // OTA check (only in station mode with internet)
+    // OTA check (only in station mode with internet).
+    //
+    // Runs in a detached task pinned to Core 1 instead of synchronously in
+    // setup(): each of checkManifest() and fetchRemoteSettings() can block
+    // up to ~23 s on slow DNS/TLS handshakes, and running both sequentially
+    // in setup() could exceed the 30 s WDT window on the subscribed main
+    // task, silently resetting the device after WiFi was already up. The
+    // task runs without WDT subscription and does not block boot.
     if (wifiMode == "station") {
-        Serial.println("[OTA] Pruefe Updates...");
-        esp_task_wdt_reset();
-        Updater::CheckResult otaResult = Updater::checkManifest();
-        esp_task_wdt_reset();
-        server->setUpdateResult(otaResult);
-        if (!otaResult.offline) {
-            Serial.printf("[OTA] %d Updates verfuegbar\n", otaResult.available.size());
-        } else {
-            Serial.println("[OTA] Offline (Server nicht erreichbar)");
-        }
-
-        // Fetch remote settings (non-locally-overridden values applied immediately)
-        esp_task_wdt_reset();
-        int applied = Updater::fetchRemoteSettings();
-        esp_task_wdt_reset();
-        if (applied > 0) {
-            Serial.printf("[OTA] %d Remote-Settings angewendet\n", applied);
-        }
+        Serial.println("[OTA] Boot-Check im Hintergrund-Task...");
+        xTaskCreatePinnedToCore(
+            [](void* param) {
+                auto* s = static_cast<MundMausServer*>(param);
+                Updater::CheckResult otaResult = Updater::checkManifest();
+                s->setUpdateResult(otaResult);
+                if (!otaResult.offline) {
+                    Serial.printf("[OTA] %d Updates verfuegbar\n", otaResult.available.size());
+                } else {
+                    Serial.println("[OTA] Offline (Server nicht erreichbar)");
+                }
+                int applied = Updater::fetchRemoteSettings();
+                if (applied > 0) {
+                    Serial.printf("[OTA] %d Remote-Settings angewendet\n", applied);
+                }
+                vTaskDelete(nullptr);
+            },
+            "ota_boot", 12288, server, 1, nullptr, 1);
     }
 }
 
