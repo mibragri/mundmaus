@@ -38,6 +38,12 @@ font-size:1.5em;text-decoration:none;transition:color .2s}
 background:linear-gradient(135deg,#4a2a00,#2a1a00);border:2px solid #ff9800;border-radius:12px;
 color:#ffcc80;font-size:.95em;line-height:1.4;text-align:center}
 .health-alert.crit{background:linear-gradient(135deg,#4a0000,#2a0000);border-color:#f44336;color:#ffcdd2}
+.wifi-status{display:none;position:fixed;bottom:1.5em;left:1.5em;font-size:.75em;color:#888;
+font-family:ui-monospace,SFMono-Regular,monospace;letter-spacing:.02em;line-height:1.5;
+max-width:calc(100vw - 12em);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wifi-status .ok{color:#7ccf7c}
+.wifi-status .warn{color:#ffcc80}
+.wifi-status .crit{color:#ff8a80}
 </style></head><body>
 <h1>MundMaus</h1>)==";
 
@@ -47,7 +53,8 @@ static const char PORTAL_UPDATE_SECTION[] PROGMEM =
     R"==(<div class="health-alert" id="health-alert"></div>)=="
     R"==(<button class="upd-btn" id="upd-btn" onclick="startUpdate()">&#128260; Aktualisieren</button>)=="
     R"==(<div class="upd-bar" id="upd-bar-wrap"><div class="upd-fill" id="upd-fill"></div></div>)=="
-    R"==(<div class="upd-status" id="upd-status"></div>)==";
+    R"==(<div class="upd-status" id="upd-status"></div>)=="
+    R"==(<div class="wifi-status" id="wifi-status"></div>)==";
 
 static const char PORTAL_SCRIPT[] PROGMEM = R"==(<script>
 function showUpd(d){
@@ -109,10 +116,24 @@ function connectWS(){
 }
 connectWS();
 // Initial check triggered via WS onopen → /api/updates/check
-// Power-supply health: fetch once at load, show banner if firmware is
-// reporting brownouts or an adaptive TX-power stepdown.
+// Power-supply health + WiFi status: fetch once at load. Always show the
+// compact status bar (bottom-left, monospace, dezent) so the operator can
+// read RSSI / brownout-count / TX-level at a glance even when nothing is
+// wrong. Show the loud alert banner on top only when the firmware has
+// already stepped TX-power down or has logged brownouts.
 fetch('/api/wifi-status').then(function(r){return r.json();}).then(function(d){
-  if(d && d.health_hint){
+  if(!d) return;
+  var txLabels=['15 dBm','13 dBm','11 dBm','8.5 dBm','7 dBm'];
+  var tx=txLabels[d.tx_level]||('lvl '+d.tx_level);
+  var rssiClass=(d.rssi>=-60)?'ok':(d.rssi>=-72)?'warn':'crit';
+  var boClass=(d.brownout_total===0)?'ok':(d.brownout_total<5)?'warn':'crit';
+  var txClass=(d.tx_level===0)?'ok':(d.tx_level<3)?'warn':'crit';
+  var s=document.getElementById('wifi-status');
+  s.innerHTML='\ud83d\udcf6 <span class="'+rssiClass+'">'+d.rssi+' dBm</span>'+
+              ' \u2022 \u26a1 <span class="'+boClass+'">'+d.brownout_total+' Brownouts</span>'+
+              ' \u2022 TX <span class="'+txClass+'">'+tx+'</span>';
+  s.style.display='block';
+  if(d.health_hint){
     var a=document.getElementById('health-alert');
     a.textContent='\u26a0 '+d.health_hint+' (Brownouts gesamt: '+d.brownout_total+')';
     if(d.tx_level>=3) a.classList.add('crit');
