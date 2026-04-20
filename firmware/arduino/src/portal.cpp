@@ -126,15 +126,18 @@ fetch('/api/wifi-status').then(function(r){return r.json();}).then(function(d){
   var txLabels=['15 dBm','13 dBm','11 dBm','8.5 dBm','7 dBm'];
   var tx=txLabels[d.tx_level]||('lvl '+d.tx_level);
   // Human-readable WiFi quality: 4-bar visual + plain-German label + dBm.
-  // Thresholds match common router status pages; -60/-70/-80 are the
-  // transition points most people recognize from phone signal bars.
+  // Thresholds tuned for our actual use-case: HTTP portal + WebSocket nav.
+  // This is a control-plane workload (tiny messages, no video/streaming),
+  // so it keeps working reliably much further into "bad" RSSI than common
+  // router dashboards suggest — we only warn once the link is actually
+  // starting to risk nav-event drops.
   var rssi=d.rssi;
   var bars, word, rssiClass;
   if(rssi>=-55)       { bars='\u25ae\u25ae\u25ae\u25ae'; word='Ausgezeichnet'; rssiClass='ok';   }
-  else if(rssi>=-65)  { bars='\u25ae\u25ae\u25ae\u2b1a'; word='Gut';           rssiClass='ok';   }
-  else if(rssi>=-72)  { bars='\u25ae\u25ae\u2b1a\u2b1a'; word='Okay';          rssiClass='warn'; }
-  else if(rssi>=-80)  { bars='\u25ae\u2b1a\u2b1a\u2b1a'; word='Schwach';       rssiClass='warn'; }
-  else                { bars='\u2b1a\u2b1a\u2b1a\u2b1a'; word='Sehr schwach';  rssiClass='crit'; }
+  else if(rssi>=-65)  { bars='\u25ae\u25ae\u25ae\u2b1a'; word='Sehr gut';      rssiClass='ok';   }
+  else if(rssi>=-75)  { bars='\u25ae\u25ae\u2b1a\u2b1a'; word='Gut';           rssiClass='ok';   }
+  else if(rssi>=-82)  { bars='\u25ae\u2b1a\u2b1a\u2b1a'; word='Ausreichend';   rssiClass='warn'; }
+  else                { bars='\u2b1a\u2b1a\u2b1a\u2b1a'; word='Schwach';       rssiClass='crit'; }
   var boClass=(d.brownout_total===0)?'ok':(d.brownout_total<5)?'warn':'crit';
   var txClass=(d.tx_level===0)?'ok':(d.tx_level<3)?'warn':'crit';
   var s=document.getElementById('wifi-status');
