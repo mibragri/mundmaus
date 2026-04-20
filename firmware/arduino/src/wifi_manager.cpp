@@ -2,6 +2,7 @@
 
 #include "wifi_manager.h"
 #include "config.h"
+#include "wifi_log.h"
 #include <WiFi.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -134,6 +135,8 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     // while the station connect attempt runs — caregivers lose the
     // "MundMaus" hotspot mid-setup and panic-power-cycle the device.
     wifi_mode_t currentMode = WiFi.getMode();
+    bool willKeepAp = (currentMode == WIFI_MODE_AP || currentMode == WIFI_MODE_APSTA);
+    WifiLog::log(String("event=connect_start mode=") + (willKeepAp ? "ap_sta" : "station"));
 
     if (WiFi.isConnected()) {
         ip   = WiFi.localIP().toString();
@@ -149,7 +152,7 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     delay(100);
     esp_task_wdt_reset();
 
-    if (currentMode == WIFI_MODE_AP || currentMode == WIFI_MODE_APSTA) {
+    if (willKeepAp) {
         WiFi.mode(WIFI_AP_STA);
     } else {
         WiFi.mode(WIFI_STA);
@@ -182,25 +185,57 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
         }
         std::sort(matches.begin(), matches.end(),
                   [](const BssMatch& a, const BssMatch& b) { return a.rssi > b.rssi; });
+        // Cap at 5 — that is one match per retry attempt below.
+        if (matches.size() > 5) matches.resize(5);
     }
     WiFi.scanDelete();
 
-    // Retry up to 3 times with exponential-ish backoff.
-    // After firmware updates, router may need a moment to accept the new connection.
+    int totalNets = (scanCount > 0) ? scanCount : 0;
+    WifiLog::log(String("event=scan_result count=") + totalNets +
+                 " matches_ssid=" + (int)matches.size());
+    for (size_t i = 0; i < matches.size(); i++) {
+        const BssMatch& m = matches[i];
+        char bssidBuf[20];
+        snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                 m.bssid[0], m.bssid[1], m.bssid[2],
+                 m.bssid[3], m.bssid[4], m.bssid[5]);
+        WifiLog::log(String("event=scan_match rssi=") + m.rssi +
+                     " ch=" + (int)m.channel +
+                     " bssid=" + bssidBuf);
+    }
+
+    // Retry up to 5 times with exponential-ish backoff. Bumped from 3 to 5
+    // because the patient's router occasionally rejects the first 2-3 attempts
+    // after a cold boot; falling to AP mode at 3 was triggering the caregiver
+    // panic-recovery flow we are trying to avoid.
     // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
     // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
-    for (int attempt = 1; attempt <= 3; attempt++) {
+    constexpr int MAX_ATTEMPTS = 5;
+    unsigned long beginMs = 0;
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         int idx = attempt - 1;
-        if (idx < static_cast<int>(matches.size())) {
+        bool pinned = (idx < static_cast<int>(matches.size()));
+        char bssidBuf[20] = "-";
+        int  attemptCh    = 0;
+        if (pinned) {
             const BssMatch& m = matches[idx];
-            Serial.printf("  Verbinde mit '%s' (Versuch %d/3: BSSID %02x:%02x:%02x:%02x:%02x:%02x Ch %d RSSI %d)...\n",
-                          localSsid.c_str(), attempt,
-                          m.bssid[0], m.bssid[1], m.bssid[2], m.bssid[3], m.bssid[4], m.bssid[5],
-                          static_cast<int>(m.channel), m.rssi);
+            snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                     m.bssid[0], m.bssid[1], m.bssid[2],
+                     m.bssid[3], m.bssid[4], m.bssid[5]);
+            attemptCh = static_cast<int>(m.channel);
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: BSSID %s Ch %d RSSI %d)...\n",
+                          localSsid.c_str(), attempt, MAX_ATTEMPTS,
+                          bssidBuf, attemptCh, m.rssi);
+            WifiLog::log(String("event=begin_attempt n=") + attempt +
+                         " mode=pinned bssid=" + bssidBuf +
+                         " ch=" + attemptCh);
+            beginMs = millis();
             WiFi.begin(localSsid.c_str(), localPw.c_str(), m.channel, m.bssid);
         } else {
-            Serial.printf("  Verbinde mit '%s' (Versuch %d/3: kein BSSID, plain)...\n",
-                          localSsid.c_str(), attempt);
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: kein BSSID, plain)...\n",
+                          localSsid.c_str(), attempt, MAX_ATTEMPTS);
+            WifiLog::log(String("event=begin_attempt n=") + attempt + " mode=plain");
+            beginMs = millis();
             WiFi.begin(localSsid.c_str(), localPw.c_str());
         }
 
@@ -217,7 +252,16 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
         if (WiFi.isConnected()) break;
 
-        if (attempt < 3) {
+        // Decode the failure reason from WiFi.status() so the log distinguishes
+        // password mistakes (auth_fail) from missing AP (no_ssid) from
+        // generic timeouts. Helps narrow down patient-site issues quickly.
+        const char* reason = "timeout";
+        wl_status_t st = WiFi.status();
+        if (st == WL_NO_SSID_AVAIL)        reason = "no_ssid";
+        else if (st == WL_CONNECT_FAILED)  reason = "auth_fail";
+        WifiLog::log(String("event=attempt_failed n=") + attempt + " reason=" + reason);
+
+        if (attempt < MAX_ATTEMPTS) {
             Serial.printf("  Warte %ds vor naechstem Versuch...\n", attempt * 2);
             for (int w = 0; w < attempt * 8; w++) {
                 delay(250);
@@ -234,6 +278,13 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     mode = "station";
     WiFi.setSleep(WIFI_PS_NONE);
     Serial.printf("  Verbunden: %s\n", ip.c_str());
+
+    // Trigger SNTP as soon as we have an IP. Non-blocking — subsequent
+    // log lines may still print boot/ms until the first sync arrives.
+    WifiLog::startNtp();
+    WifiLog::log(String("event=connected ip=") + ip +
+                 " rssi=" + (int)WiFi.RSSI() +
+                 " ms=" + (unsigned long)(millis() - beginMs));
 
     // mDNS: mundmaus.local
     if (MDNS.begin("mundmaus")) {
@@ -378,8 +429,10 @@ std::pair<String, String> WiFiManager::startup() {
             return {stationIP, "station"};
         }
         Serial.println("  WLAN fehlgeschlagen -> Hotspot");
+        WifiLog::log("event=ap_fallback attempts_failed=5");
     } else {
         Serial.println("  Keine Daten -> Hotspot");
+        WifiLog::log("event=ap_fallback attempts_failed=0 reason=no_credentials");
     }
 
     String apIP = startAP();

@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <esp_task_wdt.h>
+#include <esp_system.h>
 #include <atomic>
 
 #include "config.h"
@@ -11,6 +12,7 @@
 #include "web_server.h"
 #include "sensors.h"
 #include "updater.h"
+#include "wifi_log.h"
 
 // Globals (must outlive setup)
 static WiFiManager wifi;
@@ -172,10 +174,16 @@ void setup() {
     // Load saved settings from NVS
     Config::load();
 
+    // WiFi diagnostic log: persistent boot counter + LittleFS rotating log.
+    // Must come BEFORE wifi.startup() so connectStation() can log events.
+    WifiLog::init();
+    WifiLog::log(String("event=boot version=") + Config::VERSION +
+                 " reset_reason=" + (int)esp_reset_reason());
+
     // Banner
     Serial.println();
     Serial.println("==========================================");
-    Serial.printf( "  MUNDMAUS v%s\n", Config::VERSION);
+    Serial.printf( "  MUNDMAUS v%s (boot #%u)\n", Config::VERSION, (unsigned)WifiLog::bootCount());
     Serial.printf( "  Board: %s\n", BOARD_NAME);
     Serial.println("==========================================");
 
@@ -335,17 +343,22 @@ void loop() {
         lastWifiCheck = millis();
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
             wifiReconnecting = true;
+            WifiLog::log(String("event=disconnected uptime_s=") + (unsigned long)(millis() / 1000));
             xTaskCreate([](void* param) {
                 Serial.println("  WiFi lost, reconnecting...");
                 WiFiManager* w = static_cast<WiFiManager*>(param);
+                unsigned long reconStart = millis();
                 String ip = w->connectStation();
                 if (ip.length() > 0) {
                     wifiFailCount = 0;  // success — reset counter
+                    WifiLog::log(String("event=reconnected ms=") +
+                                 (unsigned long)(millis() - reconStart));
                 } else {
                     int c = wifiFailCount.fetch_add(1) + 1;
                     Serial.printf("  WiFi reconnect failed (%d/3)\n", c);
                     if (c >= 3) {
                         Serial.println("  Max reconnect failures — falling back to AP mode");
+                        WifiLog::log("event=ap_fallback attempts_failed=15 trigger=reconnect_loop");
                         w->startAP();
                         wifiFailCount = 0;
                     }

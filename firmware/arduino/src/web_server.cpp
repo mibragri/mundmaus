@@ -5,6 +5,7 @@
 #include "config.h"
 #include "sensors.h"
 #include "updater.h"
+#include "wifi_log.h"
 #include <LittleFS.h>
 #include <WiFi.h>
 
@@ -128,6 +129,37 @@ void MundMausServer::_setupHttpRoutes() {
         doc["ip"]       = _wifi.ip;
         doc["mode"]     = _wifi.mode;
         doc["mem_free"] = ESP.getFreeHeap();
+        _sendJson200(req, doc);
+    });
+
+    // --- GET /api/wifi-log --- Persistent WiFi event log (plain text)
+    // No auth: this is intra-LAN diagnostics for caregivers/dev. CRITICAL
+    // that this also resolves in AP-fallback mode — that is exactly when the
+    // log is needed to figure out why station mode failed. Registered
+    // BEFORE /api/wifi (GET) because the underlying matcher treats /api/wifi
+    // as a prefix and would otherwise swallow /api/wifi-log.
+    _httpServer.on("/api/wifi-log", HTTP_GET, [](AsyncWebServerRequest* req) {
+        req->send(200, "text/plain; charset=utf-8", WifiLog::read());
+    });
+
+    // --- GET /api/wifi-status --- Compact JSON snapshot for diagnostics
+    _httpServer.on("/api/wifi-status", HTTP_GET, [this](AsyncWebServerRequest* req) {
+        // Start from the wifi manager's status (mode, ssid, ip, rssi, ...).
+        // It snapshots ssid under _credMutex, so we avoid touching _wifi.ssid
+        // directly here.
+        JsonDocument doc;
+        _wifi.getStatus(doc);
+        doc["version"]    = Config::VERSION;
+        doc["boot_count"] = WifiLog::bootCount();
+        if (_wifi.mode == "station" && WiFi.isConnected()) {
+            doc["bssid"]   = WiFi.BSSIDstr();
+            doc["channel"] = WiFi.channel();
+        } else {
+            doc["bssid"]   = "";
+            doc["channel"] = 0;
+        }
+        doc["uptime_s"]   = (unsigned long)(millis() / 1000);
+        doc["ntp_synced"] = WifiLog::ntpSynced();
         _sendJson200(req, doc);
     });
 
