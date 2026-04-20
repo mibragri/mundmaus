@@ -29,7 +29,14 @@ void startNtp();
 void log(const String& event);
 
 /// Read the full log (.old followed by .log). Returns "" on read failure.
+/// Allocates a single String — prefer stream() for HTTP handlers to avoid
+/// a 16 KB heap allocation in the AsyncTCP task.
 String read();
+
+/// Stream the full log (.old followed by .log) into a Print target. Holds
+/// the log mutex during the write. Intended for AsyncResponseStream so the
+/// HTTP body never materialises as a full 16 KB String in the heap.
+void stream(Print& out);
 
 /// Delete both log files. Safe to call from any context.
 void clear();

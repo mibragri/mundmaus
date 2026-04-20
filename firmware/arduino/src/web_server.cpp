@@ -139,7 +139,12 @@ void MundMausServer::_setupHttpRoutes() {
     // BEFORE /api/wifi (GET) because the underlying matcher treats /api/wifi
     // as a prefix and would otherwise swallow /api/wifi-log.
     _httpServer.on("/api/wifi-log", HTTP_GET, [](AsyncWebServerRequest* req) {
-        req->send(200, "text/plain; charset=utf-8", WifiLog::read());
+        // Stream the log chunk-by-chunk into the response — avoids building
+        // a 16 KB String in the AsyncTCP heap, which could silently truncate
+        // under heap pressure (concurrent OTA, large scan buffers, etc.).
+        AsyncResponseStream* resp = req->beginResponseStream("text/plain; charset=utf-8");
+        WifiLog::stream(*resp);
+        req->send(resp);
     });
 
     // --- GET /api/wifi-status --- Compact JSON snapshot for diagnostics

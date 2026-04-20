@@ -421,7 +421,15 @@ void WiFiManager::getStatus(JsonDocument& doc) {
 // ============================================================
 
 std::pair<String, String> WiFiManager::startup() {
-    bool hasCreds = loadCredentials();
+    // Credentials are already populated in RAM by main() (via loadCredentials
+    // on boot, or saveCredentials during serial provisioning). Re-reading NVS
+    // here would mask a just-saved set if saveCredentials had a partial NVS
+    // write failure, producing a misleading "no_credentials" ap_fallback log.
+    String currentSsid;
+    xSemaphoreTake(_credMutex, portMAX_DELAY);
+    currentSsid = ssid;
+    xSemaphoreGive(_credMutex);
+    bool hasCreds = (currentSsid.length() > 0);
 
     if (hasCreds) {
         String stationIP = connectStation();

@@ -22,23 +22,21 @@ constexpr size_t      MAX_BYTES   = 8 * 1024;     // per-file cap before rotatio
 constexpr time_t      MIN_VALID_T = 1700000000;   // 2023-11-14: any sync past this is real
 
 // AsyncTCP (Core 0) reads via the HTTP endpoint; connectStation() and the
-// reconnect task on Core 1 write. A single mutex serializes both.
+// reconnect task on Core 1 write. A single mutex serializes both. Created
+// exactly once in init() — do not lazy-create from log()/read()/clear(), a
+// concurrent first-call race there would leak one handle.
 SemaphoreHandle_t _mutex = nullptr;
 
 uint32_t      _bootCount   = 0;
 bool          _ntpStarted  = false;
 unsigned long _ntpStartMs  = 0;
 
-void _ensureMutex() {
-    if (_mutex == nullptr) {
-        _mutex = xSemaphoreCreateMutex();
-    }
-}
-
 }  // anonymous namespace
 
 void init() {
-    _ensureMutex();
+    if (_mutex == nullptr) {
+        _mutex = xSemaphoreCreateMutex();
+    }
 
     // LittleFS may or may not have been mounted yet; begin() with format=true
     // is idempotent — returns immediately if the FS is already up. Without
@@ -95,7 +93,7 @@ String timestamp() {
 }
 
 void log(const String& event) {
-    _ensureMutex();
+    if (_mutex == nullptr) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         return;
     }
@@ -142,8 +140,8 @@ static void _appendFile(const char* path, String& out) {
 }
 
 String read() {
-    _ensureMutex();
     String out;
+    if (_mutex == nullptr) return out;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         return out;
     }
@@ -155,8 +153,30 @@ String read() {
     return out;
 }
 
+static void _streamFile(const char* path, Print& out) {
+    File f = LittleFS.open(path, "r");
+    if (!f) return;
+    uint8_t chunk[256];
+    while (f.available()) {
+        int n = f.readBytes(reinterpret_cast<char*>(chunk), sizeof(chunk));
+        if (n <= 0) break;
+        out.write(chunk, n);
+    }
+    f.close();
+}
+
+void stream(Print& out) {
+    if (_mutex == nullptr) return;
+    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
+        return;
+    }
+    if (LittleFS.exists(LOG_OLD))  _streamFile(LOG_OLD,  out);
+    if (LittleFS.exists(LOG_PATH)) _streamFile(LOG_PATH, out);
+    xSemaphoreGive(_mutex);
+}
+
 void clear() {
-    _ensureMutex();
+    if (_mutex == nullptr) return;
     if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
         return;
     }
