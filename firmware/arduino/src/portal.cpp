@@ -125,11 +125,20 @@ fetch('/api/wifi-status').then(function(r){return r.json();}).then(function(d){
   if(!d) return;
   var txLabels=['15 dBm','13 dBm','11 dBm','8.5 dBm','7 dBm'];
   var tx=txLabels[d.tx_level]||('lvl '+d.tx_level);
-  var rssiClass=(d.rssi>=-60)?'ok':(d.rssi>=-72)?'warn':'crit';
+  // Human-readable WiFi quality: 4-bar visual + plain-German label + dBm.
+  // Thresholds match common router status pages; -60/-70/-80 are the
+  // transition points most people recognize from phone signal bars.
+  var rssi=d.rssi;
+  var bars, word, rssiClass;
+  if(rssi>=-55)       { bars='\u25ae\u25ae\u25ae\u25ae'; word='Ausgezeichnet'; rssiClass='ok';   }
+  else if(rssi>=-65)  { bars='\u25ae\u25ae\u25ae\u2b1a'; word='Gut';           rssiClass='ok';   }
+  else if(rssi>=-72)  { bars='\u25ae\u25ae\u2b1a\u2b1a'; word='Okay';          rssiClass='warn'; }
+  else if(rssi>=-80)  { bars='\u25ae\u2b1a\u2b1a\u2b1a'; word='Schwach';       rssiClass='warn'; }
+  else                { bars='\u2b1a\u2b1a\u2b1a\u2b1a'; word='Sehr schwach';  rssiClass='crit'; }
   var boClass=(d.brownout_total===0)?'ok':(d.brownout_total<5)?'warn':'crit';
   var txClass=(d.tx_level===0)?'ok':(d.tx_level<3)?'warn':'crit';
   var s=document.getElementById('wifi-status');
-  s.innerHTML='\ud83d\udcf6 <span class="'+rssiClass+'">'+d.rssi+' dBm</span>'+
+  s.innerHTML='<span class="'+rssiClass+'">'+bars+' '+word+'</span> <span style="opacity:.6">('+rssi+' dBm)</span>'+
               ' \u2022 \u26a1 <span class="'+boClass+'">'+d.brownout_total+' Brownouts</span>'+
               ' \u2022 TX <span class="'+txClass+'">'+tx+'</span>';
   s.style.display='block';

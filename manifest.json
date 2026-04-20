@@ -2,7 +2,7 @@
   "manifest_version": 1,
   "files": {
     "firmware.bin": {
-      "version": 428,
+      "version": 429,
       "firmware": true
     },
     "www/chess.html.gz": {
