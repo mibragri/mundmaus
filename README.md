@@ -68,7 +68,7 @@ Zusaetzlich loggt die Firmware Boot-/Connect-Events persistent auf Flash — abr
 
 | # | Komponente | ca. Preis | Beispiel |
 |---|-----------|-----------|----------|
-| 1 | ESP32-WROOM-32 DevKit (mit Pins!) | ~8 EUR | AZ-Delivery ESP32 DevKitC V4 |
+| 1 | ESP32-WROOM-32 DevKit *oder* ESP32-S3 DevKitC (mit Pins!) | ~8 EUR | AZ-Delivery ESP32 DevKitC V4 |
 | 2 | KY-023 Joystick Modul | ~3 EUR | AZ-Delivery KY-023 |
 | 3 | Drucksensor MPS20N0040D-S + HX710B | ~5 EUR | eBay/AliExpress "MPS20N0040D HX710B" |
 | 4 | DuPont Jumper-Kabel (M-M + M-F) | ~3 EUR | 40 Stueck Set |
@@ -76,6 +76,8 @@ Zusaetzlich loggt die Firmware Boot-/Connect-Events persistent auf Flash — abr
 | 6 | Silikonschlauch 4mm Innendurchmesser | ~3 EUR | Aquarium-Zubehoer |
 
 **Gesamtkosten: ~25 EUR** — DuPont-Kabel zusammenstecken. Nur der Drucksensor (HX710B) muss geloetet werden.
+
+Die Firmware erkennt das Board beim Booten automatisch und setzt die Pin-Belegung entsprechend (ESP32-WROOM vs. ESP32-S3) — gleiches Binary, kein manuelles Umbauen.
 
 > **Gehaeuse:** Ein 3D-druckbares Gehaeuse ist enthalten (`enclosure/`). Ohne 3D-Drucker: Komponenten einfach mit DuPont-Kabeln verbinden — fertig.
 
@@ -186,9 +188,9 @@ pio run -e esp32 -t uploadfs
 3. **Browser oeffnen:** `http://192.168.4.1`
 4. **WLAN konfigurieren:** Im Portal das Heim-WLAN auswaehlen und Passwort eingeben
 5. **ESP32 startet neu** und verbindet sich mit dem Heim-WLAN
-6. **Beliebiges Geraet im gleichen WLAN** kann jetzt die Spiele oeffnen (IP-Adresse wird im Seriell-Monitor angezeigt)
+6. **Beliebiges Geraet im gleichen WLAN** kann jetzt die Spiele oeffnen — entweder ueber die IP (im Seriell-Monitor) oder einfacher: **`http://mundmaus.local`** per mDNS. Funktioniert auf Apple-Geraeten nativ, auf Windows mit Bonjour Print Services, auf Linux mit avahi-daemon.
 
-> **Fuer den TV:** Einen guenstigen Android-Stick (z.B. Xiaomi Mi TV Stick, ~30 EUR) an den TV anschliessen, Browser oeffnen, IP-Adresse eingeben. Oder einen alten Laptop/Tablet per HDMI an den TV.
+> **Fuer den TV:** Einen guenstigen Android-Stick (z.B. Xiaomi Mi TV Stick, ~30 EUR) an den TV anschliessen, Browser oeffnen, `mundmaus.local` eingeben. Oder einen alten Laptop/Tablet per HDMI an den TV.
 
 ## Einstellungen anpassen
 
@@ -209,6 +211,23 @@ Jedes Einstecken der MundMaus startet mit einer automatischen Mittelpunkt-Kalibr
 3. Wackelt der Joystick zu stark (z.B. weil der Patient gerade das Mundstueck haelt), wird die Kalibrierung als ungueltig markiert — die Firmware uebernimmt den Wert trotzdem, damit ein klemmender Sensor nicht permanenten Ausschlag produziert
 
 Konsequenz fuer den Pfleger: **Beim Anstecken das Mundstueck einen Moment loslassen.** Danach ist der Joystick zentriert — ohne Slider, ohne manuelles Trimmen. Falls der Cursor trotzdem in eine Richtung haengt: kurz MundMaus-Stecker ziehen, Joystick frei lassen, wieder einstecken — oder im Portal ueber den "Kalibrieren"-Button nachziehen.
+
+## Kiosk-Modus fuer den Patient
+
+Mit der Taste **K** wechselt jedes Spiel in den Kiosk-Modus: der Pfleger-Footer wird ausgeblendet, die grossen Action-Buttons (Neu / Zurueck / Tipp) bleiben sichtbar aber rechts vom Spielfeld, keine Menues sind erreichbar. So kann der Patient allein spielen, ohne versehentlich in Einstellungen oder Menues zu navigieren. Nochmal **K** blendet alles wieder ein.
+
+## Keyboard-Shortcuts (Pfleger)
+
+Fuer Pfleger, die die Spiele per Tastatur steuern oder testen wollen. Alle Spiele reagieren auf dieselbe Shortcut-Liste — sichtbar im Footer jedes Spiels:
+
+| Taste | Funktion |
+|-------|----------|
+| Pfeiltasten | Navigation (links/rechts/oben/unten) |
+| Leertaste / Enter | Auswaehlen / Klicken (wie Pusten) |
+| **N** | Neues Spiel |
+| **K** | Kiosk-Modus ein/aus |
+| **J** | Joystick-Simulations-Modus (Charge-Mechanik statt sofortige Navigation) |
+| **M** | Multiplayer-Modus (Schach, Vier gewinnt, Muehle) |
 
 ## Vorausschauende Navigation (Charge-Mechanik)
 
@@ -277,7 +296,17 @@ Schlauch pruefen — ist er richtig auf dem Sensor-Nippel? Kein Knick im Schlauc
 In den Einstellungen (⚙) die Empfindlichkeit reduzieren. Bei starkem WiFi-Ruckeln: ESP32 naeher an den Router stellen.
 
 **Wie komme ich auf das ESP32 wenn ich die IP vergessen habe?**
-ESP32 aus- und wieder einstecken. Wenn es kein WLAN findet, startet es automatisch den Hotspot "MundMaus" (Passwort: `mundmaus1`). Dann: `http://192.168.4.1`
+`http://mundmaus.local` probieren (mDNS — funktioniert in allen Apple-Geraeten nativ). Wenn das nicht geht: ESP32 aus- und wieder einstecken. Wenn es kein WLAN findet, startet es automatisch den Hotspot "MundMaus" (Passwort: `mundmaus1`). Dann: `http://192.168.4.1`
+
+**Das WLAN hat sich geaendert, wie sage ich das der MundMaus?**
+Im Portal den Zahnrad-Button oeffnen und unter "WLAN" neue Credentials eintragen. Alternativ (wenn das alte WLAN gar nicht mehr da ist): einen POST an `http://mundmaus.local/api/wifi/reset` schickt — loescht gespeicherte Credentials, ESP32 rebootet in den AP-Fallback-Modus, dann wie bei der Erstinbetriebnahme neu konfigurieren.
+
+**Was passiert wenn ein Firmware-Update schief geht?**
+Zwei Sicherheitsnetze:
+1. **Dual-Partition-Rollback** (Arduino-Firmware): ESP32 bootet nach einem fehlgeschlagenem Update automatisch auf die vorherige Version zurueck — transparent, ohne manuelles Eingreifen.
+2. **Recovery-AP** (MicroPython-Firmware): Nach 3 fehlgeschlagenen Boot-Versuchen startet die Firmware den AP-Fallback "MundMaus" und stellt die Vorversion aus `.bak`-Dateien wieder her.
+
+In beiden Faellen ist das Geraet ueber den Portal-Zugriff weiter erreichbar — kein Ziegelstein-Risiko beim Update.
 
 ## Mitmachen
 
