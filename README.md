@@ -46,6 +46,20 @@ Die **Einstellungen** (⚙) erlauben Pflegern, Joystick-Empfindlichkeit, Puste-S
 
 Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. Beim Einschalten prueft der ESP32 ob Updates verfuegbar sind — ein Klick im Portal installiert sie. Bei fehlgeschlagenem Update: automatischer Rollback auf die vorherige Version.
 
+### Verbindungs-Diagnose
+
+Unten links im Portal zeigt eine Status-Zeile jederzeit den Zustand des Geraets:
+
+```
+▮▮▮▯ Sehr gut (-63 dBm) • ⚡ 0 Brownouts • TX 15 dBm
+```
+
+- **Signal-Balken + Klartext** (Ausgezeichnet / Sehr gut / Gut / Ausreichend / Schwach) — keine dBm-Kenntnisse noetig, Detail in Klammern fuer Interessierte
+- **Brownout-Zaehler** — zaehlt automatische Resets durch USB-Spannungsabfaelle. Bei > 0 erscheint ein Banner oben mit Handlungsempfehlung (kuerzeres/dickeres USB-Kabel, besseres Netzteil)
+- **TX-Level** — aktueller WLAN-Sendepegel. Firmware reduziert automatisch in Stufen (15 → 13 → 11 → 8.5 → 7 dBm), falls Brownouts auftreten, um den Strom-Peak unter die kritische Schwelle zu druecken
+
+Zusaetzlich loggt die Firmware Boot-/Connect-Events persistent auf Flash — abrufbar unter `http://<geraet>/api/wifi-log` (auch im AP-Fallback-Mode erreichbar). Damit lassen sich Cold-Boot-Probleme auch nachtraeglich diagnostizieren, ohne dass ein Laptop am Seriell-Port haengen muss.
+
 ## Was du brauchst
 
 ### Einkaufsliste
