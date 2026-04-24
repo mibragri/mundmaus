@@ -48,6 +48,8 @@ Neue Spiele und Firmware-Updates werden automatisch ueber WiFi heruntergeladen. 
 
 ### Verbindungs-Diagnose
 
+![Portal mit Status-Zeile](screenshots/portal-status.png)
+
 Unten links im Portal zeigt eine Status-Zeile jederzeit den Zustand des Geraets:
 
 ```
