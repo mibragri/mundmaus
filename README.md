@@ -200,6 +200,16 @@ Ueber das Portal (Zahnrad-Symbol ⚙) koennen Pfleger die Empfindlichkeit anpass
 
 Aenderungen wirken sofort (Live-Preview). "Save" speichert dauerhaft, "Cancel" verwirft.
 
+## Joystick-Auto-Kalibrierung
+
+Jedes Einstecken der MundMaus startet mit einer automatischen Mittelpunkt-Kalibrierung:
+
+1. Beim Boot liest die Firmware ~50 Joystick-Werte in einer halben Sekunde
+2. Weicht der Joystick in dieser Zeit kaum ab (Spread < 300 ADC-Counts), wird der Mittelwert als neuer Nullpunkt uebernommen
+3. Wackelt der Joystick zu stark (z.B. weil der Patient gerade das Mundstueck haelt), wird die Kalibrierung als ungueltig markiert — die Firmware uebernimmt den Wert trotzdem, damit ein klemmender Sensor nicht permanenten Ausschlag produziert
+
+Konsequenz fuer den Pfleger: **Beim Anstecken das Mundstueck einen Moment loslassen.** Danach ist der Joystick zentriert — ohne Slider, ohne manuelles Trimmen. Falls der Cursor trotzdem in eine Richtung haengt: kurz MundMaus-Stecker ziehen, Joystick frei lassen, wieder einstecken — oder im Portal ueber den "Kalibrieren"-Button nachziehen.
+
 ## Vorausschauende Navigation (Charge-Mechanik)
 
 Damit der Patient die Kontrolle behaelt und nicht versehentlich ueber Karten hinwegspringt, nutzt die Navigation keine unsichtbaren Cooldowns sondern ein sichtbares Ladeprinzip:
