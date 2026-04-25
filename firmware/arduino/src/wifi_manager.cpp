@@ -228,10 +228,11 @@ int WiFiManager::_adaptiveTxPower() {
     // previous boot's TX activity drew too much current, so the next attempt
     // at the current level would likely brown out again.
     esp_reset_reason_t reason = esp_reset_reason();
+    // Counter is incremented in WifiLog::init() — here we just read for log.
+    uint32_t total = prefs.getUInt("bo_total", 0);
+
     if (reason == ESP_RST_BROWNOUT) {
-        // Count every brownout boot for the portal's cable-health indicator.
-        uint32_t total = prefs.getUInt("bo_total", 0) + 1;
-        prefs.putUInt("bo_total", total);
+        prefs.putUChar("stable_cnt", 0);
         if (level < NUM_TX_LEVELS - 1) {
             level++;
             prefs.putUChar("tx_level", level);
@@ -243,10 +244,22 @@ int WiFiManager::_adaptiveTxPower() {
                          " total=" + total);
         }
     } else {
-        // Non-brownout boot at current level — level stays where it is.
-        // Deliberately no auto-increase: cold boots are rare and we would
-        // rather stay conservative than oscillate on a marginal supply.
-        WifiLog::log(String("event=tx_level level=") + _txLabel(TX_LEVELS[level]));
+        // Non-brownout boot — increment stable counter. After 3 stable boots
+        // step UP one notch (recover from a previous brownout-driven stepdown
+        // when the supply has settled). Hysteresis: down is immediate at first
+        // brownout, up takes 3 stable boots — so we recover but don't oscillate.
+        uint8_t stable = prefs.getUChar("stable_cnt", 0) + 1;
+        if (stable >= 3 && level > 0) {
+            level--;
+            prefs.putUChar("tx_level", level);
+            prefs.putUChar("stable_cnt", 0);
+            WifiLog::log(String("event=tx_recover level=") + _txLabel(TX_LEVELS[level]) +
+                         " after_stable=" + stable);
+        } else {
+            prefs.putUChar("stable_cnt", stable);
+            WifiLog::log(String("event=tx_level level=") + _txLabel(TX_LEVELS[level]) +
+                         " stable=" + stable);
+        }
     }
     prefs.end();
     return (int)TX_LEVELS[level];

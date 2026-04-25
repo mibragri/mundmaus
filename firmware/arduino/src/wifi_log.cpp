@@ -53,6 +53,22 @@ void init() {
         prefs.end();
     }
 
+    // Brownout counter is incremented HERE, very early in setup() — before any
+    // WiFi activity runs. The previous location (deep inside connectStation
+    // → _adaptiveTxPower) was missed during fast brownout-loops because the
+    // device re-browned out before reaching that code path. Empirically the
+    // counter under-reported by ~5x. Doing it here means: if a single boot
+    // log line "event=boot reset_reason=9" gets written (which it does), the
+    // counter is also persisted in the same NVS commit window.
+    if (esp_reset_reason() == ESP_RST_BROWNOUT) {
+        Preferences bp;
+        if (bp.begin("wifi", false)) {
+            uint32_t total = bp.getUInt("bo_total", 0) + 1;
+            bp.putUInt("bo_total", total);
+            bp.end();
+        }
+    }
+
     if (!LittleFS.exists(LOG_DIR)) {
         LittleFS.mkdir(LOG_DIR);
     }
