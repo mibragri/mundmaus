@@ -1245,6 +1245,7 @@ function updateKbMode(){
 let ws=null;
 let wsBackoff=3000;
 let wsReconnectTimer=null;
+let wsHbInterval = null, wsWatchdogInterval = null, wsLastActivity = 0;
 
 function connectWebSocket() {
   const host=location.hostname===''||location.hostname==='localhost'?'localhost':location.hostname;
@@ -1252,12 +1253,24 @@ function connectWebSocket() {
   try{
     ws=new WebSocket(wsUrl);
     ws.onopen=()=>{
+      wsLastActivity = Date.now();
+      if (wsHbInterval) clearInterval(wsHbInterval);
+      wsHbInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send('{"type":"hb"}'); } catch(e) {} }
+      }, 2000);
+      if (wsWatchdogInterval) clearInterval(wsWatchdogInterval);
+      wsWatchdogInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN && (Date.now() - wsLastActivity) > 10000) {
+          console.warn('WS heartbeat timeout, forcing reconnect');
+          try { ws.close(); } catch(e) {}
+        }
+      }, 1000);
       console.log('ESP32 connected');
       updateWs(true);
       wsBackoff=3000;
       charge.wsSupported=false; // re-detect on reconnect
     };
-    ws.onmessage=(ev)=>{try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
+    ws.onmessage=(ev)=>{ wsLastActivity = Date.now(); try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
       if(m.type==='nav_hold'){
         charge.wsSupported=true;
         if(!charge.active||charge.dir!==m.dir)startCharge(m.dir,parseFloat(m.intensity)||1.0,'ws');
@@ -1269,6 +1282,8 @@ function connectWebSocket() {
       else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
     }catch(err){console.log('WS parse error',err);}};
     ws.onclose=()=>{
+      if (wsHbInterval) { clearInterval(wsHbInterval); wsHbInterval = null; }
+      if (wsWatchdogInterval) { clearInterval(wsWatchdogInterval); wsWatchdogInterval = null; }
       console.log('WS disconnected');
       updateWs(false);
       if(wsReconnectTimer)clearTimeout(wsReconnectTimer);

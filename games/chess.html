@@ -1951,6 +1951,7 @@ document.addEventListener('keyup', (e) => {
 // ── WebSocket ────────────────────────────────────────────
 let ws = null;
 let wsReconnectTimer = null;
+let wsHbInterval = null, wsWatchdogInterval = null, wsLastActivity = 0;
 let wsBackoff = 3000; // start at 3s, doubles on failure, cap 30s
 const WS_BACKOFF_INIT = 3000;
 const WS_BACKOFF_MAX = 30000;
@@ -1960,11 +1961,23 @@ function wsConnect() {
   try {
     ws = new WebSocket(`ws://${host}:81`);
     ws.onopen = () => {
+      wsLastActivity = Date.now();
+      if (wsHbInterval) clearInterval(wsHbInterval);
+      wsHbInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send('{"type":"hb"}'); } catch(e) {} }
+      }, 2000);
+      if (wsWatchdogInterval) clearInterval(wsWatchdogInterval);
+      wsWatchdogInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN && (Date.now() - wsLastActivity) > 10000) {
+          console.warn('WS heartbeat timeout, forcing reconnect');
+          try { ws.close(); } catch(e) {}
+        }
+      }, 1000);
       $wsStatus.className = 'connected';
       $wsStatus.title = 'ESP32 verbunden';
       wsBackoff = WS_BACKOFF_INIT; // reset on success
     };
-    ws.onmessage = (evt) => {
+    ws.onmessage = (evt) => { wsLastActivity = Date.now(); 
       try {
         const msg = JSON.parse(evt.data);
         resetIdle();
@@ -1992,6 +2005,8 @@ function wsConnect() {
       } catch(e) {}
     };
     ws.onclose = () => {
+      if (wsHbInterval) { clearInterval(wsHbInterval); wsHbInterval = null; }
+      if (wsWatchdogInterval) { clearInterval(wsWatchdogInterval); wsWatchdogInterval = null; }
       $wsStatus.className = '';
       $wsStatus.title = 'ESP32 nicht verbunden';
       ws = null;
