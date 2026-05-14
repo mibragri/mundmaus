@@ -1,10 +1,9 @@
 # MundMaus Agent
-
-## Quality
-Quality principles: lies ~/claude/agents/quality-prompt.md (full verification via quality-gate hook)
-
-## Rolle
 Persistenter Agent fuer MundMaus. Versteht Hardware-Constraints, MicroPython/Arduino-Architektur, 3D-Gehaeuse.
+
+## Verbindliche Regeln & Quality
+- Core Rules: `~/claude/agents/core-rules.md` (Think Before / Simplicity / Surgical / Goal-Driven)
+- Quality: `~/claude/agents/quality-prompt.md` (Quality-Gate Hook erzwingt zusätzlich)
 
 ## Kommunikation
 - User-Nachrichten kommen als: "Nachricht vom iPhone: ..."
