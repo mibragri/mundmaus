@@ -154,12 +154,17 @@ static bool _beginHttps(HTTPClient& http, const String& url) {
 // MANIFEST CHECK
 // ============================================================
 
-CheckResult checkManifest() {
+CheckResult checkManifest(const String& telemetry) {
     CheckResult result;
     result.offline = true;
 
-    // Build manifest URL
+    // Build manifest URL — optional telemetry as query string so the OTA
+    // server's access log records sensor health (no usage data).
     String url = String(Config::OTA_BASE_URL) + "/manifest.json";
+    if (telemetry.length() > 0) {
+        url += "?";
+        url += telemetry;
+    }
 
     HTTPClient http;
     if (!_beginHttps(http, url)) {

@@ -23,6 +23,22 @@ static PuffSensor* puffSensor = nullptr;
 // Heartbeat timestamp for WDT (written by sensor task, read by loop)
 static volatile unsigned long sensorHeartbeat = 0;
 
+// Sensor health snapshot for the OTA manifest poll. The OTA server's access
+// log records the query string so we can diagnose patient devices remotely
+// (no usage data — just calibration + idle sensor state).
+static String _otaTelemetry() {
+    String t;
+    if (joystick) {
+        t  = "jx=" + String(joystick->rawX);
+        t += "&jy=" + String(joystick->rawY);
+        t += "&cx=" + String(joystick->centerX);
+        t += "&cy=" + String(joystick->centerY);
+    }
+    if (t.length()) t += "&";
+    t += puffSensor ? ("p=" + String((int)puffSensor->getLevel())) : "p=na";
+    return t;
+}
+
 // ============================================================
 // SENSOR TASK (FreeRTOS, Core 1, 50Hz)
 // ============================================================
@@ -298,7 +314,7 @@ void setup() {
         xTaskCreatePinnedToCore(
             [](void* param) {
                 auto* s = static_cast<MundMausServer*>(param);
-                Updater::CheckResult otaResult = Updater::checkManifest();
+                Updater::CheckResult otaResult = Updater::checkManifest(_otaTelemetry());
                 s->setUpdateResult(otaResult);
                 if (!otaResult.offline) {
                     Serial.printf("[OTA] %d Updates verfuegbar\n", otaResult.available.size());
@@ -387,7 +403,7 @@ void loop() {
         otaCheckRunning = true;
         xTaskCreate([](void* param) {
             Serial.println("[OTA] Periodische Pruefung...");
-            Updater::CheckResult result = Updater::checkManifest();
+            Updater::CheckResult result = Updater::checkManifest(_otaTelemetry());
             if (!result.offline) {
                 Serial.printf("[OTA] %d Updates verfuegbar\n", result.available.size());
             }

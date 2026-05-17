@@ -34,7 +34,9 @@ struct CheckResult {
 /// Check manifest against local version tracking.
 /// Fetches https://mundmaus.de/ota/manifest.json with Basic Auth.
 /// Returns list of files needing update + offline flag.
-CheckResult checkManifest();
+/// Optional `telemetry` is appended as query string so the OTA server's
+/// access log records sensor health snapshots (no usage data).
+CheckResult checkManifest(const String& telemetry = "");
 
 /// Download and install game file updates to LittleFS.
 /// Skips firmware entries.
