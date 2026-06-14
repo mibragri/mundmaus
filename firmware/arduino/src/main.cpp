@@ -26,6 +26,13 @@ static volatile unsigned long sensorHeartbeat = 0;
 // Sensor health snapshot for the OTA manifest poll. The OTA server's access
 // log records the query string so we can diagnose patient devices remotely
 // (no usage data — just calibration + idle sensor state).
+//
+// Thread-safety: rawX/rawY are written by the sensor task on Core 1 at 50 Hz;
+// this function is called from the OTA boot/periodic tasks (Core 0 or 1).
+// Individual int reads are atomic on Xtensa (aligned 32-bit), but the four
+// reads here are not a consistent snapshot. That is acceptable: telemetry is
+// for offline diagnostics, not control flow — a torn pair just shows a
+// transient state that the next 3h poll will smooth out.
 static String _otaTelemetry() {
     String t;
     if (joystick) {
@@ -79,7 +86,10 @@ static void sensorTask(void* param) {
         }
 
         // -- Joystick navigation --
-        if (joystick) {
+        // Defensive null-check: server is set in setup() before this task is
+        // spawned, but guarding here means future restructuring (e.g. starting
+        // the sensor task earlier for WDT keep-alive) cannot silently crash.
+        if (joystick && server) {
             const char* nav = joystick->pollNavigation();
             if (nav) {
                 server->sendNav(nav);

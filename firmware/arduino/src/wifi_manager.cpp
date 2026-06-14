@@ -13,6 +13,11 @@
 // MUTEX (Bug 4: protect credential string lifetime)
 // ============================================================
 
+// Lazy init: the test-and-set looks like a race but is safe in practice —
+// every caller (loadCreds/saveCreds/setCreds/connectStation/...) is invoked
+// from setup() before any FreeRTOS task is spawned, so the first _ensureMutex
+// call has no concurrent siblings. Do NOT call _ensureMutex from a task
+// callback without first ensuring setup() has already run.
 void WiFiManager::_ensureMutex() {
     if (_credMutex == nullptr) {
         _credMutex = xSemaphoreCreateMutex();
@@ -269,15 +274,152 @@ int WiFiManager::_adaptiveTxPower() {
 // STATION MODE
 // ============================================================
 
+bool WiFiManager::_tryConnectWithBssid(const String& ssid, const String& pw,
+                                       const uint8_t bssid[6], uint8_t channel,
+                                       unsigned long timeoutMs,
+                                       unsigned long& outBeginMs) {
+    char cachedBuf[20];
+    snprintf(cachedBuf, sizeof(cachedBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+             bssid[0], bssid[1], bssid[2], bssid[3], bssid[4], bssid[5]);
+    Serial.printf("  Versuche cached BSSID %s Ch %u...\n", cachedBuf, (unsigned)channel);
+    WifiLog::log(String("event=cached_try bssid=") + cachedBuf +
+                 " ch=" + (int)channel);
+    outBeginMs = millis();
+    WiFi.begin(ssid.c_str(), pw.c_str(), (int32_t)channel, bssid);
+    unsigned long start = millis();
+    while (!WiFi.isConnected() && millis() - start < timeoutMs) {
+        delay(250);
+        esp_task_wdt_reset();
+    }
+    if (WiFi.isConnected()) {
+        WifiLog::log("event=cached_ok");
+        return true;
+    }
+    Serial.println("  Cached BSSID fehlgeschlagen, fallback auf scan");
+    WifiLog::log("event=cached_fail");
+    WiFi.disconnect(false);
+    return false;
+}
+
+bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
+                                  unsigned long timeoutMs,
+                                  unsigned long& outBeginMs) {
+    // Scan first so the strongest matching BSSID can be pinned on each
+    // attempt. Plain WiFi.begin(ssid, pw) in a Fritz-Repeater mesh lets
+    // ESP32 heuristics pick an AP — sometimes a weaker one that refuses
+    // the association.
+    struct BssMatch {
+        uint8_t bssid[6];
+        int32_t channel;
+        int     rssi;
+    };
+    std::vector<BssMatch> matches;
+    int scanCount = WiFi.scanNetworks();
+    if (scanCount > 0) {
+        for (int i = 0; i < scanCount; i++) {
+            if (WiFi.SSID(i) == ssid) {
+                BssMatch m;
+                memcpy(m.bssid, WiFi.BSSID(i), 6);
+                m.channel = WiFi.channel(i);
+                m.rssi    = WiFi.RSSI(i);
+                matches.push_back(m);
+            }
+        }
+        std::sort(matches.begin(), matches.end(),
+                  [](const BssMatch& a, const BssMatch& b) { return a.rssi > b.rssi; });
+        // Cap at 5 — that is one match per retry attempt below.
+        if (matches.size() > 5) matches.resize(5);
+    }
+    WiFi.scanDelete();
+
+    int totalNets = (scanCount > 0) ? scanCount : 0;
+    WifiLog::log(String("event=scan_result count=") + totalNets +
+                 " matches_ssid=" + (int)matches.size());
+    for (size_t i = 0; i < matches.size(); i++) {
+        const BssMatch& m = matches[i];
+        char bssidBuf[20];
+        snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                 m.bssid[0], m.bssid[1], m.bssid[2],
+                 m.bssid[3], m.bssid[4], m.bssid[5]);
+        WifiLog::log(String("event=scan_match rssi=") + m.rssi +
+                     " ch=" + (int)m.channel +
+                     " bssid=" + bssidBuf);
+    }
+
+    // Retry up to 5 times with exponential-ish backoff. Bumped from 3 to 5
+    // because the patient's router occasionally rejects the first 2-3 attempts
+    // after a cold boot; falling to AP mode at 3 was triggering the caregiver
+    // panic-recovery flow we are trying to avoid.
+    // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
+    // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
+    constexpr int MAX_ATTEMPTS = 5;
+    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        int idx = attempt - 1;
+        bool pinned = (idx < static_cast<int>(matches.size()));
+        char bssidBuf[20] = "-";
+        int  attemptCh    = 0;
+        if (pinned) {
+            const BssMatch& m = matches[idx];
+            snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
+                     m.bssid[0], m.bssid[1], m.bssid[2],
+                     m.bssid[3], m.bssid[4], m.bssid[5]);
+            attemptCh = static_cast<int>(m.channel);
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: BSSID %s Ch %d RSSI %d)...\n",
+                          ssid.c_str(), attempt, MAX_ATTEMPTS,
+                          bssidBuf, attemptCh, m.rssi);
+            WifiLog::log(String("event=begin_attempt n=") + attempt +
+                         " mode=pinned bssid=" + bssidBuf +
+                         " ch=" + attemptCh);
+            outBeginMs = millis();
+            WiFi.begin(ssid.c_str(), pw.c_str(), m.channel, m.bssid);
+        } else {
+            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: kein BSSID, plain)...\n",
+                          ssid.c_str(), attempt, MAX_ATTEMPTS);
+            WifiLog::log(String("event=begin_attempt n=") + attempt + " mode=plain");
+            outBeginMs = millis();
+            WiFi.begin(ssid.c_str(), pw.c_str());
+        }
+
+        unsigned long start = millis();
+        while (!WiFi.isConnected()) {
+            if (millis() - start > timeoutMs) {
+                Serial.printf("  Timeout (%lums)\n", timeoutMs);
+                WiFi.disconnect(false);
+                break;
+            }
+            delay(250);
+            esp_task_wdt_reset();  // keep WDT happy during long connect attempts
+        }
+
+        if (WiFi.isConnected()) return true;
+
+        // Decode the failure reason from WiFi.status() so the log distinguishes
+        // password mistakes (auth_fail) from missing AP (no_ssid) from
+        // generic timeouts. Helps narrow down patient-site issues quickly.
+        const char* reason = "timeout";
+        wl_status_t st = WiFi.status();
+        if (st == WL_NO_SSID_AVAIL)        reason = "no_ssid";
+        else if (st == WL_CONNECT_FAILED)  reason = "auth_fail";
+        WifiLog::log(String("event=attempt_failed n=") + attempt + " reason=" + reason);
+
+        if (attempt < MAX_ATTEMPTS) {
+            Serial.printf("  Warte %ds vor naechstem Versuch...\n", attempt * 2);
+            for (int w = 0; w < attempt * 8; w++) {
+                delay(250);
+                esp_task_wdt_reset();
+            }
+        }
+    }
+    return false;
+}
+
 String WiFiManager::connectStation(unsigned long timeoutMs) {
     _ensureMutex();
 
-    // Bug 4: Copy the credentials to locals under the mutex BEFORE starting
-    // the WiFi.begin retry loop. WiFi.begin() only latches the char* at the
-    // start of the attempt, so if saveCredentials() reassigns `ssid` mid-
-    // connect, the underlying buffer can be freed out from under WiFi.begin
-    // → use-after-free. By using locals we give the WiFi stack a buffer we
-    // own for the duration of the connect attempt.
+    // Bug 4: Copy credentials to locals under the mutex BEFORE entering the
+    // retry loop. WiFi.begin() only latches the char* at the start of the
+    // attempt, so a concurrent saveCredentials() reassigning `ssid` would
+    // free the buffer mid-connect → use-after-free.
     String localSsid;
     String localPw;
     xSemaphoreTake(_credMutex, portMAX_DELAY);
@@ -333,146 +475,20 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
     unsigned long beginMs = 0;
 
-    // Cached-BSSID fast-path: if the last successful connect recorded a BSSID,
-    // try it directly before scanning. Scan is a TX-burst producer (probe
-    // requests on every channel) and has been the root-cause window for
-    // brownouts on underpowered setups. Skipping the scan on the happy-path
-    // dramatically reduces TX exposure during cold-boot.
+    // Cached-BSSID fast-path: skip the scan if last good BSSID is known.
+    // Scan is a TX-burst producer (probe requests on every channel) and the
+    // main brownout trigger on underpowered setups.
     uint8_t cachedBssid[6];
     uint8_t cachedChan = 0;
     if (_loadLastBssid(cachedBssid, cachedChan)) {
-        char cachedBuf[20];
-        snprintf(cachedBuf, sizeof(cachedBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
-                 cachedBssid[0], cachedBssid[1], cachedBssid[2],
-                 cachedBssid[3], cachedBssid[4], cachedBssid[5]);
-        Serial.printf("  Versuche cached BSSID %s Ch %u...\n", cachedBuf, (unsigned)cachedChan);
-        WifiLog::log(String("event=cached_try bssid=") + cachedBuf +
-                     " ch=" + (int)cachedChan);
-        beginMs = millis();
-        WiFi.begin(localSsid.c_str(), localPw.c_str(), (int32_t)cachedChan, cachedBssid);
-        unsigned long start = millis();
-        while (!WiFi.isConnected() && millis() - start < timeoutMs) {
-            delay(250);
-            esp_task_wdt_reset();
-        }
-        if (WiFi.isConnected()) {
-            WifiLog::log("event=cached_ok");
-        } else {
-            Serial.println("  Cached BSSID fehlgeschlagen, fallback auf scan");
-            WifiLog::log("event=cached_fail");
-            WiFi.disconnect(false);
-        }
+        _tryConnectWithBssid(localSsid, localPw, cachedBssid, cachedChan,
+                             timeoutMs, beginMs);
     }
 
-    // Scan + retry loop only runs if the cached fast-path did not connect.
+    // Scan + retry only if the cached fast-path did not connect.
     if (!WiFi.isConnected()) {
-    // Scan first so the strongest matching BSSID can be pinned on each
-    // attempt. Plain WiFi.begin(ssid, pw) in a Fritz-Repeater mesh lets
-    // ESP32 heuristics pick an AP — sometimes a weaker one that refuses
-    // the association.
-    struct BssMatch {
-        uint8_t bssid[6];
-        int32_t channel;
-        int     rssi;
-    };
-    std::vector<BssMatch> matches;
-    int scanCount = WiFi.scanNetworks();
-    if (scanCount > 0) {
-        for (int i = 0; i < scanCount; i++) {
-            if (WiFi.SSID(i) == localSsid) {
-                BssMatch m;
-                memcpy(m.bssid, WiFi.BSSID(i), 6);
-                m.channel = WiFi.channel(i);
-                m.rssi    = WiFi.RSSI(i);
-                matches.push_back(m);
-            }
-        }
-        std::sort(matches.begin(), matches.end(),
-                  [](const BssMatch& a, const BssMatch& b) { return a.rssi > b.rssi; });
-        // Cap at 5 — that is one match per retry attempt below.
-        if (matches.size() > 5) matches.resize(5);
+        _scanAndConnect(localSsid, localPw, timeoutMs, beginMs);
     }
-    WiFi.scanDelete();
-
-    int totalNets = (scanCount > 0) ? scanCount : 0;
-    WifiLog::log(String("event=scan_result count=") + totalNets +
-                 " matches_ssid=" + (int)matches.size());
-    for (size_t i = 0; i < matches.size(); i++) {
-        const BssMatch& m = matches[i];
-        char bssidBuf[20];
-        snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
-                 m.bssid[0], m.bssid[1], m.bssid[2],
-                 m.bssid[3], m.bssid[4], m.bssid[5]);
-        WifiLog::log(String("event=scan_match rssi=") + m.rssi +
-                     " ch=" + (int)m.channel +
-                     " bssid=" + bssidBuf);
-    }
-
-    // Retry up to 5 times with exponential-ish backoff. Bumped from 3 to 5
-    // because the patient's router occasionally rejects the first 2-3 attempts
-    // after a cold boot; falling to AP mode at 3 was triggering the caregiver
-    // panic-recovery flow we are trying to avoid.
-    // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
-    // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
-    constexpr int MAX_ATTEMPTS = 5;
-    for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        int idx = attempt - 1;
-        bool pinned = (idx < static_cast<int>(matches.size()));
-        char bssidBuf[20] = "-";
-        int  attemptCh    = 0;
-        if (pinned) {
-            const BssMatch& m = matches[idx];
-            snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
-                     m.bssid[0], m.bssid[1], m.bssid[2],
-                     m.bssid[3], m.bssid[4], m.bssid[5]);
-            attemptCh = static_cast<int>(m.channel);
-            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: BSSID %s Ch %d RSSI %d)...\n",
-                          localSsid.c_str(), attempt, MAX_ATTEMPTS,
-                          bssidBuf, attemptCh, m.rssi);
-            WifiLog::log(String("event=begin_attempt n=") + attempt +
-                         " mode=pinned bssid=" + bssidBuf +
-                         " ch=" + attemptCh);
-            beginMs = millis();
-            WiFi.begin(localSsid.c_str(), localPw.c_str(), m.channel, m.bssid);
-        } else {
-            Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: kein BSSID, plain)...\n",
-                          localSsid.c_str(), attempt, MAX_ATTEMPTS);
-            WifiLog::log(String("event=begin_attempt n=") + attempt + " mode=plain");
-            beginMs = millis();
-            WiFi.begin(localSsid.c_str(), localPw.c_str());
-        }
-
-        unsigned long start = millis();
-        while (!WiFi.isConnected()) {
-            if (millis() - start > timeoutMs) {
-                Serial.printf("  Timeout (%lums)\n", timeoutMs);
-                WiFi.disconnect(false);
-                break;
-            }
-            delay(250);
-            esp_task_wdt_reset();  // keep WDT happy during long connect attempts
-        }
-
-        if (WiFi.isConnected()) break;
-
-        // Decode the failure reason from WiFi.status() so the log distinguishes
-        // password mistakes (auth_fail) from missing AP (no_ssid) from
-        // generic timeouts. Helps narrow down patient-site issues quickly.
-        const char* reason = "timeout";
-        wl_status_t st = WiFi.status();
-        if (st == WL_NO_SSID_AVAIL)        reason = "no_ssid";
-        else if (st == WL_CONNECT_FAILED)  reason = "auth_fail";
-        WifiLog::log(String("event=attempt_failed n=") + attempt + " reason=" + reason);
-
-        if (attempt < MAX_ATTEMPTS) {
-            Serial.printf("  Warte %ds vor naechstem Versuch...\n", attempt * 2);
-            for (int w = 0; w < attempt * 8; w++) {
-                delay(250);
-                esp_task_wdt_reset();
-            }
-        }
-    }
-    }  // end of: if (!WiFi.isConnected())  — scan+retry fallback block
 
     if (!WiFi.isConnected()) {
         return "";
@@ -485,7 +501,7 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
     // Persist BSSID+channel of this successful connect so the next cold-boot
     // can go straight to WiFi.begin() with the pinned BSSID and skip the
-    // scan phase entirely — which is the brownout-sensitive TX-burst window.
+    // scan phase entirely.
     const uint8_t* connectedBssid = WiFi.BSSID();
     if (connectedBssid) {
         _saveLastBssid(connectedBssid, (uint8_t)WiFi.channel());

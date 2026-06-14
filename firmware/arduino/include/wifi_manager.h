@@ -95,4 +95,23 @@ private:
     /// the wifi_power_t to apply. Floor is 7 dBm — below that the radio
     /// reaches specified minimum and further cuts stop helping.
     int _adaptiveTxPower();
+
+    /// Cached-BSSID fast-path used by connectStation(). Does a single
+    /// WiFi.begin() against a known BSSID/channel and waits up to timeoutMs
+    /// for association. Returns true on success. `outBeginMs` is set to the
+    /// millis() at which WiFi.begin() was called (used for the connect-time
+    /// log line in connectStation).
+    bool _tryConnectWithBssid(const String& ssid, const String& pw,
+                              const uint8_t bssid[6], uint8_t channel,
+                              unsigned long timeoutMs,
+                              unsigned long& outBeginMs);
+
+    /// Scan-and-retry fallback used by connectStation() when the cached
+    /// BSSID does not connect (or none is cached). Scans, ranks matches by
+    /// RSSI, then makes up to MAX_ATTEMPTS connect attempts with exponential
+    /// backoff. Returns true on success. `outBeginMs` is set to the
+    /// millis() of the WiFi.begin() that finally succeeded.
+    bool _scanAndConnect(const String& ssid, const String& pw,
+                         unsigned long timeoutMs,
+                         unsigned long& outBeginMs);
 };

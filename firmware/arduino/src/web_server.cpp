@@ -133,6 +133,40 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
     });
 
+    // --- GET /api/sensor --- Live sensor values for caregiver-independent
+    // diagnosis (e.g. did the patient's puff actually reach the threshold?
+    // is the joystick centered or stuck?). Plain HTTP poll, no WebSocket
+    // needed — we want this usable from `curl` from the AP-fallback hotspot
+    // when nobody is in front of the device.
+    _httpServer.on("/api/sensor", HTTP_GET, [this](AsyncWebServerRequest* req) {
+        JsonDocument doc;
+        if (_puffSensor) {
+            int32_t raw      = _puffSensor->lastRaw();
+            int32_t baseline = _puffSensor->baseline;
+            int32_t delta    = raw - baseline;
+            int32_t thresh   = _puffSensor->rawThreshold();
+            doc["puff"]["raw"]            = raw;
+            doc["puff"]["baseline"]       = baseline;
+            doc["puff"]["delta"]          = delta;
+            doc["puff"]["threshold"]      = thresh;
+            doc["puff"]["over_threshold"] = (delta > thresh) || (-delta > thresh);
+            doc["puff"]["level"]          = _puffSensor->getLevel();
+        } else {
+            doc["puff"]["error"] = "no puff sensor";
+        }
+        if (_joystick) {
+            doc["joystick"]["raw_x"]    = _joystick->rawX;
+            doc["joystick"]["raw_y"]    = _joystick->rawY;
+            doc["joystick"]["center_x"] = _joystick->centerX;
+            doc["joystick"]["center_y"] = _joystick->centerY;
+            doc["joystick"]["dx"]       = _joystick->rawX - _joystick->centerX;
+            doc["joystick"]["dy"]       = _joystick->rawY - _joystick->centerY;
+        } else {
+            doc["joystick"]["error"] = "no joystick";
+        }
+        _sendJson200(req, doc);
+    });
+
     // --- GET /api/wifi-log --- Persistent WiFi event log (plain text)
     // No auth: this is intra-LAN diagnostics for caregivers/dev. CRITICAL
     // that this also resolves in AP-fallback mode — that is exactly when the
@@ -586,37 +620,42 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
 void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg) {
     const char* type = msg["type"] | "";
 
+    // Early-return dispatch: each branch is self-contained, no fall-through.
+    // Unknown types reach the trailing log so silent typos surface in Serial.
+
     if (strcmp(type, "wifi_config") == 0) {
         const char* ssid = msg["ssid"] | "";
         const char* pw   = msg["password"] | "";
-        if (strlen(ssid) > 0) {
-            // BLOCKER 2: Don't schedule a reboot on NVS failure — emit an
-            // error status instead so the portal can surface the problem.
-            if (!_wifi.saveCredentials(String(ssid), String(pw))) {
-                JsonDocument resp;
-                resp["type"]    = "wifi_status";
-                resp["status"]  = "error";
-                resp["error"]   = "NVS Schreibfehler";
-                resp["message"] = "WLAN-Speichern fehlgeschlagen";
-                String buf;
-                serializeJson(resp, buf);
-                client->text(buf);
-                return;
-            }
+        if (strlen(ssid) == 0) return;  // empty SSID: silently drop
 
+        // BLOCKER 2: Don't schedule a reboot on NVS failure — emit an
+        // error status instead so the portal can surface the problem.
+        if (!_wifi.saveCredentials(String(ssid), String(pw))) {
             JsonDocument resp;
             resp["type"]    = "wifi_status";
-            resp["status"]  = "saved";
-            resp["ssid"]    = ssid;
-            resp["message"] = "Gespeichert. Neustart...";
+            resp["status"]  = "error";
+            resp["error"]   = "NVS Schreibfehler";
+            resp["message"] = "WLAN-Speichern fehlgeschlagen";
             String buf;
             serializeJson(resp, buf);
-            _broadcastText(buf);
-
-            _pendingReboot = millis() | 1;  // I3: ensure nonzero
+            client->text(buf);
+            return;
         }
 
-    } else if (strcmp(type, "wifi_scan") == 0) {
+        JsonDocument resp;
+        resp["type"]    = "wifi_status";
+        resp["status"]  = "saved";
+        resp["ssid"]    = ssid;
+        resp["message"] = "Gespeichert. Neustart...";
+        String buf;
+        serializeJson(resp, buf);
+        _broadcastText(buf);
+
+        _pendingReboot = millis() | 1;  // I3: ensure nonzero
+        return;
+    }
+
+    if (strcmp(type, "wifi_scan") == 0) {
         // P1-4: Never call WiFi.scanNetworks() from this handler — it runs on
         // the AsyncTCP task (Core 0) and would block WS traffic for the
         // patient for 2-5 seconds. Dispatch to a worker task; results arrive
@@ -628,8 +667,10 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         String buf;
         serializeJson(resp, buf);
         client->text(buf);
+        return;
+    }
 
-    } else if (strcmp(type, "config_preview") == 0) {
+    if (strcmp(type, "config_preview") == 0) {
         const char* key = msg["key"] | "";
         if (strlen(key) > 0) {
             // M3: Accept both int and float values (JS may send 1.0 for 1)
@@ -637,13 +678,17 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
                 Config::update(key, (int)msg["value"].as<float>());
             }
         }
+        return;
+    }
 
-    } else if (strcmp(type, "config_preview_bulk") == 0) {
+    if (strcmp(type, "config_preview_bulk") == 0) {
         if (msg["values"].is<JsonObjectConst>()) {
             _applyConfigValues(msg["values"].as<JsonObjectConst>());
         }
+        return;
+    }
 
-    } else if (strcmp(type, "config_save") == 0) {
+    if (strcmp(type, "config_save") == 0) {
         Config::save();
         JsonDocument resp;
         resp["type"] = "config_saved";
@@ -651,8 +696,10 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         String buf;
         serializeJson(resp, buf);
         _broadcastText(buf);
+        return;
+    }
 
-    } else if (strcmp(type, "config_reset") == 0) {
+    if (strcmp(type, "config_reset") == 0) {
         Config::reset();
         JsonDocument resp;
         resp["type"] = "config_values";
@@ -670,17 +717,27 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         String buf;
         serializeJson(resp, buf);
         _broadcastText(buf);
+        return;
+    }
 
-    } else if (strcmp(type, "calibrate") == 0) {
+    if (strcmp(type, "calibrate") == 0) {
         // I3: Don't block async handler -- set flag, sensor task handles it
         calibrateRequested = true;
-    } else if (strcmp(type, "debug_joy") == 0) {
+        return;
+    }
+
+    if (strcmp(type, "debug_joy") == 0) {
         bool enable = msg["enable"] | !debugJoystick;  // explicit or toggle
         debugJoystick = enable;
         debugJoystickClientId = enable ? client->id() : 0;
         Serial.printf("  Debug joystick: %s (client %lu)\n",
                       debugJoystick ? "ON" : "OFF", (unsigned long)debugJoystickClientId);
+        return;
     }
+
+    // Unknown type — surface in logs so typos / version mismatches don't
+    // disappear silently. The empty-string default for `type` lands here too.
+    Serial.printf("  WS: unknown message type '%s'\n", type);
 }
 
 // ============================================================
@@ -691,8 +748,7 @@ void MundMausServer::sendNav(const char* direction) {
     // I1: Push to queue -- processed on main core in processSensorQueue()
     SensorEvent ev;
     ev.type = SensorEvent::NAV;
-    strncpy(ev.data, direction, sizeof(ev.data) - 1);
-    ev.data[sizeof(ev.data) - 1] = '\0';
+    snprintf(ev.data, sizeof(ev.data), "%s", direction);
     ev.value = 0;
     xQueueSend(_sensorQueue, &ev, 0);  // non-blocking
 }
@@ -700,8 +756,7 @@ void MundMausServer::sendNav(const char* direction) {
 void MundMausServer::sendNavHold(const char* direction, float intensity) {
     SensorEvent ev;
     ev.type = SensorEvent::NAV_HOLD;
-    strncpy(ev.data, direction, sizeof(ev.data) - 1);
-    ev.data[sizeof(ev.data) - 1] = '\0';
+    snprintf(ev.data, sizeof(ev.data), "%s", direction);
     ev.value = constrain(intensity, 0.0f, 1.0f);
     xQueueSend(_sensorQueue, &ev, 0);
 }
@@ -717,8 +772,7 @@ void MundMausServer::sendNavRelease() {
 void MundMausServer::sendAction(const char* kind) {
     SensorEvent ev;
     ev.type = SensorEvent::ACTION;
-    strncpy(ev.data, kind, sizeof(ev.data) - 1);
-    ev.data[sizeof(ev.data) - 1] = '\0';
+    snprintf(ev.data, sizeof(ev.data), "%s", kind);
     ev.value = 0;
     xQueueSend(_sensorQueue, &ev, 0);
 }
@@ -966,8 +1020,7 @@ void MundMausServer::_updateTaskWrapper(void* param) {
             Serial.printf("  OTA: %s (%d/%d)\n", name.c_str(), cur, total);
             SensorEvent ev;
             ev.type = SensorEvent::UPDATE_PROGRESS;
-            strncpy(ev.data, name.c_str(), sizeof(ev.data) - 1);
-            ev.data[sizeof(ev.data) - 1] = '\0';
+            snprintf(ev.data, sizeof(ev.data), "%s", name.c_str());
             ev.intVal  = cur;
             ev.intVal2 = total;
             xQueueSend(q, &ev, 0);
@@ -981,8 +1034,7 @@ void MundMausServer::_updateTaskWrapper(void* param) {
             {
                 SensorEvent ev;
                 ev.type = SensorEvent::UPDATE_PROGRESS;
-                strncpy(ev.data, "Firmware...", sizeof(ev.data) - 1);
-                ev.data[sizeof(ev.data) - 1] = '\0';
+                snprintf(ev.data, sizeof(ev.data), "Firmware...");
                 ev.intVal = 0; ev.intVal2 = 1;
                 xQueueSend(q, &ev, 0);
             }
@@ -990,8 +1042,7 @@ void MundMausServer::_updateTaskWrapper(void* param) {
                 [q](int written, int total) {
                     SensorEvent ev;
                     ev.type = SensorEvent::UPDATE_PROGRESS;
-                    strncpy(ev.data, "Firmware", sizeof(ev.data) - 1);
-                    ev.data[sizeof(ev.data) - 1] = '\0';
+                    snprintf(ev.data, sizeof(ev.data), "Firmware");
                     ev.intVal = written / 1024;
                     ev.intVal2 = total / 1024;
                     xQueueSend(q, &ev, 0);
@@ -1019,16 +1070,12 @@ void MundMausServer::_updateTaskWrapper(void* param) {
         SensorEvent ev;
         if (ok) {
             ev.type = SensorEvent::UPDATE_COMPLETE;
-            if (needsReboot) {
-                strncpy(ev.data, "Update OK — Neustart...", sizeof(ev.data) - 1);
-            } else {
-                strncpy(ev.data, "Update abgeschlossen", sizeof(ev.data) - 1);
-            }
+            snprintf(ev.data, sizeof(ev.data), "%s",
+                     needsReboot ? "Update OK — Neustart..." : "Update abgeschlossen");
         } else {
             ev.type = SensorEvent::UPDATE_ERROR;
-            strncpy(ev.data, "Update fehlgeschlagen", sizeof(ev.data) - 1);
+            snprintf(ev.data, sizeof(ev.data), "Update fehlgeschlagen");
         }
-        ev.data[sizeof(ev.data) - 1] = '\0';
         xQueueSend(q, &ev, 0);
     }
 

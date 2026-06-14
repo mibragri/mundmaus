@@ -15,11 +15,24 @@ class CalibratedJoystick;
 class PuffSensor;
 
 // Thread-safe event for sensor->WS bridge (I1)
+//
+// data[] format contract per event type:
+//   NAV / NAV_HOLD            : direction string ("up"/"down"/"left"/"right")
+//   NAV_RELEASE / PUFF_LEVEL  : empty ("")
+//   ACTION                    : kind ("press"/"puff")
+//   CALIBRATE_DONE            : empty (values live in intVal/intVal2/intVal3)
+//   UPDATE_PROGRESS           : filename or short status ("Firmware...")
+//   UPDATE_COMPLETE/ERROR     : human-readable status message (German)
+//   DEBUG_JOYSTICK            : "<dy>,<state>,<axis>" packed via snprintf
+//
+// All producers MUST bound the write to sizeof(data); use snprintf(data,
+// sizeof(data), ...) consistently. Strings longer than 63 bytes are
+// silently truncated — keep status messages short.
 struct SensorEvent {
     enum Type { NAV, NAV_HOLD, NAV_RELEASE, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
                 UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT,
                 DEBUG_JOYSTICK } type;
-    char data[64];   // direction string, action kind, or filename/message
+    char data[64];   // see format contract above
     float value;     // for puff_level
     int intVal;      // for progress current/total, calibrate centerX
     int intVal2;     // for progress total, calibrate centerY

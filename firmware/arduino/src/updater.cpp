@@ -36,6 +36,12 @@ static constexpr int SCHEMA_VERSION = 1;
 // observe half-written state and corrupt the JSON blob.
 static SemaphoreHandle_t _versionsMutex = nullptr;
 
+// Lazy init: the test-and-set looks like a race but is safe in practice —
+// loadVersions() is the first caller and runs from setup() before any
+// background OTA task is spawned. saveVersions() / checkManifest() /
+// installFirmwareUpdate() all come later, after the mutex is initialized.
+// Do NOT add a new code path that calls _ensureMutex() concurrently from
+// two unsynchronized tasks without changing this to eager construction.
 static void _ensureMutex() {
     if (_versionsMutex == nullptr) {
         _versionsMutex = xSemaphoreCreateMutex();
