@@ -102,7 +102,7 @@
     border-style: solid;
     border-width: 6px;
     box-shadow: 0 0 28px rgba(255, 215, 0, 0.8);
-    animation: focusPulse 1.5s ease-in-out infinite;
+    animation: focusPulse 1.5s ease-in-out 3;
   }
 
   /* Selected pile slot: orange background */
@@ -112,7 +112,7 @@
     border-width: var(--sel-border-w) !important;
     background: rgba(255, 143, 0, 0.25) !important;
     box-shadow: 0 0 24px var(--sel-glow), inset 0 0 18px var(--sel-glow) !important;
-    animation: selPulse 1.2s ease-in-out infinite;
+    animation: selPulse 1.2s ease-in-out 3;
   }
 
   /* Valid target pile slot: magenta background */
@@ -122,7 +122,7 @@
     border-width: var(--sel-border-w) !important;
     background: rgba(255, 102, 255, 0.15) !important;
     box-shadow: 0 0 20px var(--target-glow), inset 0 0 15px var(--target-glow) !important;
-    animation: tgtPulse 0.8s ease-in-out infinite;
+    animation: tgtPulse 0.8s ease-in-out 3;
   }
 
   @keyframes selPulse {
@@ -174,7 +174,7 @@
     outline-offset: -3px;
     box-shadow: 0 0 28px rgba(255, 215, 0, 0.8), inset 0 0 10px rgba(255, 215, 0, 0.2), var(--card-shadow);
     transform: scale(1.05);
-    animation: focusPulse 1.5s ease-in-out infinite;
+    animation: focusPulse 1.5s ease-in-out 3;
     z-index: 850 !important;
   }
 
@@ -186,7 +186,7 @@
     outline-offset: -5px;
     box-shadow: 0 0 35px rgba(255,143,0,0.6), 0 0 70px rgba(255,143,0,0.3), var(--card-shadow);
     z-index: 900 !important;
-    animation: cardSelPulse 1.2s ease-in-out infinite;
+    animation: cardSelPulse 1.2s ease-in-out 3;
   }
   /* Keep red suit text readable on orange */
   .card.face-up.red.selected-state { color: #8b0000 !important; }
@@ -202,7 +202,7 @@
     outline: 5px dashed var(--target-border);
     outline-offset: -5px;
     box-shadow: 0 0 25px var(--target-glow), var(--card-shadow);
-    animation: tgtBgPulse 0.8s ease-in-out infinite;
+    animation: tgtBgPulse 0.8s ease-in-out 3;
   }
 
   @keyframes tgtBgPulse {
@@ -285,7 +285,7 @@
   .sel-badge.target-mark {
     background: var(--target);
     color: #000;
-    animation: tgtPulse 0.8s ease-in-out infinite;
+    animation: tgtPulse 0.8s ease-in-out 3;
   }
 
   /* ── Header (top bar with stats) ────────────── */
@@ -471,7 +471,7 @@
     border: 6px solid #FFD700;
     color: var(--text);
     box-shadow: 0 0 28px rgba(255, 215, 0, 0.8);
-    animation: focusPulse 1.5s ease-in-out infinite;
+    animation: focusPulse 1.5s ease-in-out 3;
   }
 
   .action-btn.active {

@@ -93,7 +93,7 @@
     border-style: solid;
     border-width: 5px;
     box-shadow: 0 0 16px rgba(255,215,0,0.4);
-    animation: focusPulse 1.5s ease-in-out infinite;
+    animation: focusPulse 1.5s ease-in-out 3;
   }
 
   .pile-slot.selected-state {
@@ -102,7 +102,7 @@
     border-width: var(--sel-border-w) !important;
     background: rgba(255, 143, 0, 0.25) !important;
     box-shadow: 0 0 24px var(--sel-glow), inset 0 0 18px var(--sel-glow) !important;
-    animation: selPulse 1.2s ease-in-out infinite;
+    animation: selPulse 1.2s ease-in-out 3;
   }
 
   .pile-slot.target {
@@ -111,7 +111,7 @@
     border-width: var(--sel-border-w) !important;
     background: rgba(255, 102, 255, 0.15) !important;
     box-shadow: 0 0 20px var(--target-glow), inset 0 0 15px var(--target-glow) !important;
-    animation: tgtPulse 0.8s ease-in-out infinite;
+    animation: tgtPulse 0.8s ease-in-out 3;
   }
 
   @keyframes selPulse {
@@ -168,7 +168,7 @@
     outline-offset: -6px;
     box-shadow: 0 0 28px rgba(255,215,0,0.8), var(--card-shadow);
     z-index: 899 !important;
-    animation: focusPulse 1.5s ease-in-out infinite;
+    animation: focusPulse 1.5s ease-in-out 3;
     transform: scale(1.03);
   }
 
@@ -180,7 +180,7 @@
     box-shadow: 0 0 35px rgba(255,143,0,0.6), 0 0 70px rgba(255,143,0,0.3), var(--card-shadow);
     transform: scale(1.06);
     z-index: 900 !important;
-    animation: cardSelPulse 1.2s ease-in-out infinite;
+    animation: cardSelPulse 1.2s ease-in-out 3;
   }
   .card.face-up.red.selected-state { color: #8b0000 !important; }
 
@@ -194,7 +194,7 @@
     outline: 5px dashed var(--target-border);
     outline-offset: -5px;
     box-shadow: 0 0 25px var(--target-glow), var(--card-shadow);
-    animation: tgtBgPulse 0.8s ease-in-out infinite;
+    animation: tgtBgPulse 0.8s ease-in-out 3;
   }
 
   @keyframes tgtBgPulse {
@@ -264,7 +264,7 @@
   .sel-badge.target-mark {
     background: var(--target);
     color: #000;
-    animation: tgtPulse 0.8s ease-in-out infinite;
+    animation: tgtPulse 0.8s ease-in-out 3;
   }
 
   /* Header */
