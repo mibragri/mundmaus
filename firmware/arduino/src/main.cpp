@@ -404,6 +404,40 @@ void loop() {
         }
     }
 
+    // BLOCKER 4 (recovery): the AP fallback above is a one-way latch — once
+    // mode is "ap" the station-reconnect branch never runs again, so a
+    // transient router outage (reboot / brief power cut at the patient's home)
+    // would strand the device on its hotspot until someone power-cycles it, and
+    // the caregivers there cannot re-provision. Keep probing station in the
+    // background so it self-heals. Slower cadence than the 30s health check:
+    // each attempt briefly cycles the radio, so we accept a short hotspot blip
+    // every few minutes rather than every 30s. connectStation() restores
+    // mode="station"+ip on success; on failure it leaves the radio without the
+    // AP, so we re-assert the hotspot to keep the caregiver interface up. Gated
+    // on stored credentials — an unprovisioned device is meant to stay in AP.
+    static unsigned long lastApRetry = 0;
+    if (wifi.mode == "ap" && !wifiReconnecting && wifi.ssid.length() > 0 &&
+        millis() - lastApRetry > 5UL * 60 * 1000) {
+        lastApRetry = millis();
+        wifiReconnecting = true;
+        WifiLog::log("event=ap_recovery_probe");
+        xTaskCreate([](void* param) {
+            WiFiManager* w = static_cast<WiFiManager*>(param);
+            String ip = w->connectStation();
+            if (ip.length() > 0) {
+                Serial.printf("  AP-Recovery: Station wieder verbunden (%s)\n", ip.c_str());
+                WifiLog::log(String("event=ap_recovery_ok ip=") + ip);
+                // connectStation() already restored mode="station" + ip.
+            } else {
+                Serial.println("  AP-Recovery: weiterhin Hotspot");
+                WifiLog::log("event=ap_recovery_fail");
+                w->startAP();  // re-assert hotspot until the next probe
+            }
+            wifiReconnecting = false;
+            vTaskDelete(nullptr);
+        }, "ap_recover", 6144, &wifi, 1, nullptr);
+    }
+
     // Periodic OTA check (every 3 hours, non-blocking)
     static unsigned long lastOtaCheck = 0;
     static std::atomic<bool> otaCheckRunning{false};
