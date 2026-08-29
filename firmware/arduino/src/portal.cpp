@@ -100,7 +100,7 @@ function connectWS(){
       document.getElementById('upd-fill').style.width='100%';
       _updating=true;
       _fadeOut();
-      setTimeout(function(){fetch('/api/reboot').catch(function(){})},1500);
+      setTimeout(function(){fetch('/api/reboot',{method:'POST'}).catch(function(){})},1500);
     }
     else if(d.type==='update_error'){
       document.getElementById('upd-status').textContent='\u2717 Fehler: '+d.file;

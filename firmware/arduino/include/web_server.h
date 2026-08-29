@@ -113,6 +113,9 @@ private:
     void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
                     AwsEventType type, void* arg, uint8_t* data, size_t len);
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
+    /// True unless the request carries a foreign page's Origin/Referer.
+    bool _sameOriginOk(AsyncWebServerRequest* req);
+
     void _sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc);
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);
     int _applyConfigValues(JsonObjectConst values);

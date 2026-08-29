@@ -34,19 +34,23 @@ static constexpr int SCHEMA_VERSION = 1;
 // check task, post-install refresh, HTTP handler callback) and all paths
 // mutate the same backing store. Without a mutex concurrent writers can
 // observe half-written state and corrupt the JSON blob.
-static SemaphoreHandle_t _versionsMutex = nullptr;
 
-// Lazy init: the test-and-set looks like a race but is safe in practice —
-// loadVersions() is the first caller and runs from setup() before any
-// background OTA task is spawned. saveVersions() / checkManifest() /
-// installFirmwareUpdate() all come later, after the mutex is initialized.
-// Do NOT add a new code path that calls _ensureMutex() concurrently from
-// two unsynchronized tasks without changing this to eager construction.
-static void _ensureMutex() {
-    if (_versionsMutex == nullptr) {
-        _versionsMutex = xSemaphoreCreateMutex();
-    }
-}
+// Constructed eagerly, not lazily.
+//
+// The previous lazy _ensureMutex() rested on "loadVersions() is the first
+// caller and runs from setup()". loadVersions() had ZERO call sites anywhere in
+// the repo, and markBootOk() returns before reaching the mutex on every normal
+// boot — so on a normal boot the handle was still null when the first real
+// caller arrived. Two of those can arrive concurrently: the ota_boot task
+// (main.cpp, pinned to core 1) and upd_check (spawned by POST
+// /api/updates/check, which the portal fires on EVERY ws.onopen, including 3s
+// reconnects). Both reach checkManifest(), so both could create their own
+// mutex, leaving no mutual exclusion at all — one task clearing _versions while
+// the other iterates it is a heap-corruption panic or a corrupted ota_ver blob.
+//
+// Global constructors run in app_main with the FreeRTOS scheduler already up,
+// so creating the semaphore here is safe and removes the ordering assumption.
+static SemaphoreHandle_t _versionsMutex = xSemaphoreCreateMutex();
 
 // Internal: load versions into _versions. Caller must hold _versionsMutex.
 static void _loadVersionsLocked() {
@@ -106,14 +110,12 @@ static void _saveVersionsLocked() {
 }
 
 void loadVersions() {
-    _ensureMutex();
     if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
     _loadVersionsLocked();
     xSemaphoreGive(_versionsMutex);
 }
 
 void saveVersions() {
-    _ensureMutex();
     if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
     _saveVersionsLocked();
     xSemaphoreGive(_versionsMutex);
@@ -202,7 +204,6 @@ CheckResult checkManifest(const String& telemetry) {
     // Otherwise two concurrent manifest checks can both read the same stale
     // state, seed overlapping entries, and race on saveVersions() — the
     // JSON blob write is not atomic and the loser corrupts the namespace.
-    _ensureMutex();
     if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) {
         return result;
     }
@@ -390,7 +391,12 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         int written = 0;
         bool writeFailed = false;
         unsigned long lastData = millis();
-        while (http.connected() && (contentLen > 0 || contentLen < 0)) {
+        // available() as well as connected(): the server can close the socket
+        // as soon as it has sent everything, leaving the last bytes buffered
+        // locally. Testing connected() alone makes a complete download look
+        // truncated, and the completeness check below then fails it forever.
+        while ((http.connected() || tcpStream->available() > 0) &&
+               (contentLen > 0 || contentLen < 0)) {
             int avail = tcpStream->available();
             if (avail <= 0) {
                 if (millis() - lastData > 30000) {
@@ -435,8 +441,20 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             Serial.printf("  OTA: %s truncated: got %d/%d bytes\n",
                           uf->name.c_str(), written, expectedLen);
             downloadOk = false;
+        } else if (expectedLen < 0) {
+            // No Content-Length means a chunked response (a proxy, a CDN, an
+            // nginx in front of the OTA host). This loop reads the RAW TCP
+            // stream — de-chunking only happens inside HTTPClient's
+            // writeToStream()/getString(), neither of which is used here — so
+            // what got written is the payload interleaved with hex chunk
+            // headers. This branch used to accept any non-zero length, which
+            // atomically renamed a file full of framing over the working copy
+            // and marked it installed: a blank page for the patient that OTA
+            // would never offer to repair. Refuse instead and keep the old file.
+            Serial.printf("  OTA: %s chunked response (no Content-Length) — abgelehnt\n",
+                          uf->name.c_str());
+            downloadOk = false;
         }
-        // expectedLen < 0 (chunked/unknown): accept any non-zero length
 
         if (!downloadOk) {
             LittleFS.remove(tmpPath);
@@ -473,7 +491,6 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         }
 
         // Update version tracking (Bug 5: lock around _versions mutation)
-        _ensureMutex();
         if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) == pdTRUE) {
             _versions[uf->name] = uf->remoteVer;
             xSemaphoreGive(_versionsMutex);
@@ -490,7 +507,6 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
         String path = "/" + uf->name;
         LittleFS.remove(path);
         // Bug 5: lock around _versions mutation
-        _ensureMutex();
         if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) == pdTRUE) {
             _versions.erase(uf->name);
             xSemaphoreGive(_versionsMutex);
@@ -699,7 +715,6 @@ void markBootOk() {
     // the schema_version fix (Bug 2), re-loading is unnecessary work and
     // stomps on any entries the boot sequence already populated. Instead,
     // load ONLY if _versions has not been loaded yet this boot.
-    _ensureMutex();
     if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) {
         // Shouldn't happen — fall back to cancelling rollback and return.
         esp_ota_mark_app_valid_cancel_rollback();

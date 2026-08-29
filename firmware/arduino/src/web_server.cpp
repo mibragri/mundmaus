@@ -211,7 +211,12 @@ void MundMausServer::_setupHttpRoutes() {
     // WiFi.setTxPower(). Intended for verifying connect viability at each
     // adaptive step (15 / 13 / 11 / 8.5 / 7 dBm) before rolling out a lower
     // floor to a patient site that we can't re-flash over USB.
-    _httpServer.on("/api/debug/tx-level", HTTP_POST, [](AsyncWebServerRequest* req) {
+    _httpServer.on("/api/debug/tx-level", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json",
+                      "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         if (!req->hasParam("n")) {
             req->send(400, "text/plain", "missing ?n=0..4\n");
             return;
@@ -252,6 +257,11 @@ void MundMausServer::_setupHttpRoutes() {
     // steals the request. Registering this handler first ensures first-match
     // wins and the reset route works correctly.
     _httpServer.on("/api/wifi/reset", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json",
+                      "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         Serial.println("  WiFi credentials cleared via API");
         _wifi.deleteCredentials();
         JsonDocument doc;
@@ -480,7 +490,18 @@ void MundMausServer::_setupHttpRoutes() {
     );
 
     // --- GET /api/reboot ---
-    _httpServer.on("/api/reboot", HTTP_GET, [this](AsyncWebServerRequest* req) {
+    // POST, not GET. A state-changing GET needs no preflight and no readable
+    // response, so `<img src="http://<ip>/api/reboot">` on any page a browser
+    // on the patient's LAN loads was enough to reboot the device — on a timer,
+    // his game restarting every few seconds. The read-only diagnostic endpoints
+    // stay open by design (documented above); only the destructive ones are
+    // gated.
+    _httpServer.on("/api/reboot", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json",
+                      "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         JsonDocument doc;
         doc["ok"] = true;
         _sendJson200(req, doc);
@@ -603,6 +624,39 @@ void MundMausServer::_setupWsRoutes() {
                        AwsEventType type, void* arg, uint8_t* data, size_t len) {
         _onWsEvent(server, client, type, arg, data, len);
     });
+    // Reject cross-origin WebSocket handshakes.
+    //
+    // WebSockets are exempt from the same-origin policy, so any page a browser
+    // on the patient's LAN happens to load could open ws://<device>:81/ and
+    // send {"type":"wifi_config",...}. That saves credentials and schedules a
+    // reboot: the device comes up on a network that does not exist, falls back
+    // to its hotspot, and the patient has no games until someone on site
+    // re-provisions it through a captive portal. {"type":"calibrate"} is the
+    // same class — it re-centres the joystick wherever his mouth happens to be.
+    //
+    // Pages served by the device itself send their own address as Origin. A
+    // missing or opaque ("null") Origin is allowed on purpose: non-browser
+    // clients (curl, the diagnostics in tests/e2e) send none, and rejecting
+    // them would cost more than it buys. Known gap: a sandboxed iframe on a
+    // hostile page also produces "null", so this stops the drive-by case, not a
+    // determined attacker already running code in the browser.
+    _ws.handleHandshake([this](AsyncWebServerRequest* request) -> bool {
+        if (!request->hasHeader("Origin")) return true;
+        const String origin = request->header("Origin");
+        if (origin.length() == 0 || origin == "null") return true;
+
+        const String ip = _wifi.ip;
+        if ((ip.length() > 0 && (origin == "http://" + ip ||
+                                 origin == "http://" + ip + ":81")) ||
+            origin == "http://mundmaus.local" ||
+            origin == "http://mundmaus.local:81" ||
+            origin == "http://" + String(Config::AP_SSID) + ".local") {
+            return true;
+        }
+        Serial.printf("  WS: Handshake abgelehnt, fremde Origin '%s'\n", origin.c_str());
+        return false;
+    });
+
     _wsHttpServer.addHandler(&_ws);
 }
 
@@ -967,6 +1021,32 @@ void MundMausServer::checkReboot() {
 // ============================================================
 // JSON HELPERS
 // ============================================================
+
+// True when the request did not come from a foreign web page.
+//
+// Absent Origin/Referer is allowed: curl, the diagnostics in tests/e2e and the
+// captive-portal flow send neither, and rejecting them would cost more than it
+// buys on a device whose read-only API is deliberately open. What this stops is
+// the drive-by case — a page on the patient's LAN quietly issuing a destructive
+// request from a browser, which always carries its own origin.
+bool MundMausServer::_sameOriginOk(AsyncWebServerRequest* req) {
+    String origin;
+    if (req->hasHeader("Origin")) {
+        origin = req->header("Origin");
+    } else if (req->hasHeader("Referer")) {
+        origin = req->header("Referer");
+    } else {
+        return true;
+    }
+    if (origin.length() == 0 || origin == "null") return true;
+
+    const String ip = _wifi.ip;
+    if (ip.length() > 0 && origin.startsWith("http://" + ip)) return true;
+    if (origin.startsWith("http://mundmaus.local")) return true;
+
+    Serial.printf("  API: fremde Origin abgelehnt: '%s'\n", origin.c_str());
+    return false;
+}
 
 void MundMausServer::_sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc) {
     String buf;
