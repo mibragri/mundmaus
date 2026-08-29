@@ -17,10 +17,11 @@ Geometrie:
 | Strecke | Wert |
 |---|---:|
 | Schraubenlänge gesamt | 20.0 mm |
-| Senkung im Lid (Kopf bündig) | 2.1 mm |
+| Senkung im Lid (Kopf bündig, im Lid-Korpus enthalten) | 2.1 mm |
 | Lid-Korpus durchquert (Decke + Lip-Hänger) | 12.0 mm |
-| Eindringtiefe in Base-Säule | 8.0 mm |
-| Summe | 22.1 mm |
+| Spiel Lid-Hänger zu Säulen-Top | 0.2 mm |
+| Eindringtiefe in Base-Säule (tatsächlich) | 7.8 mm |
+| Summe (= Schraubenlänge) | 20.0 mm |
 | Säulenoberkante Z (base coords) | 26.8 mm |
 | Spiel Säulen-Top zu Lid-Hänger-Boden | 0.2 mm |
 | Boden-Reserve unter Bohrung | 16.8 mm |
@@ -29,7 +30,7 @@ Geometrie:
 ## Komponenten-Layout (unverändert von v5.7)
 - Mic mount collar: -X wall (internal, -58.1 inner edge)
 - Joystick center: X=-19.0 (platform -37.5 to -0.5)
-- ESP32 center: X=35.0 (PCB 7.8 to 62.2, USB at -X end)
+- ESP32 center: X=31.0 (PCB 3.8 to 58.2, USB at -X end)
 - Sensor shelf: +X inner wall, shelf X=61.0 to 66.0, Z=5.5 to 25.5
 
 ## Clearance Analysis
@@ -38,7 +39,7 @@ Geometrie:
 | Lip zone bottom | 27.0 mm |
 | Sensor PCB top to lip zone | 1.5 mm |
 | Mic collar to joystick platform | 20.60 mm |
-| ESP32 right edge to +X inner wall | 3.80 mm |
+| ESP32 right edge to +X inner wall | 7.80 mm |
 | Sensor bottom Z to ESP32 PCB top Z | -0.7 mm |
 | Hold-down wall gap (lid closed) | 1.0 mm |
 | Barb hole diameter | 2.8 mm (press-fit) |

@@ -2,6 +2,7 @@
 """MundMaus v5.5 Enclosure Validator — checks dimensions, clearances, printability."""
 
 import sys
+from pathlib import Path
 
 # ═══════════════════════════════════════════════════════════════════
 # REFERENCE DIMENSIONS (from datasheets / research)
@@ -41,8 +42,29 @@ SPEC = {
 # IMPORT ENCLOSURE CONSTANTS
 # ═══════════════════════════════════════════════════════════════════
 
-sys.path.insert(0, ".")
+# Resolve from this file, not from the CWD: sys.path.insert(0, ".") meant the
+# import only worked when run from inside enclosure/.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+# The model this validator actually knows how to check.
+VALIDATED_MODEL = "mundmaus_v55_enclosure"
+
 from mundmaus_v55_enclosure import *  # noqa: E402, F403
+
+# Refuse to pass silently on a superseded model.
+#
+# This validator was written against v5.5 and still is. v5.8 removed the detent
+# ridge mechanism that section 4 checks, and roughly twenty constants the other
+# sections need (PRES_L, PRES_HOLDER_*, JOY_TO_PRES_CLEARANCE,
+# BARB_TO_LID_RIM_CLEARANCE_Z, RIDGE_*/GROOVE_*, …) do not exist there at all,
+# so it cannot simply be pointed at the current design. Until it is ported, it
+# must not print "design is valid" for a model nobody prints — that reads as a
+# green light for the current enclosure.
+_CURRENT_MODEL = max(
+    (p.stem for p in Path(__file__).resolve().parent.glob("mundmaus_v*_enclosure.py")),
+    default=VALIDATED_MODEL,
+)
+_MODEL_IS_CURRENT = (_CURRENT_MODEL == VALIDATED_MODEL)
 
 # ═══════════════════════════════════════════════════════════════════
 # VALIDATION
@@ -459,7 +481,20 @@ if warnings:
     for w in warnings:
         print(w)
 
-if not errors:
+if not _MODEL_IS_CURRENT:
+    print(f"\n🔴 STALE: this validator checks {VALIDATED_MODEL}, but the current "
+          f"model is {_CURRENT_MODEL}.")
+    print("   Its sections rely on constants and a detent mechanism that the "
+          "current design no longer has,")
+    print("   so a pass here says nothing about the enclosure you would print. "
+          "Port it before trusting it.")
+elif not errors:
     print("\n🟢 No errors — design is valid")
 
 print()
+
+# Exit code, so this can actually gate anything. There was no sys.exit at all:
+# the script printed a red ERRORS block and still returned 0, which meant any
+# `validate_enclosure.py && …` or hook keyed on the exit status passed
+# unconditionally — a check that could not fail.
+sys.exit(1 if (errors or not _MODEL_IS_CURRENT) else 0)

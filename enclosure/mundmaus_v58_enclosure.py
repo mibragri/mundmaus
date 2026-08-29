@@ -47,7 +47,7 @@ TOL, TOL_LOOSE = 0.2, 0.2  # tighter guide rails — slight press-fit for ESP32
 ESP_L, ESP_W, ESP_H = 54.4, 28.0, 1.2  # Espressif DevKitC V4 spec (was 51.5)
 ESP_MODULE_H = 3.1                      # WROOM-32 metal shield height
 ESP_STANDOFF_H, ESP_GUIDE_H = 3.0, 3.0  # back to 3.0 — USB connector needs clearance below PCB
-ESP_POS_X, ESP_POS_Y = 35.0, 0.0       # right side; USB faces -X (center). v5.8: Y=-2→0 für Eck-Säulen-Symmetrie
+ESP_POS_X, ESP_POS_Y = 31.0, 0.0       # v5.8 rev4: X=35→31 (4mm -X) für DuPont-Service-Raum zum Drucksensor; Y=0 für Säulen-Symmetrie
 ESP_USB_PROTRUSION = 2.4
 # ESP32 is mounted UPSIDE DOWN: WROOM module faces floor for cooling,
 # buttons (EN/BOOT) face floor, pin headers face up.
@@ -149,10 +149,17 @@ JOY_PLATFORM_MAX_X = JOY_POS_X + JOY_PLATFORM_MAIN_X / 2
 # Pressure sensor derived (v5.6: flat mount on +X inner wall)
 PRES_INNER_X = CAV_X / 2          # = 66.0 (inner surface of +X wall)
 PRES_SHELF_X_START = PRES_INNER_X - PRES_MOUNT_DEPTH  # = 61.0
-PRES_Z_BOT = PRES_POS_Z - PRES_PCB_W / 2   # = 8.0 (bottom of PCB)
-PRES_Z_TOP = PRES_POS_Z + PRES_PCB_W / 2    # = 28.0 (top of PCB)
+PRES_Z_BOT = PRES_POS_Z - PRES_PCB_W / 2   # = 5.5 (bottom of PCB)
+PRES_Z_TOP = PRES_POS_Z + PRES_PCB_W / 2    # = 25.5 (top of PCB)
+# The shelf carries the PCB, so its TOP must land on PRES_Z_BOT. It used to be
+# built upward FROM PRES_Z_BOT, which lifted the board by PRES_SHELF_T: the PCB
+# really spanned 7.0 to 27.0 and LIP_ZONE_BOTTOM is 27.0 — zero clearance, the
+# descending lid lip landing on the sensor. The guard below checked PRES_Z_TOP
+# and reported a comfortable 1.5 mm, because it modelled the board exactly one
+# shelf thickness too low.
+PRES_SHELF_Z_BOT = PRES_Z_BOT - PRES_SHELF_T   # = 4.0 (underside of the shelf)
 # Nipple position (offset from PCB center, estimated from datasheet)
-PRES_NIPPLE_Z = PRES_POS_Z + PRES_PCB_W / 2 - 5.0   # = 23.0
+PRES_NIPPLE_Z = PRES_POS_Z + PRES_PCB_W / 2 - 5.0   # = 20.5
 PRES_NIPPLE_Y = PRES_POS_Y + PRES_PCB_H / 2 - 4.0    # = 3.5
 
 # Lip insertion zone: Z = EXT_H_BASE - LIP_H to EXT_H_BASE
@@ -182,8 +189,21 @@ COLLAR_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - MIC_COLLAR_INNER_X
 ESP_LEFT_EDGE_X = ESP_POS_X - ESP_L / 2
 ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
 ESP_TO_WALL_CLEARANCE = INNER_POS_X - ESP_RIGHT_EDGE_X
-# Sensor vs ESP32 vertical clearance (different Z heights, same X region)
-PRES_ESP_Z_GAP = PRES_Z_BOT - (FLOOR_T + ESP_STANDOFF_H + ESP_H)  # = 1.8mm
+# Sensor vs ESP32 vertical clearance. NEGATIVE in the current layout: the sensor
+# PCB bottom sits below the ESP32 PCB top, so the two are kept apart by X
+# separation alone. The report printed this as an ordinary row with no guard,
+# and the comment claimed "= 1.8mm" — stale since PRES_POS_Z was lowered from
+# 18.0 to 15.5. At the previously committed ESP_POS_X = 35 the boards also
+# overlapped by 1.2 mm in X, i.e. real interference that nothing would catch.
+PRES_ESP_Z_GAP = PRES_Z_BOT - (FLOOR_T + ESP_STANDOFF_H + ESP_H)  # = -0.7mm
+PRES_ESP_X_GAP = PRES_SHELF_X_START - ESP_RIGHT_EDGE_X
+
+if PRES_ESP_Z_GAP < 0 and PRES_ESP_X_GAP < 0:
+    raise ValueError(
+        f"COLLISION: sensor shelf and ESP32 overlap on both axes "
+        f"(Z gap {PRES_ESP_Z_GAP:.1f}mm, X gap {PRES_ESP_X_GAP:.1f}mm). "
+        f"Move the sensor up or the ESP32 further -X."
+    )
 
 # Schraub-Säulen-Geometrie (Base- und Lid-Hänger-Positionen identisch)
 PILLAR_BASE_TOP_Z = EXT_H_BASE - LIP_H - PILLAR_BASE_TOP_Z_OFFSET  # 26.8mm in base coords
@@ -374,12 +394,14 @@ def _add_pressure_sensor_mount(base: cq.Workplane) -> cq.Workplane:
     # Absolute positions (CadQuery coordinate rule)
     inner_x = PRES_INNER_X                          # = 66.0 (inner surface of +X wall)
     shelf_x_start = inner_x - PRES_MOUNT_DEPTH      # = 61.0
-    shelf_z_bot = PRES_Z_BOT                         # = 8.0 (bottom of PCB)
+    shelf_z_bot = PRES_SHELF_Z_BOT                   # = 4.0 (underside of shelf)
     shelf_center_x = shelf_x_start + PRES_MOUNT_DEPTH / 2  # = 63.5
-    # Create shelf as a box on the +X inner wall
+    # Create shelf as a box on the +X inner wall. Built upward from its
+    # UNDERSIDE so the top face lands on PRES_Z_BOT and the PCB resting on it
+    # spans PRES_Z_BOT..PRES_Z_TOP, which is what the lip-clearance guard checks.
     shelf = (
         cq.Workplane("XY")
-        .workplane(offset=shelf_z_bot)  # Z = 8.0
+        .workplane(offset=shelf_z_bot)  # Z = 4.0, top face at 5.5
         .center(shelf_center_x, PRES_POS_Y)  # X=63.5, Y=0.0
         .box(PRES_MOUNT_DEPTH, PRES_PCB_H, PRES_SHELF_T, centered=[True, True, False])
     )
@@ -729,7 +751,17 @@ def render_pngs(base: cq.Workplane, lid: cq.Workplane, outdir: Path) -> None:
 def write_report(report_path: Path) -> None:
     pillar_corner_clearance = INNER_R - _PILLAR_CORNER_DIST - PILLAR_OD / 2
     base_pillar_height = PILLAR_BASE_TOP_Z - FLOOR_T
-    screw_total_engagement = (EXT_H_BASE + EXT_H_LID) - (PILLAR_BASE_TOP_Z - SCREW_PENETRATION)
+    # What a SCREW_LEN screw actually reaches into the pillar. The report used to
+    # add SCREW_HEAD_H to the full lid height and print "Summe 22.1 mm" for a
+    # 20 mm screw — the countersunk head sits INSIDE those 12 mm, so it was
+    # counted twice. Harmless on the bench (the screw reaches 7.8 mm instead of
+    # the nominal 8.0), but a build document that tells an assembler a 20 mm
+    # screw needs 22.1 mm of travel is not.
+    screw_actual_penetration = SCREW_LEN - (EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET)
+    if screw_actual_penetration < 6.0:
+        raise ValueError(
+            f"Schraube zu kurz: nur {screw_actual_penetration:.1f}mm Gewindeeingriff "
+            f"in der Säule (SCREW_LEN={SCREW_LEN}). Mindestens 6mm nötig.")
     report = textwrap.dedent(
         f"""\
         # MundMaus v5.8 Enclosure — Schraub-Verschluss (Spax 3.5x20)
@@ -751,10 +783,11 @@ def write_report(report_path: Path) -> None:
         | Strecke | Wert |
         |---|---:|
         | Schraubenlänge gesamt | {SCREW_LEN:.1f} mm |
-        | Senkung im Lid (Kopf bündig) | {SCREW_HEAD_H:.1f} mm |
+        | Senkung im Lid (Kopf bündig, im Lid-Korpus enthalten) | {SCREW_HEAD_H:.1f} mm |
         | Lid-Korpus durchquert (Decke + Lip-Hänger) | {EXT_H_LID + LIP_H:.1f} mm |
-        | Eindringtiefe in Base-Säule | {SCREW_PENETRATION:.1f} mm |
-        | Summe | {SCREW_HEAD_H + EXT_H_LID + LIP_H + SCREW_PENETRATION:.1f} mm |
+        | Spiel Lid-Hänger zu Säulen-Top | {PILLAR_BASE_TOP_Z_OFFSET:.1f} mm |
+        | Eindringtiefe in Base-Säule (tatsächlich) | {screw_actual_penetration:.1f} mm |
+        | Summe (= Schraubenlänge) | {EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET + screw_actual_penetration:.1f} mm |
         | Säulenoberkante Z (base coords) | {PILLAR_BASE_TOP_Z:.1f} mm |
         | Spiel Säulen-Top zu Lid-Hänger-Boden | {PILLAR_BASE_TOP_Z_OFFSET:.1f} mm |
         | Boden-Reserve unter Bohrung | {(PILLAR_BASE_TOP_Z - SCREW_PENETRATION) - FLOOR_T:.1f} mm |
