@@ -1,26 +1,34 @@
 #!/usr/bin/env python3
-"""MundMaus Game Quality Gate — Playwright-basierte Tests.
+"""MundMaus Game Quality Gate — STATISCHE Pruefungen (kein Browser).
 
-Prueft ein Spiel auf alle Quality-Standards aus der Session 2026-04-06.
-Muss vor jedem Deploy PASS zeigen. Laeuft gegen den lokalen ESP32.
+Dieses Skript liest den HTML-Quelltext und prueft Datei-Existenz. Es startet
+KEINEN Browser und benutzt kein Playwright, entgegen dem frueheren Docstring.
+Ein Spiel, das beim ersten Klick eine Exception wirft oder Zustand ueber
+newGame() hinweg leaken laesst, besteht hier sauber.
+
+Das verhaltensbasierte Gate aus CLAUDE.md (start -> spielen -> gewinnen ->
+neues Spiel -> kein State-Leak, Undo bis leer) liegt in tests/e2e/ und wird
+mit `npx playwright test` ausgefuehrt. Beide gehoeren vor jeden Deploy;
+deploy-ota.sh ruft inzwischen beide auf.
 
 Usage:
     python3 tools/test-game.py games/solitaire.html
     python3 tools/test-game.py --all                    # alle Spiele
-    python3 tools/test-game.py --all --host 192.168.178.86
 """
 
 import argparse
 import json
 import subprocess
 import sys
-import gzip
 import re
 from pathlib import Path
 
 PROJECT = Path(__file__).resolve().parent.parent
 GAMES_DIR = PROJECT / "games"
-ALL_GAMES = ["chess", "freecell", "memo", "muehle", "solitaire", "vier-gewinnt"]
+# Discovered, not hard-coded: a literal list meant --all silently skipped any
+# newly added game — zero static checks, zero freshness check — while
+# check-games.sh globbed the directory and disagreed about what "all" means.
+ALL_GAMES = sorted(p.stem for p in GAMES_DIR.glob("*.html") if p.stem != "settings")
 
 # ══════════════════════════════════════════════════════════════
 # CSS / JS Static Checks (no browser needed)
@@ -61,6 +69,26 @@ class StaticChecker:
         self._check_colorblind_safe()
         self._check_escape_key()
         return len(self.errors) == 0
+
+    def _function_body(self, name):
+        """Return the body of `function name(...)`, or None if absent.
+
+        Brace-matched rather than a fixed slice: an 800-character window cut
+        functions in half and, worse, made checks pass by accident because some
+        unrelated later code happened to fall inside it.
+        """
+        match = re.search(rf'function\s+{re.escape(name)}\s*\([^)]*\)\s*\{{', self.content)
+        if not match:
+            return None
+        depth, i = 1, match.end()
+        while i < len(self.content) and depth:
+            c = self.content[i]
+            if c == '{':
+                depth += 1
+            elif c == '}':
+                depth -= 1
+            i += 1
+        return self.content[match.end():i - 1]
 
     def _check_charge_nav(self):
         for fn in ["computeTarget", "startCharge", "cancelCharge", "completeCharge", "chargeLoop", "renderChargePreview"]:
@@ -172,16 +200,32 @@ class StaticChecker:
 
     def _check_win_overlay_clear(self):
         # Win message must be cleared on new game (prevents sticky overlay)
-        if "message" in self.content and "className" in self.content:
-            # Game has a message element — check if initGame/startGame/newGame clears it
-            for fn in ["initGame", "newGameState", "startGame", "createBoard"]:
-                match = re.search(rf'function {fn}\s*\([^)]*\)\s*\{{', self.content)
-                if match:
-                    body = self.content[match.end():match.end()+800]
-                    if "message" in self.content and "show win" in self.content:
-                        if "className" not in body and "''" not in body:
-                            self.errors.append(f"{fn}() may not clear win overlay — message.className not reset")
-                    break
+        # Starting a new game must clear the win overlay. memo once dealt a fresh
+        # board underneath a still-visible full-screen win screen, leaving the
+        # patient driving a game he could not see and could not escape without a
+        # keyboard. The previous form of this check was gated on the literal
+        # "show win", which appears in no game (the games build the class as
+        # 'show ' + cls), so it could never fire.
+        if 'id="win-screen"' in self.content:
+            for fn in ["createBoard", "initGame", "newGame", "startGame"]:
+                body = self._function_body(fn)
+                if body is None:
+                    continue
+                if "winScreen" not in body and "win-screen" not in body:
+                    self.errors.append(
+                        f"{fn}() does not hide #win-screen — a new board would be "
+                        f"dealt underneath the win overlay")
+                break
+
+        # A message-based win banner must not be wiped by a stale clear timer.
+        # solitaire and freecell scheduled an unmanaged 1.5s clear; the win
+        # banner arrived before it fired, and the stale timer removed it while
+        # gameWon stayed true — dead navigation on a board that looked normal.
+        body = self._function_body("showMessage")
+        if body and "setTimeout" in body and "clearTimeout" not in body:
+            self.errors.append(
+                "showMessage() schedules a clear without cancelling the previous "
+                "one — a stale timer can wipe the win banner")
 
     def _check_ws_dot_in_header(self):
         # WS status dot should be inside the h1 (between MundMaus and game name)
@@ -206,10 +250,19 @@ class StaticChecker:
             self.warnings.append("No portal link (P key) — user cannot navigate back to game selection")
 
     def _check_error_flash(self):
-        # From fix d5bed9e: red error flash must be visible on invalid puff
-        if "sndError" in self.content:
-            if "flashError" not in self.content and "error-flash" not in self.content and "red" not in self.content.lower()[:self.content.lower().find("sndError")]:
-                self.warnings.append("sndError exists but no visual error flash — invalid actions may be silent")
+        # From fix d5bed9e: red error flash must be visible on invalid puff.
+        # The patient is deaf, so an audio-only rejection is no feedback at all.
+        # This used to search lower-cased text for the mixed-case "sndError",
+        # which never matched: find() returned -1, the slice became the whole
+        # file, and the warning could never fire.
+        if "sndError" not in self.content:
+            return
+        if ("flashError" not in self.content
+                and "error-flash" not in self.content
+                and "shake" not in self.content.lower()):
+            self.warnings.append(
+                "sndError exists but no visual error flash — invalid actions are "
+                "silent for a deaf patient")
 
     def _check_no_blue_rgba(self):
         # From fixes caf006b, df004fe: no blue backgrounds anywhere
@@ -379,7 +432,8 @@ def main():
     parser = argparse.ArgumentParser(description="MundMaus Game Quality Gate")
     parser.add_argument("game", nargs="?", help="Game HTML file or name (e.g. solitaire)")
     parser.add_argument("--all", action="store_true", help="Test all games")
-    parser.add_argument("--host", default="192.168.178.86", help="ESP32 host for browser tests")
+    # No --host: nothing here talks to a device. The browser tests live in
+    # tests/e2e and take their target from ESP32_URL.
     args = parser.parse_args()
 
     if args.all:

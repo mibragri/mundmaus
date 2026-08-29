@@ -3,28 +3,37 @@
   "files": {
     "firmware.bin": {
       "version": 4214,
-      "firmware": true
+      "firmware": true,
+      "sha256": "219543f766481b22f20dc70cfca9327cd2474301463528102239254910ba0433",
+      "size": 1338096
     },
     "www/chess.html.gz": {
-      "version": 22
+      "version": 24,
+      "sha256": "17c6a1e2511f9c6d4637d6dc93c224735a407073217768022e44aaf746ee3182"
     },
     "www/freecell.html.gz": {
-      "version": 24
+      "version": 26,
+      "sha256": "81ce7171b4da7be7e8ad3f59c0ac7f3f098a9c2aaf05dd0ea83f6dc0f502658b"
     },
     "www/memo.html.gz": {
-      "version": 19
+      "version": 21,
+      "sha256": "af2d12683a75c199fd2e3235b979a90519e12cdf4b9d6bb232bbfb166018fcee"
     },
     "www/muehle.html.gz": {
-      "version": 12
+      "version": 14,
+      "sha256": "9b746cca4989e19de1eb3ee748a1020805426eaf6b795475f8e9478131ae815f"
     },
     "www/settings.html.gz": {
-      "version": 11
+      "version": 13,
+      "sha256": "c579b6070203e6a6dd20d4d6741c9dbb2f41baf498d0611b0965d996d1aff428"
     },
     "www/solitaire.html.gz": {
-      "version": 36
+      "version": 38,
+      "sha256": "252faab1fd1ea59702424c0f60fa0fac6da40e01183f6f27340dbe9e013dd14e"
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 20
+      "version": 22,
+      "sha256": "060097d3015c481a8e24993927a86184fa4b38eef1b7a7e328ff24f2e58736da"
     }
   }
 }

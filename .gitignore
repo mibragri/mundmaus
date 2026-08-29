@@ -5,6 +5,11 @@ __pycache__/
 
 # Credentials (WiFi passwords on ESP32)
 wifi.json
+# OTA Basic-Auth secret. ota_auth.py (below) was ignored but its Arduino-side
+# twin was not: firmware/arduino/.env holds OTA_AUTH_B64 in clear text and sat
+# untracked-but-unignored for months. `git add -A` is called safe inside the
+# project repos, and that is exactly what would have committed it.
+.env
 
 # Agent worktrees
 .worktrees/
@@ -19,7 +24,10 @@ result.json
 enclosure/result.json
 enclosure/bambu-profiles/result.json
 
-# Manifest state (hashes between runs, not for version control)
+# Manifest state — no longer produced. The hashes now live in manifest.json
+# itself; keeping them in a gitignored side file made version bumps depend on
+# untracked local state, so a fresh clone bumped every game with unchanged
+# content. Entry kept so old working copies do not re-add the stale file.
 .manifest-state.json
 
 # Temp files
