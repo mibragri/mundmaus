@@ -769,9 +769,16 @@ function autoComplete() {
     if(!moved||foundations.every(f=>f.length===13)){clearInterval(autoCompleteIv);autoCompleteIv=null;checkWin();}
   },150);
 }
+let msgTimer=null;
 function showMessage(text,cls='') {
   const el=document.getElementById('message');el.textContent=text;el.className='show '+cls;
-  if(cls!=='win')setTimeout(()=>el.className='',1500);
+  // Cancel any pending clear first. The auto-complete hint schedules one 1.5s
+  // out; the win banner arrives before that and sets no timer of its own, so
+  // the stale clear used to wipe the 🎉 while gameWon stayed true. Navigation is
+  // dead in that state and the patient is deaf, so he saw an ordinary finished
+  // board whose joystick simply stopped responding.
+  if(msgTimer){clearTimeout(msgTimer);msgTimer=null;}
+  if(cls!=='win')msgTimer=setTimeout(()=>{el.className='';msgTimer=null;},1500);
 }
 function updateStatus() {
   document.getElementById('moves').textContent=moves;
@@ -1211,9 +1218,9 @@ document.addEventListener('keydown',(e)=>{
     case' ':case'Enter':e.preventDefault();if(!e.repeat)doPuff();break;
     case'Backspace':e.preventDefault();if(!e.repeat){cancelCharge();doUndo();render();updateStatus();}break;
     case'u':case'U':doUndo();render();updateStatus();break;
-    case'n':initGame();break;
+    case'n':case'N':initGame();break;
     case'k':case'K':toggleKiosk();break;
-    case'j':kbSimMode=!kbSimMode;updateKbMode();break;
+    case'j':case'J':kbSimMode=!kbSimMode;updateKbMode();break;
     case'p':case'P':window.location.href='/';return;
     case'Escape':window.location.href='/';return;
   }

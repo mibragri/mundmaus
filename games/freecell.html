@@ -856,10 +856,17 @@ function checkWin() {
   }
 }
 
+let msgTimer = null;
 function showMessage(text, cls='') {
   const el = document.getElementById('message');
   el.textContent = text; el.className = 'show ' + cls;
-  if (cls !== 'win') setTimeout(() => el.className = '', 1500);
+  // Cancel any pending clear first. The auto-complete hint schedules one 1.5s
+  // out; the win banner arrives before that and sets no timer of its own, so
+  // the stale clear used to wipe the 🎉 while gameWon stayed true. Navigation is
+  // dead in that state and the patient is deaf, so he saw an ordinary finished
+  // board whose joystick simply stopped responding.
+  if (msgTimer) { clearTimeout(msgTimer); msgTimer = null; }
+  if (cls !== 'win') msgTimer = setTimeout(() => { el.className = ''; msgTimer = null; }, 1500);
 }
 
 function updateStatus() {
@@ -1650,7 +1657,7 @@ document.addEventListener('keydown', (e) => {
     case ' ': case 'Enter': e.preventDefault(); if (!e.repeat) { cancelCharge(); doPuff(); } break;
     case 'Backspace': e.preventDefault(); if (!e.repeat) { cancelCharge(); doUndo(); render(); updateStatus(); } break;
     case 'u': case 'U': cancelCharge(); doUndo(); render(); updateStatus(); break;
-    case 'n': cancelCharge(); initGame(); break;
+    case 'n': case 'N': cancelCharge(); initGame(); break;
     case 'j': case 'J': kbSimMode = !kbSimMode; updateKbMode(); break;
     case 'k': case 'K': toggleKiosk(); break;
     case 'h': case 'H': doHint(); break;

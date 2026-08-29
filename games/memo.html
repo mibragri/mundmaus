@@ -822,16 +822,21 @@ function getElapsed() {
 
 // ── Rendering ────────────────────────────────────────────
 function updateCursor() {
+  // 'checking' is the ~1.2 s reveal pause after a mismatch. Input stays blocked
+  // there, but the cursor must remain visible: the patient is deaf and the gold
+  // cursor is his only indication of where he is. Hiding it after most moves
+  // left him with nothing on screen to orient by.
+  const cursorVisible = state.phase === 'playing' || state.phase === 'checking';
   const cards = $board.querySelectorAll('.card');
   cards.forEach((el, i) => {
-    el.classList.toggle('cursor', i === state.cursor && state.phase === 'playing' && !state.inBtnCol);
+    el.classList.toggle('cursor', i === state.cursor && cursorVisible && !state.inBtnCol);
     el.classList.toggle('flipped', state.cards[i].flipped || state.cards[i].matched);
     el.classList.toggle('matched', state.cards[i].matched);
     el.classList.toggle('selected', state.first === i && state.second === null);
   });
   // Button highlight
   $actionBtns.forEach((btn, i) => {
-    btn.classList.toggle('cursor', state.phase === 'playing' && state.inBtnCol && state.btnIdx === i);
+    btn.classList.toggle('cursor', cursorVisible && state.inBtnCol && state.btnIdx === i);
   });
 }
 

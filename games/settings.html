@@ -696,6 +696,18 @@ for (const key of Object.keys(EXPERT_FIELDS)) {
 
     wsSend({ type: 'config_preview', key: key, value: val });
   });
+
+  // Reflect the clamp once the field is committed. Doing it on every keystroke
+  // would fight the carer mid-typing, but leaving it out meant the field kept
+  // displaying a rejected number (99999) while the device used the clamped one
+  // (3000) — the value read back was simply not the value in effect.
+  el.addEventListener('change', () => {
+    const def = EXPERT_FIELDS[key];
+    const val = parseFloat(el.value);
+    if (isNaN(val)) { el.value = configCurrent[key]; return; }
+    const clamped = clamp(val, def.min, def.max);
+    if (String(clamped) !== el.value) el.value = clamped;
+  });
 }
 
 // ── Expert toggle ────────────────────────────────────────
@@ -708,7 +720,10 @@ function toggleExpert() {
 // ── Action buttons ───────────────────────────────────────
 
 function doSave() {
-  wsSend({ type: 'config_save' });
+  if (!wsSend({ type: 'config_save' })) {
+    showToast('✗ Nicht verbunden / Not connected', 'error');
+    return;
+  }
   showToast('Speichern... / Saving...', '');
 }
 
@@ -746,12 +761,18 @@ async function doCancel() {
 
 function doReset() {
   if (!confirm('Werkseinstellungen wiederherstellen?\nRestore factory defaults?')) return;
-  wsSend({ type: 'config_reset' });
+  if (!wsSend({ type: 'config_reset' })) {
+    showToast('✗ Nicht verbunden / Not connected', 'error');
+    return;
+  }
   showToast('Zurücksetzen... / Resetting...', '');
 }
 
 function doCalibrate() {
-  wsSend({ type: 'calibrate' });
+  if (!wsSend({ type: 'calibrate' })) {
+    showToast('✗ Nicht verbunden / Not connected', 'error');
+    return;
+  }
   showToast('Kalibriere... / Calibrating...', '');
   document.getElementById('btn-calibrate').disabled = true;
   setTimeout(() => { document.getElementById('btn-calibrate').disabled = false; }, 3000);
@@ -775,10 +796,16 @@ let wsBackoff = 3000;
 const WS_BACKOFF_INIT = 3000;
 const WS_BACKOFF_MAX = 30000;
 
+// Returns false when the device is not reachable. It used to return nothing and
+// drop the message, while the caller still showed a progress toast that simply
+// faded — so a carer saving the patient's puff threshold during a reboot or a
+// WiFi drop walked away believing it was stored.
 function wsSend(obj) {
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send(JSON.stringify(obj));
+    return true;
   }
+  return false;
 }
 
 function wsConnect() {
@@ -884,8 +911,13 @@ async function loadSettings() {
     }
   } catch (err) {
     console.warn('[Settings] Load failed, using defaults:', err);
-    // Apply hardcoded defaults so the UI is usable offline
-    applyFullConfig({
+    // Apply hardcoded defaults so the UI is usable offline. configDefaults has
+    // to be filled as well: checkUnsaved() and doCancel() compare against it,
+    // and while it stayed empty every key was skipped — the "unsaved" badge
+    // could never appear and Cancel navigated away reverting nothing. The
+    // WebSocket usually connects seconds later, so live previews DO reach the
+    // device and those unreverted values stay active but unsaved.
+    const OFFLINE_DEFAULTS = {
       DEADZONE: 150,
       NAV_THRESHOLD: 450,
       NAV_REPEAT_MS: 400,
@@ -893,7 +925,9 @@ async function loadSettings() {
       PUFF_COOLDOWN_MS: 400,
       PUFF_RAW_THRESHOLD: 75000,
       SENSOR_POLL_MS: 20
-    });
+    };
+    configDefaults = Object.assign({}, OFFLINE_DEFAULTS);
+    applyFullConfig(Object.assign({}, OFFLINE_DEFAULTS));
   }
 }
 

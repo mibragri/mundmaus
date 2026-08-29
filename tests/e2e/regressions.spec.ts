@@ -85,6 +85,47 @@ test.describe('memo — mouse operation', () => {
   });
 });
 
+// showMessage() scheduled an unmanaged 1.5 s clear. The auto-complete hint set
+// one, the win banner arrived before it fired and set no timer of its own, and
+// the stale clear then wiped the 🎉 while gameWon stayed true — navigation dead,
+// board looking perfectly normal. The patient is deaf, so the win sound told him
+// nothing and his joystick had simply stopped responding.
+for (const game of ['solitaire', 'freecell'] as const) {
+  test.describe(`${game} — win banner`, () => {
+    test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+    test.beforeEach(async ({ page }) => {
+      await gotoGame(page, game);
+      await page.waitForSelector('#game', { timeout: 15_000 });
+    });
+
+    test('survives a pending auto-complete message clear', async ({ page }) => {
+      await page.evaluate(`showMessage('✨...', '')`);   // schedules a clear at +1.5 s
+      await page.waitForTimeout(200);
+      await page.evaluate(`showMessage('🎉', 'win')`);
+      await expect(page.locator('#message')).toHaveClass(/win/);
+
+      await page.waitForTimeout(1700);                   // past the stale clear
+      await expect(page.locator('#message')).toHaveClass(/win/);
+    });
+
+    test('a plain message still clears itself', async ({ page }) => {
+      await page.evaluate(`showMessage('✨...', '')`);
+      await expect(page.locator('#message')).toHaveClass(/show/);
+      await page.waitForTimeout(1700);
+      await expect(page.locator('#message')).not.toHaveClass(/show/);
+    });
+
+    // The footer advertises N for a new game, but only the lowercase key was
+    // matched — with Caps Lock on, a carer sees a game that ignores them.
+    test('Shift+N starts a new game', async ({ page }) => {
+      await page.evaluate('moves = 42');
+      await page.keyboard.press('Shift+KeyN');
+      await page.waitForTimeout(250);
+      expect(await page.evaluate('moves')).toBe(0);
+    });
+  });
+}
+
 test.describe('freecell — NEW button', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
   test.beforeEach(async ({ page }) => {
