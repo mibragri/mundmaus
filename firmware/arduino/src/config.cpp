@@ -21,6 +21,7 @@ volatile int SENSOR_POLL_MS    = DEFAULT_SENSOR_POLL_MS;
 // KEY TABLES
 // ============================================================
 
+// Public names — used in the JSON API, the settings page and remote settings.
 const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE] = {
     "DEADZONE",
     "NAV_THRESHOLD",
@@ -28,6 +29,29 @@ const char* CONFIGURABLE_KEYS[NUM_CONFIGURABLE] = {
     "NAV_COOLDOWN_MS",
     "PUFF_COOLDOWN_MS",
     "PUFF_RAW_THRESHOLD",
+    "SENSOR_POLL_MS",
+};
+
+// Storage names — NVS keys are capped at 15 chars + NUL
+// (NVS_KEY_NAME_MAX_SIZE == 16). Preferences::putInt() REJECTS a longer key and
+// returns 0 without throwing, so the value silently never persists and isKey()
+// stays false forever — which also disables the "don't overwrite a locally
+// tuned value" guard in applyRemote(). That is how PUFF_COOLDOWN_MS (16 chars)
+// and PUFF_RAW_THRESHOLD (18) could never be saved: a carer tuned the patient's
+// puff sensitivity, it worked until the next reboot or 3-hour settings poll,
+// and then he lost his only means of clicking.
+//
+// The [16] element type is the guard: a key longer than 15 chars fails to
+// compile ("initializer-string for array of chars is too long"), so this class
+// of bug cannot come back. Only the two over-long keys were shortened; the
+// others keep their names so values already stored on devices survive.
+static const char NVS_KEYS[NUM_CONFIGURABLE][16] = {
+    "DEADZONE",
+    "NAV_THRESHOLD",
+    "NAV_REPEAT_MS",
+    "NAV_COOLDOWN_MS",
+    "PUFF_CD_MS",
+    "PUFF_RAW_TH",
     "SENSOR_POLL_MS",
 };
 
@@ -95,7 +119,7 @@ void load() {
             // (e.g. a PUFF_RAW_THRESHOLD of 0 from an older firmware schema)
             // could leave the device in a broken state that the patient
             // cannot recover from without keyboard access.
-            int val = prefs.getInt(CONFIGURABLE_KEYS[i], _defaultVal(i));
+            int val = prefs.getInt(NVS_KEYS[i], _defaultVal(i));
             *ptr = constrain(val, RANGES[i].min, RANGES[i].max);
         }
     }
@@ -112,10 +136,15 @@ void save() {
         if (!ptr) continue;
 
         if (*ptr != _defaultVal(i)) {
-            prefs.putInt(CONFIGURABLE_KEYS[i], *ptr);
+            if (prefs.putInt(NVS_KEYS[i], *ptr) == 0) {
+                // Fail loudly: a silent no-op here means the carer's tuning is
+                // lost at the next reboot, and nothing on the page says so.
+                Serial.printf("  FEHLER: NVS-Schreiben fuer %s fehlgeschlagen\n",
+                              CONFIGURABLE_KEYS[i]);
+            }
         } else {
             // Remove key if value equals default (keep NVS clean)
-            prefs.remove(CONFIGURABLE_KEYS[i]);
+            prefs.remove(NVS_KEYS[i]);
         }
     }
 
@@ -174,8 +203,8 @@ void getSaved(JsonDocument& doc) {
 
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
         // Check if key exists in NVS (isKey returns true only if stored)
-        if (prefs.isKey(CONFIGURABLE_KEYS[i])) {
-            doc[CONFIGURABLE_KEYS[i]] = prefs.getInt(CONFIGURABLE_KEYS[i], _defaultVal(i));
+        if (prefs.isKey(NVS_KEYS[i])) {
+            doc[CONFIGURABLE_KEYS[i]] = prefs.getInt(NVS_KEYS[i], _defaultVal(i));
         }
     }
 
@@ -193,8 +222,9 @@ int applyRemote(const JsonDocument& remote) {
         int idx = _findKey(key);
         if (idx < 0) continue;
 
-        // Skip if locally customized
-        if (prefs.isKey(key)) continue;
+        // Skip if locally customized. Must look up the STORAGE key, not the
+        // public one — they differ for the two shortened keys.
+        if (prefs.isKey(NVS_KEYS[idx])) continue;
 
         int value = kv.value().as<int>();
         if (update(key, value)) {

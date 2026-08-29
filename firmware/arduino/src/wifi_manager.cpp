@@ -446,16 +446,26 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
     // Clear any stale WiFi state before begin(). A cold boot can leave the
     // radio partially initialized from the bootloader; WiFi.begin() then
     // latches onto that state and the association silently fails.
-    WiFi.disconnect(true, true);
-    WiFi.mode(WIFI_OFF);
-    delay(100);
-    esp_task_wdt_reset();
-
+    //
+    // Only do that when no AP has to survive. WiFi.mode(WIFI_OFF) deinitialises
+    // the driver and destroys the softAP netif, and nothing down this path
+    // starts one again — WiFi.softAP() exists in startAP() alone. Running it
+    // unconditionally made the willKeepAp branch inert and dropped the
+    // "MundMaus" hotspot for the entire connect attempt, i.e. exactly the Bug 3
+    // failure the comment above claims to have fixed. It went unnoticed until
+    // the AP-recovery probe in main.cpp started calling this from AP mode every
+    // 5 minutes, leaving carers without the hotspot for most of that window.
     if (willKeepAp) {
+        WiFi.disconnect(false, false);  // drop the STA link only, keep the AP up
         WiFi.mode(WIFI_AP_STA);
+        WiFi.softAP(Config::AP_SSID, Config::AP_PASS);  // no-op if already up
     } else {
+        WiFi.disconnect(true, true);
+        WiFi.mode(WIFI_OFF);
+        delay(100);
         WiFi.mode(WIFI_STA);
     }
+    esp_task_wdt_reset();
 
     WiFi.setHostname("mundmaus");
     WiFi.setAutoReconnect(true);
