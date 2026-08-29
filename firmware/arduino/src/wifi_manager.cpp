@@ -22,6 +22,9 @@ void WiFiManager::_ensureMutex() {
     if (_credMutex == nullptr) {
         _credMutex = xSemaphoreCreateMutex();
     }
+    if (_scanMutex == nullptr) {
+        _scanMutex = xSemaphoreCreateMutex();
+    }
 }
 
 // ============================================================
@@ -314,6 +317,9 @@ bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
         int     rssi;
     };
     std::vector<BssMatch> matches;
+    // Serialise against the portal's scan: one shared driver result buffer.
+    _ensureMutex();
+    if (_scanMutex) xSemaphoreTake(_scanMutex, portMAX_DELAY);
     int scanCount = WiFi.scanNetworks();
     if (scanCount > 0) {
         for (int i = 0; i < scanCount; i++) {
@@ -330,7 +336,11 @@ bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
         // Cap at 5 — that is one match per retry attempt below.
         if (matches.size() > 5) matches.resize(5);
     }
-    WiFi.scanDelete();
+    // Only free a completed scan. Calling scanDelete() on a scan that is still
+    // running (n < 0) clears the driver's scanning bit and strands the caller
+    // that started it.
+    if (scanCount >= 0) WiFi.scanDelete();
+    if (_scanMutex) xSemaphoreGive(_scanMutex);
 
     int totalNets = (scanCount > 0) ? scanCount : 0;
     WifiLog::log(String("event=scan_result count=") + totalNets +
@@ -573,6 +583,9 @@ std::vector<String> WiFiManager::scanNetworks() {
     // or WIFI_STA from connectStation), so no toggling is required. The old
     // enableSTA(true)/enableSTA(false) toggle around the scan was the root
     // cause of brief radio outages during scans while in AP mode.
+    // Serialise against _scanAndConnect(): one shared driver result buffer.
+    _ensureMutex();
+    if (_scanMutex) xSemaphoreTake(_scanMutex, portMAX_DELAY);
     int n = WiFi.scanNetworks();
 
     // Build (rssi, ssid) pairs for sorting
@@ -606,7 +619,8 @@ std::vector<String> WiFiManager::scanNetworks() {
         }
     }
 
-    WiFi.scanDelete();
+    if (n >= 0) WiFi.scanDelete();
+    if (_scanMutex) xSemaphoreGive(_scanMutex);
 
     return result;
 }

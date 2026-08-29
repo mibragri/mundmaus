@@ -72,7 +72,14 @@ private:
     // hold a pointer from ssid.c_str(), causing use-after-free.
     SemaphoreHandle_t _credMutex = nullptr;
 
-    /// Lazily create _credMutex on first use.
+    /// Serialises WiFi.scanNetworks()/scanDelete(). The driver keeps ONE global
+    /// result buffer, so two overlapping scans corrupt each other: the second
+    /// caller gets WIFI_SCAN_RUNNING (-1) and skips its loop, but still calls
+    /// scanDelete(), which clears the scanning bit so the first caller never
+    /// sees SCAN_DONE and blocks for the full 60s driver timeout.
+    SemaphoreHandle_t _scanMutex = nullptr;
+
+    /// Lazily create _credMutex and _scanMutex on first use.
     void _ensureMutex();
 
     /// Load last-known-good BSSID/channel from NVS (namespace "wifi",
