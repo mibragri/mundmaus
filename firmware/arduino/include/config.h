@@ -73,6 +73,14 @@ constexpr int DEFAULT_PUFF_RAW_THRESHOLD = 75000;
 // A puff is far shorter than this, so anything holding this long is drift.
 constexpr unsigned long PUFF_REBASE_MS = 15000;
 
+// How long without a fresh sample before the cached reading is discarded.
+// With INPUT_PULLDOWN a disconnected DATA line reads LOW, so a lost sensor is
+// indistinguishable from "not ready yet" — and the last value used to be kept
+// forever, freezing the puff bar at a plausible mid-scale reading while the
+// patient's click was dead. The wiring is breadboard + DuPont with no solder
+// joints, so a cable working loose is a realistic failure, not a hypothetical.
+constexpr unsigned long PUFF_STALE_MS = 2000;
+
 // Timing
 constexpr int DEFAULT_PUFF_SEND_INTERVAL_MS = 100;
 constexpr int DEFAULT_SENSOR_POLL_MS        = 20;

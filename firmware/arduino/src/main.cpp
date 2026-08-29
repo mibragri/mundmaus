@@ -23,6 +23,13 @@ static PuffSensor* puffSensor = nullptr;
 // Heartbeat timestamp for WDT (written by sensor task, read by loop)
 static volatile unsigned long sensorHeartbeat = 0;
 
+// Timestamp of the last station-recovery probe while in AP fallback. File scope
+// so the reconnect task can stamp it the moment the fallback engages: otherwise
+// it stayed 0, the "> 5 min" test was already true when the fallback happened
+// (t ~ 372 s), and the very first thing a carer got after the hotspot appeared
+// was another connect attempt cycling the radio out from under them.
+static std::atomic<unsigned long> lastApRetry{0};
+
 // Sensor health snapshot for the OTA manifest poll. The OTA server's access
 // log records the query string so we can diagnose patient devices remotely
 // (no usage data — just calibration + idle sensor state).
@@ -389,7 +396,7 @@ void loop() {
         if (wifi.mode == "station" && WiFi.status() != WL_CONNECTED) {
             wifiReconnecting = true;
             WifiLog::log(String("event=disconnected uptime_s=") + (unsigned long)(millis() / 1000));
-            xTaskCreate([](void* param) {
+            if (xTaskCreate([](void* param) {
                 Serial.println("  WiFi lost, reconnecting...");
                 WiFiManager* w = static_cast<WiFiManager*>(param);
                 unsigned long reconStart = millis();
@@ -406,11 +413,22 @@ void loop() {
                         WifiLog::log("event=ap_fallback attempts_failed=15 trigger=reconnect_loop");
                         w->startAP();
                         wifiFailCount = 0;
+                        // Give carers the full hotspot window before the first
+                        // recovery probe takes the radio again.
+                        lastApRetry = millis();
                     }
                 }
                 wifiReconnecting = false;
                 vTaskDelete(nullptr);
-            }, "wifi_recon", 6144, &wifi, 1, nullptr);
+            }, "wifi_recon", 6144, &wifi, 1, nullptr) != pdPASS) {
+                // A failed task creation used to leave wifiReconnecting latched
+                // true, which silently disabled reconnect, AP fallback AND the
+                // recovery probe below — the device would sit unreachable until
+                // someone power-cycled it, and the carers cannot diagnose that.
+                Serial.println("  FEHLER: Task wifi_recon nicht erstellbar");
+                WifiLog::log("event=task_create_failed task=wifi_recon");
+                wifiReconnecting = false;
+            }
         } else if (wifi.mode == "station" && WiFi.status() == WL_CONNECTED) {
             wifiFailCount = 0;  // connection is fine
         }
@@ -427,13 +445,12 @@ void loop() {
     // mode="station"+ip on success; on failure it leaves the radio without the
     // AP, so we re-assert the hotspot to keep the caregiver interface up. Gated
     // on stored credentials — an unprovisioned device is meant to stay in AP.
-    static unsigned long lastApRetry = 0;
     if (wifi.mode == "ap" && !wifiReconnecting && wifi.ssid.length() > 0 &&
         millis() - lastApRetry > 5UL * 60 * 1000) {
         lastApRetry = millis();
         wifiReconnecting = true;
         WifiLog::log("event=ap_recovery_probe");
-        xTaskCreate([](void* param) {
+        if (xTaskCreate([](void* param) {
             WiFiManager* w = static_cast<WiFiManager*>(param);
             String ip = w->connectStation();
             if (ip.length() > 0) {
@@ -447,7 +464,11 @@ void loop() {
             }
             wifiReconnecting = false;
             vTaskDelete(nullptr);
-        }, "ap_recover", 6144, &wifi, 1, nullptr);
+        }, "ap_recover", 6144, &wifi, 1, nullptr) != pdPASS) {
+            Serial.println("  FEHLER: Task ap_recover nicht erstellbar");
+            WifiLog::log("event=task_create_failed task=ap_recover");
+            wifiReconnecting = false;
+        }
     }
 
     // Periodic OTA check (every 3 hours, non-blocking)
@@ -457,7 +478,7 @@ void loop() {
         (millis() - lastOtaCheck > 3UL * 60 * 60 * 1000)) {
         lastOtaCheck = millis();
         otaCheckRunning = true;
-        xTaskCreate([](void* param) {
+        if (xTaskCreate([](void* param) {
             Serial.println("[OTA] Periodische Pruefung...");
             Updater::CheckResult result = Updater::checkManifest(_otaTelemetry());
             if (!result.offline) {
@@ -476,7 +497,12 @@ void loop() {
             xQueueSend(srv->sensorQueue(), &ev, 0);
             otaCheckRunning = false;
             vTaskDelete(nullptr);
-        }, "ota_check", 8192, server, 1, nullptr);
+        }, "ota_check", 8192, server, 1, nullptr) != pdPASS) {
+            // Latching this one shut would block the only route by which a fix
+            // ever reaches the patient's device.
+            Serial.println("  FEHLER: Task ota_check nicht erstellbar");
+            otaCheckRunning = false;
+        }
     }
 
     delay(10);

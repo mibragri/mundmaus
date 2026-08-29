@@ -260,6 +260,7 @@ PuffSensor::PuffSensor(int dataPin, int clkPin)
     , _lastRaw(0)
     , _offBaselineSince(0)
     , _rebaseCount(0)
+    , _lastRawMs(0)
 {
     pinMode(_dataPin, INPUT_PULLDOWN);
     pinMode(_clkPin, OUTPUT);
@@ -337,41 +338,57 @@ void PuffSensor::calibrateBaseline(int samples) {
 void PuffSensor::poll() {
     // Non-blocking read. Skip if sensor not ready (DATA high).
     int32_t raw = _readRawNonblocking();
-    if (raw != 0) {
-        _lastRaw = raw;
-
-        // Baseline tracking: slowly adapt to thermal drift.
-        // Only adjust when the reading is close to baseline (no puff active).
-        // Shift baseline by 1/256th of the delta per sample (~50Hz = full
-        // correction in ~5 seconds for small drift).
-        int32_t drift = raw - baseline;
-        if (abs(drift) < Config::PUFF_RAW_THRESHOLD / 2) {
-            int32_t step = drift / 256;
-            // Integer division stalls below 256 counts; nudge by one so the
-            // baseline actually converges instead of parking a small offset.
-            if (step == 0 && drift != 0) step = (drift > 0) ? 1 : -1;
-            baseline += step;
+    if (raw == 0) {
+        // No sample this cycle. _readRawNonblocking() returns 0 both for "not
+        // ready" and for a sensor that is gone: with INPUT_PULLDOWN a detached
+        // DATA line reads LOW, so 24 zero bits clock out. The cached value used
+        // to survive that forever — detectPuff() then saw delta 0 and never
+        // fired again, while main.cpp kept broadcasting the frozen level at
+        // 10 Hz, so the patient watched a plausible half-full bar with a dead
+        // click and /api/sensor still called it healthy. Drop the reading so
+        // the bar falls to zero and lastRaw()==0 marks it in the health snapshot.
+        if (_lastRaw != 0 && millis() - _lastRawMs > Config::PUFF_STALE_MS) {
+            _lastRaw = 0;
             _offBaselineSince = 0;
-        } else {
-            // Outside the tracking window the baseline used to be frozen for
-            // good, so a large step (tube moved, sensor re-seated, thermal
-            // jump) left the sensor permanently out of range — this is what
-            // silently cost the patient his only click until a reboot.
-            // Distinguish the two cases by duration: a puff is brief, a new DC
-            // level persists. Adopt the new level once it has held.
-            unsigned long now = millis();
-            if (_offBaselineSince == 0) {
-                _offBaselineSince = now;
-            } else if (now - _offBaselineSince > Config::PUFF_REBASE_MS) {
-                baseline = raw;
-                _maxRange = abs(baseline) / 2;
-                if (_maxRange == 0) _maxRange = 100000;
-                _previousRaw = raw;
-                _offBaselineSince = 0;
-                _rebaseCount++;
-                Serial.printf("  Drucksensor: Baseline neu uebernommen (%d, #%u)\n",
-                              (int)baseline, (unsigned)_rebaseCount);
-            }
+            Serial.println("  Drucksensor: keine Daten mehr (Kabel lose? Spannung?)");
+        }
+        return;
+    }
+
+    _lastRaw = raw;
+    _lastRawMs = millis();
+
+    // Baseline tracking: slowly adapt to thermal drift.
+    // Only adjust when the reading is close to baseline (no puff active).
+    // Shift baseline by 1/256th of the delta per sample (~50Hz = full
+    // correction in ~5 seconds for small drift).
+    int32_t drift = raw - baseline;
+    if (abs(drift) < Config::PUFF_RAW_THRESHOLD / 2) {
+        int32_t step = drift / 256;
+        // Integer division stalls below 256 counts; nudge by one so the
+        // baseline actually converges instead of parking a small offset.
+        if (step == 0 && drift != 0) step = (drift > 0) ? 1 : -1;
+        baseline += step;
+        _offBaselineSince = 0;
+    } else {
+        // Outside the tracking window the baseline used to be frozen for good,
+        // so a large step (tube moved, sensor re-seated, thermal jump) left the
+        // sensor permanently out of range — this is what silently cost the
+        // patient his only click until a reboot. Distinguish the two cases by
+        // duration: a puff is brief, a new DC level persists. Adopt the new
+        // level once it has held.
+        unsigned long now = millis();
+        if (_offBaselineSince == 0) {
+            _offBaselineSince = now;
+        } else if (now - _offBaselineSince > Config::PUFF_REBASE_MS) {
+            baseline = raw;
+            _maxRange = abs(baseline) / 2;
+            if (_maxRange == 0) _maxRange = 100000;
+            _previousRaw = raw;
+            _offBaselineSince = 0;
+            _rebaseCount++;
+            Serial.printf("  Drucksensor: Baseline neu uebernommen (%d, #%u)\n",
+                          (int)baseline, (unsigned)_rebaseCount);
         }
     }
 }

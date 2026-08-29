@@ -39,17 +39,22 @@ env.Append(CPPDEFINES=[('OTA_AUTH_B64', env.StringifyMacro(ota_auth))])
 import shutil
 import subprocess
 _lint_marker = os.path.join(env.subst("$BUILD_DIR"), ".lint_passed")
-_src_dir = os.path.join(env.subst("$PROJECT_DIR"), "src")
 _pio_bin = shutil.which("pio") or os.path.expanduser("~/.platformio/penv/bin/pio")
+# Both trees: this used to look at src/ alone, which holds only .cpp files —
+# every header lives in include/. Editing a header therefore never invalidated
+# the marker, so lint was silently skipped and the build still reported success.
+_lint_dirs = [os.path.join(env.subst("$PROJECT_DIR"), d) for d in ("src", "include")]
 
 def _src_newer_than_marker():
     if not os.path.exists(_lint_marker):
         return True
     marker_mtime = os.path.getmtime(_lint_marker)
-    for f in os.listdir(_src_dir):
-        if f.endswith((".cpp", ".h")):
-            if os.path.getmtime(os.path.join(_src_dir, f)) > marker_mtime:
-                return True
+    for d in _lint_dirs:
+        for root, _dirs, files in os.walk(d):
+            for f in files:
+                if f.endswith((".cpp", ".h", ".hpp")):
+                    if os.path.getmtime(os.path.join(root, f)) > marker_mtime:
+                        return True
     return False
 
 if _src_newer_than_marker() and "PIOTEST" not in os.environ and "_MUNDMAUS_LINT" not in os.environ:

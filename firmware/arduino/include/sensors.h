@@ -79,6 +79,10 @@ public:
     /// been held long enough to count as drift.
     bool offBaseline() const { return _offBaselineSince != 0; }
 
+    /// No usable sample: the sensor has never reported, or has stopped.
+    /// lastRaw() reads 0 in this state, which is what the health snapshot shows.
+    bool stale() const { return _lastRaw == 0; }
+
     int32_t baseline;
 
 private:
@@ -90,6 +94,7 @@ private:
     int32_t _lastRaw;
     unsigned long _offBaselineSince;  // 0 = reading is within the tracking window
     uint32_t _rebaseCount;
+    unsigned long _lastRawMs;         // when _lastRaw was last refreshed
 
     /// Read if data ready (non-blocking). Returns 0 if not ready.
     int32_t _readRawNonblocking();
