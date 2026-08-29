@@ -212,6 +212,21 @@ CheckResult checkManifest(const String& telemetry) {
 
     // Compare remote files against local versions
     JsonObject files = manifest["files"].as<JsonObject>();
+
+    // A response that is valid JSON but carries no "files" object is not an
+    // empty manifest — it is a broken one (a server error page, a maintenance
+    // stub, a truncated deploy). Treated as data it means "the server deleted
+    // everything": the delete-detection loop below marks every www/ entry for
+    // removal, the portal then offers N updates, and the single button a carer
+    // is meant to press wipes every game off LittleFS. offline was already set
+    // false above, so bail out and put that back rather than acting on it.
+    if (files.isNull() || files.size() == 0) {
+        Serial.println("[OTA] Manifest ohne 'files' — ignoriert");
+        result.offline = true;
+        xSemaphoreGive(_versionsMutex);
+        return result;
+    }
+
     for (JsonPair kv : files) {
         String fname = kv.key().c_str();
         int remoteVer = kv.value()["version"] | 0;

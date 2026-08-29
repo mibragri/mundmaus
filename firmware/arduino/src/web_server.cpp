@@ -276,23 +276,37 @@ void MundMausServer::_setupHttpRoutes() {
         nullptr,
         // Body handler
         [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total) {
-            // Accumulate body (single chunk for small JSON)
-            // M2: _tempObject leaks if client disconnects mid-upload.
-            // ESPAsyncWebServer does not provide a request destructor callback
-            // and does not call body handler on disconnect, so we cannot free it.
-            // Reviewed: accepted as known limitation — only triggers during WiFi
-            // config (rare), not normal operation. Leak is one String object.
+            // Accumulate body (single chunk for small JSON).
+            //
+            // The framework frees _tempObject with free() (WebRequest.cpp), so
+            // the previous `new String()` was a mismatched deallocation that
+            // also leaked the String's own heap buffer on every aborted
+            // request. A calloc'd char buffer is what free() expects.
+            //
+            // The size is bounded too: `Content-Length: -1` parses into a
+            // size_t of SIZE_MAX, which makes `index + len >= total`
+            // unreachable, so a remote client on the patient's LAN could stream
+            // indefinitely and grow the allocation until AsyncTCP can no longer
+            // allocate — at which point ports 80 AND 81 die together and the
+            // patient loses both the games and the WebSocket that drives them.
+            constexpr size_t MAX_BODY = 1024;
             if (index == 0) {
-                req->_tempObject = new String();
+                if (total == 0 || total > MAX_BODY) {
+                    req->send(413, "application/json",
+                              "{\"ok\":false,\"error\":\"Body zu gross\"}");
+                    return;
+                }
+                req->_tempObject = calloc(1, total + 1);
             }
-            String* body = static_cast<String*>(req->_tempObject);
-            body->concat(reinterpret_cast<const char*>(data), len);
+            char* body = static_cast<char*>(req->_tempObject);
+            if (!body || index + len > total) return;
+            memcpy(body + index, data, len);
 
             if (index + len >= total) {
                 // Full body received, parse and respond
                 JsonDocument input;
-                DeserializationError err = deserializeJson(input, *body);
-                delete body;
+                DeserializationError err = deserializeJson(input, body);
+                free(body);
                 req->_tempObject = nullptr;
 
                 if (err) {
@@ -401,19 +415,28 @@ void MundMausServer::_setupHttpRoutes() {
         [this](AsyncWebServerRequest* req) {},
         nullptr,
         [this](AsyncWebServerRequest* req, uint8_t* data, size_t len, size_t index, size_t total) {
+            // Same as /api/wifi above: free()-compatible allocation and a hard
+            // size bound, so a bogus Content-Length cannot grow this forever.
+            constexpr size_t MAX_BODY = 1024;
             if (index == 0) {
-                req->_tempObject = new String();
+                if (total == 0 || total > MAX_BODY) {
+                    req->send(413, "application/json",
+                              "{\"ok\":false,\"error\":\"Body zu gross\"}");
+                    return;
+                }
+                req->_tempObject = calloc(1, total + 1);
             }
-            String* body = static_cast<String*>(req->_tempObject);
-            body->concat(reinterpret_cast<const char*>(data), len);
+            char* body = static_cast<char*>(req->_tempObject);
+            if (!body || index + len > total) return;
+            memcpy(body + index, data, len);
 
             if (index + len < total) {
                 return;
             }
 
             JsonDocument input;
-            DeserializationError err = deserializeJson(input, *body);
-            delete body;
+            DeserializationError err = deserializeJson(input, body);
+            free(body);
             req->_tempObject = nullptr;
 
             if (err) {
@@ -483,7 +506,9 @@ void MundMausServer::_setupHttpRoutes() {
         if (!_checkRunning.compare_exchange_strong(expected, true)) {
             return;  // check already in progress
         }
-        xTaskCreate([](void* param) {
+        // Same reasoning as the other two spawn sites: only the task body clears
+        // the flag, so an unchecked failure disables update checks for good.
+        if (xTaskCreate([](void* param) {
             auto* srv = static_cast<MundMausServer*>(param);
             Updater::CheckResult result = Updater::checkManifest();
             srv->setUpdateResult(result);
@@ -493,7 +518,10 @@ void MundMausServer::_setupHttpRoutes() {
             xQueueSend(srv->sensorQueue(), &ev, 0);
             srv->_checkRunning = false;
             vTaskDelete(nullptr);
-        }, "upd_check", 8192, this, 1, nullptr);
+        }, "upd_check", 8192, this, 1, nullptr) != pdPASS) {
+            Serial.println("  FEHLER: Task upd_check nicht erstellbar");
+            _checkRunning = false;
+        }
     });
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
@@ -531,7 +559,18 @@ void MundMausServer::_setupHttpRoutes() {
         _sendJson200(req, doc);
 
         // Spawn one-shot task for blocking HTTPS downloads (16KB stack for TLS+JSON+buffer)
-        xTaskCreate(_updateTaskWrapper, "ota_install", 16384, this, 1, nullptr);
+        //
+        // The return value must be checked: _updateRunning is already latched
+        // true above, and only the task body clears it. A failed spawn (no
+        // 16 KB contiguous block — plausible after days of fragmentation) would
+        // wedge the flag permanently, and checkReboot() defers every reboot
+        // while it is set. That kills /api/reboot, /api/wifi/reset AND the
+        // reboot after saving new WiFi credentials — the carers' entire way of
+        // getting the device back onto a network.
+        if (xTaskCreate(_updateTaskWrapper, "ota_install", 16384, this, 1, nullptr) != pdPASS) {
+            Serial.println("  FEHLER: Task ota_install nicht erstellbar");
+            _updateRunning = false;
+        }
     });
 
     // --- OTA update task wrapper (I5: runs blocking downloads off async context) ---
@@ -1126,7 +1165,12 @@ void MundMausServer::_startAsyncScan() {
         return; // scan already running
     }
     // 4KB stack is enough for scanNetworks + a small JSON serialize.
-    xTaskCreate(_wifiScanTaskWrapper, "wifi_scan", 4096, this, 1, nullptr);
+    // Check the result: _wifiScanRunning is already set, and only the task body
+    // clears it, so a failed spawn would disable network scanning for good.
+    if (xTaskCreate(_wifiScanTaskWrapper, "wifi_scan", 4096, this, 1, nullptr) != pdPASS) {
+        Serial.println("  FEHLER: Task wifi_scan nicht erstellbar");
+        _wifiScanRunning = false;
+    }
 }
 
 void MundMausServer::_wifiScanTaskWrapper(void* param) {
