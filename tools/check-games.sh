@@ -101,12 +101,19 @@ for game in "${GAMES[@]}"; do
         ERRORS=$((ERRORS + 1))
     fi
 
-    # 8. Arduino LittleFS has .gz file
-    if [[ -f "$PROJECT_DIR/firmware/arduino/data/www/${game}.html.gz" ]]; then
-        echo "  arduino data: OK"
-    else
+    # 8. Arduino LittleFS .gz must exist AND match the source.
+    # Existence alone passed for a stale archive: nothing in the repo copies
+    # games/*.html.gz into firmware/arduino/data/www/, it is done by hand, and
+    # deploy-website.sh uses this script as its ONLY gate.
+    LFS_GZ="$PROJECT_DIR/firmware/arduino/data/www/${game}.html.gz"
+    if [[ ! -f "$LFS_GZ" ]]; then
         echo "  arduino data: MISSING (firmware/arduino/data/www/${game}.html.gz)"
         ERRORS=$((ERRORS + 1))
+    elif ! cmp -s <(gunzip -c "$LFS_GZ") "$PROJECT_DIR/games/${game}.html"; then
+        echo "  arduino data: STALE (does not match games/${game}.html — regenerate)"
+        ERRORS=$((ERRORS + 1))
+    else
+        echo "  arduino data: OK"
     fi
 done
 

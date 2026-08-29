@@ -967,9 +967,14 @@ void MundMausServer::processSensorQueue() {
             doc["message"] = ev.data;
             break;
         case SensorEvent::UPDATE_ERROR:
+            // One field, not the same string in two. "file" suggested the
+            // portal was naming the failing file; the producer only ever puts a
+            // generic message in ev.data, so "✗ Fehler: Update fehlgeschlagen"
+            // was all it could ever say. Which file failed is only in the serial
+            // log — carrying it here would mean threading the name out of the
+            // install loop, which is a larger change than this warrants.
             doc["type"]  = "update_error";
-            doc["file"]  = ev.data;
-            doc["error"] = ev.data;  // error detail in data field
+            doc["error"] = ev.data;
             break;
         case SensorEvent::DEBUG_JOYSTICK: {
             // Print to Serial for remote diagnostics (always available)

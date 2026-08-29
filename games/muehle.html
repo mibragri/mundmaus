@@ -1620,6 +1620,19 @@ function userAction() {
 
   // Remove phase (human)
   if (game.pendingRemover && (multiplayerMode || game.pendingRemover === W)) {
+    // Nothing removable: pass the obligation on instead of waiting for a puff
+    // that can never land. The AI branch already does exactly this; without it
+    // here, every point rejects the input, pendingRemover stays set and the
+    // game sits there. NEW still works, so this is not a hard trap, but the
+    // patient cannot tell a stuck game from one that ignores him.
+    if (removablePositions(game.board, game.pendingRemover).length === 0) {
+      afterRemoval();
+      renderBoard();
+      updateStatus();
+      if (checkAndHandleWin()) return;
+      scheduleAI();
+      return;
+    }
     if (canRemove(game.board, pos, game.pendingRemover)) {
       executeRemoval(pos);
       renderBoard();

@@ -103,7 +103,7 @@ function connectWS(){
       setTimeout(function(){fetch('/api/reboot',{method:'POST'}).catch(function(){})},1500);
     }
     else if(d.type==='update_error'){
-      document.getElementById('upd-status').textContent='\u2717 Fehler: '+d.file;
+      document.getElementById('upd-status').textContent='\u2717 Fehler: '+d.error;
       _updating=false;
     }
     else if(d.type==='nav'&&_navItems.length){

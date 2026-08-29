@@ -8,8 +8,8 @@
       "size": 1338096
     },
     "www/chess.html.gz": {
-      "version": 26,
-      "sha256": "07a51966c672e96d2988992b6456460be6dba6bc739367e668d0b16ce53274cf"
+      "version": 27,
+      "sha256": "680a936c19fb5096331a004ad576d3c663b0dca4ecca3b56f1438d0e2910d675"
     },
     "www/freecell.html.gz": {
       "version": 26,
@@ -20,8 +20,8 @@
       "sha256": "af2d12683a75c199fd2e3235b979a90519e12cdf4b9d6bb232bbfb166018fcee"
     },
     "www/muehle.html.gz": {
-      "version": 16,
-      "sha256": "78d558c858a11779008c955e5ffbe9ba4bf2871a616d68f3c502dd12a90ccae7"
+      "version": 17,
+      "sha256": "5a6c2c37cf3a481d3850e6806a8fefe5eb82568cd9a0feb97b702705fc5d7596"
     },
     "www/settings.html.gz": {
       "version": 13,

@@ -996,6 +996,12 @@ function execMove(move, promoType) {
 
   updateCastling(move);
 
+  // Read the moving piece BEFORE the move. The halfmove-clock check below used
+  // to look at the DESTINATION square afterwards, where a promotion has already
+  // become a queen — so promoting without capturing never reset the clock and
+  // could hand out a false fifty-move draw right after a promotion.
+  const wasPawn = game.board[move.fr]?.[move.fc]?.type === PAWN;
+
   const {board: nb, captured} = applyMove(game.board, move, promoType);
   game.board = nb;
 
@@ -1013,7 +1019,7 @@ function execMove(move, promoType) {
   }
 
   // Halfmove clock
-  if (game.board[move.tr][move.tc]?.type === PAWN || captured) game.halfmove = 0;
+  if (wasPawn || captured) game.halfmove = 0;
   else game.halfmove++;
 
   if (game.turn === B) game.moveNum++;
@@ -1708,6 +1714,11 @@ function action() {
     const promoType = types[ui.promoCursor];
     $promoOverlay.classList.add('hidden');
     execMove(ui.promoMove, promoType);
+    // The normal move path sets this; the promoting branch never did, so the
+    // yellow "last move" marker stayed on the previous move until the AI
+    // replied. The patient works purely visually — that marker is how he sees
+    // what just happened.
+    ui.lastMove = ui.promoMove;
     ui.promoMove = null;
     ui.selected = null;
     ui.legalForSelected = [];
