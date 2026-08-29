@@ -456,15 +456,13 @@ def _cut_usb_cable_notch(base: cq.Workplane) -> cq.Workplane:
     return base.cut(notch)
 
 
-def _cut_usb_plug_channel(base: cq.Workplane) -> cq.Workplane:
-    """Cut a channel in the joystick platform for USB Micro-B plug access."""
-    plug_z = FLOOR_T + ESP_STANDOFF_H + ESP_H / 2 + 1.5
-    ch_x0 = JOY_PLATFORM_MIN_X - 0.5  # 0.5mm overlap past platform face
-    ch_x1 = JOY_PLATFORM_MIN_X + USB_PLUG_DEPTH
-    channel = cq.Workplane("XY").workplane(offset=plug_z - USB_PLUG_H / 2).center(
-        (ch_x0 + ch_x1) / 2, ESP_POS_Y
-    ).rect(ch_x1 - ch_x0, USB_PLUG_W).extrude(USB_PLUG_H)
-    return base.cut(channel)
+# _cut_usb_plug_channel() was removed here. It was defined but never called, and
+# re-enabling it as written would have cut in the wrong place: it anchored on
+# JOY_PLATFORM_MIN_X (ch_x0 = -38.0, the platform's -X end next to the mic mount)
+# while the ESP32's USB face sits at ESP_USB_FACE_X = +1.4, and make_base builds
+# four joystick pillars rather than a platform solid, so it would also have cut
+# through air. USB cable access is provided by _cut_usb_cable_notch(), which IS
+# called. Dead code that cuts in the wrong place is a trap for whoever revives it.
 
 
 def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
@@ -513,6 +511,13 @@ def make_base() -> cq.Workplane:
         _add_pressure_sensor_mount,
         _cut_pressure_barb_port,
         _cut_usb_cable_notch,
+        # Was silently missing from this list, so the printed base had NO
+        # ventilation at all while the module docstring still claimed the vent
+        # slots were unchanged from v5.7 (the lid has none either). Verified
+        # before re-enabling: the cut removes exactly VENT_N*VENT_W*VENT_LEN*WALL
+        # = 268.8 mm³ and leaves the bounding box untouched, so it goes through
+        # the -Y wall rather than into air.
+        _cut_vent_slots,
         _add_mic_mount,
     ]:
         base = fn(base)
@@ -597,8 +602,14 @@ def make_lid() -> cq.Workplane:
                    .circle(SCREW_CLEAR_D / 2)
                    .loft())
             lid = lid.cut(csk)
-        except Exception:
-            pass
+        except Exception as e:
+            # Do not swallow this one. A failed loft here means the screw heads
+            # are not countersunk, and nothing would say so until after a
+            # multi-hour print — at which point four 2.1mm heads stand proud of
+            # the lid of a device the patient rests his face against. A pillar
+            # move is enough to upset the loft, so this must fail the build.
+            raise RuntimeError(
+                f"Senkkopf-Loft fehlgeschlagen bei ({cx}, {cy}): {e}") from e
     # ESP32 hold-down: continuous wall hangs from lid ceiling, presses PCB onto standoffs.
     # Runs along X axis between pin header rows (3mm Y width).
     # A wall is much stronger than isolated pillars — FDM layers run unbroken.
@@ -617,7 +628,11 @@ def make_lid() -> cq.Workplane:
     # Each gusset: 5mm along Y (out from wall), 5mm along Z (down from ceiling).
     gusset_h, gusset_d = 5.0, 5.0  # height (Z) and depth (Y)
     wall_top_z = LID_INNER_H  # ceiling in lid coords
-    wall_x_start = ESP_POS_X - wall_len / 2  # = 23.0 (ESP32 area, must be +X)
+    # = 19.0 with ESP_POS_X = 31.0. The annotation said 23.0, left over from
+    # ESP_POS_X = 35; the assert below only checks the sign, so nothing caught
+    # it. These derived-position comments are what CLAUDE.md names as the main
+    # defence against workplane sign errors, so a stale one is worse than none.
+    wall_x_start = ESP_POS_X - wall_len / 2  # = 19.0 (ESP32 area, must be +X)
     assert wall_x_start > 0, f"wall_x_start={wall_x_start} must be positive (+X = ESP32 side)"
     for side in [-1, 1]:
         gy = ESP_POS_Y + side * wall_t / 2  # wall surface Y
