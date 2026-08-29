@@ -52,6 +52,44 @@ if missing:
 print('  All source files present')
 "
 
+# --- Firmware provenance ---
+# The check above proves firmware.bin EXISTS; it never proved it is the build the
+# manifest advertises. manifest.json labels it with MUNDMAUS_FW_VERSION from
+# platformio.ini, but nothing in the repo copies the built binary to the root, so
+# the root sat on a 2026-05-01 v4.2.12 build while the manifest said 4214. A
+# deploy would have published the patient's own current firmware under a new
+# version number — and his device records that number after a successful update,
+# so it would never fetch the real release again. Existence is not provenance.
+if grep -q '"firmware.bin"' "$MANIFEST"; then
+    echo -e "\n${YELLOW}--- Firmware provenance ---${NC}"
+    FW_BIN="$PROJECT_DIR/firmware.bin"
+    FW_BUILT="$PROJECT_DIR/firmware/arduino/.pio/build/esp32/firmware.bin"
+    FW_EXPECT="$(sed -n 's/.*-DMUNDMAUS_VERSION=\\"\([0-9.]*\)\\".*/\1/p' \
+                 "$PROJECT_DIR/firmware/arduino/platformio.ini")"
+
+    if [[ -z "$FW_EXPECT" ]]; then
+        echo -e "${RED}ERROR: cannot read MUNDMAUS_VERSION from platformio.ini${NC}"
+        exit 1
+    fi
+    if [[ ! -f "$FW_BIN" ]]; then
+        echo -e "${RED}ERROR: $FW_BIN is missing.${NC}"
+        echo    "       Build it and copy it here:"
+        echo    "         cd firmware/arduino && pio run -e esp32"
+        echo    "         cp '$FW_BUILT' '$FW_BIN'"
+        exit 1
+    fi
+    if ! strings "$FW_BIN" | grep -Fxq "$FW_EXPECT"; then
+        FOUND="$(strings "$FW_BIN" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | tr '\n' ' ')"
+        echo -e "${RED}ERROR: firmware.bin does not contain version $FW_EXPECT (found: ${FOUND:-none}).${NC}"
+        echo    "       It would still be published as v$FW_EXPECT, and the patient's"
+        echo    "       device would record that version and never fetch the real one."
+        echo    "         cd firmware/arduino && pio run -e esp32"
+        echo    "         cp '$FW_BUILT' '$FW_BIN'"
+        exit 1
+    fi
+    echo -e "  ${GREEN}firmware.bin contains v$FW_EXPECT${NC}"
+fi
+
 # --- Game quality gate (skip with --skip-test) ---
 if [[ "${1:-}" != "--skip-test" ]]; then
     echo -e "\n${YELLOW}--- Running game quality gate ---${NC}"
@@ -66,7 +104,14 @@ echo -e "\n${YELLOW}--- Deploying to $REMOTE_HOST:$REMOTE_DIR ---${NC}"
 
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
 
-rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
+# Files first, manifest last. The manifest used to go up before the files it
+# points at, leaving a window as long as a 1.3 MB firmware upload in which a
+# device polling for updates saw the new version numbers but downloaded the
+# PREVIOUS deploy's content — HTTP 200 with stale bytes, not a 404. updater.cpp
+# only withholds the version bump on a failed transfer, so a successful download
+# of stale content is recorded as the new version and that content is then
+# pinned forever. Publishing the manifest last makes the window harmless: the
+# device simply sees the old manifest and tries again later.
 
 MANIFEST="$MANIFEST" python3 -c "
 import json, os
@@ -89,6 +134,9 @@ for name in m['files']:
     src="$PROJECT_DIR/games/$(basename "$fname")"
     rsync -avz "$src" "$REMOTE_HOST:$REMOTE_DIR/$fname"
 done
+
+# Manifest last — it is what makes the new versions visible to devices.
+rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
 
 # --- Verify ---
 echo -e "\n${YELLOW}--- Verifying ---${NC}"
