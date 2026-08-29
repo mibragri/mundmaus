@@ -774,6 +774,19 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
         return;
     }
 
+    // Heartbeat. Every game sends {"type":"hb"} every 2s and then force-closes
+    // the socket if nothing has come BACK within 10s (wsWatchdogInterval). The
+    // firmware never answered, so the only thing keeping a game connected was
+    // the incidental puff_level traffic at 10 Hz. Wherever that traffic is
+    // absent — a device with no pressure sensor attached, or a sensor that has
+    // gone stale — every game dropped and reopened its socket every 10 seconds
+    // forever, which is exactly the reconnect churn that stresses the shared
+    // client list. Answering makes the heartbeat two-way, as the games assume.
+    if (strcmp(type, "hb") == 0) {
+        if (client) client->text("{\"type\":\"hb\"}");
+        return;
+    }
+
     // Unknown type — surface in logs so typos / version mismatches don't
     // disappear silently. The empty-string default for `type` lands here too.
     Serial.printf("  WS: unknown message type '%s'\n", type);
