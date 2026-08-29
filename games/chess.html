@@ -1859,6 +1859,14 @@ function showDiffMenu() {
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   ui.phase = 'menu';
   ui.menuCursor = Math.min(aiDepth - 1, 3);
+  // Both overlays were only ever hidden inside action()'s gameover/promoting
+  // branches, which are unreachable once phase is 'playing' again. Pressing N
+  // (the footer advertises it) therefore dealt a new board underneath an 85%
+  // black win screen, or under the promotion dialog — the cursor was alive but
+  // invisible, and only a reload by a second person got the patient out.
+  // muehle.html does this correctly; here it was simply omitted.
+  $gameOver.classList.add('hidden');
+  $promoOverlay.classList.add('hidden');
   $diffMenu.classList.remove('hidden');
   $diffMenu.querySelectorAll('.diff-opt').forEach((el, i) =>
     el.classList.toggle('cursor', i === ui.menuCursor));
@@ -1866,6 +1874,10 @@ function showDiffMenu() {
 
 function startGame() {
   if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  // Also clear here, not just in showDiffMenu(): a new game can be started
+  // straight from a WebSocket new_game event without passing the menu.
+  $gameOver.classList.add('hidden');
+  $promoOverlay.classList.add('hidden');
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   newGame();

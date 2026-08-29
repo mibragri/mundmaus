@@ -60,15 +60,30 @@ test.describe('WebSocket connectivity', () => {
     expect(typeof message.ip).toBe('string');
   });
 
-  test('3. portal connects to WS and receives update_status', async ({ page }) => {
-    // In v4.0+ portal, WS connection triggers /api/updates/check on open
-    // and receives update_status messages. No visible WS indicator exists.
+  test('3. portal opens a WebSocket and receives a frame from the device', async ({ page }) => {
+    // This used to assert only that #upd-btn was attached. portal.cpp emits that
+    // button unconditionally in the portal HTML, so the test passed with the
+    // WebSocket server dead or never sending anything — it verified neither
+    // half of its own name. Capture actual frames instead.
+    const frames: string[] = [];
+    page.on('websocket', ws => {
+      ws.on('framereceived', f => {
+        if (typeof f.payload === 'string') frames.push(f.payload);
+      });
+    });
+
     await gotoESP32(page, '/');
-    // Verify WS connection works by checking the update button state changes
-    // (the portal script calls connectWS() which fetches /api/updates/check)
-    await page.waitForTimeout(3000);
-    // The update button should be attached (JS ran successfully via WS)
-    const updBtn = page.locator('#upd-btn');
-    await expect(updBtn).toBeAttached();
+
+    await expect.poll(() => frames.length, {
+      timeout: 15_000,
+      message: 'portal opened no WebSocket, or the device sent no frame',
+    }).toBeGreaterThan(0);
+
+    // Whatever arrives must be a typed JSON message, not arbitrary bytes.
+    const types = frames.map(f => {
+      try { return JSON.parse(f).type; } catch { return null; }
+    });
+    expect(types.some(t => typeof t === 'string' && t.length > 0),
+           `no typed JSON frame among: ${frames.slice(0, 3).join(' | ')}`).toBe(true);
   });
 });

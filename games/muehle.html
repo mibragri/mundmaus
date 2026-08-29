@@ -1288,7 +1288,14 @@ function renderBoard() {
       });
     } else if (game.phase === 'zug') {
       if (game.selected !== null) {
-        for (const adj of ADJ[game.selected]) {
+        // At three pieces every empty point is legal (flying). The hints only
+        // ever showed neighbours, so the patient — who navigates visually and
+        // is deaf — had no way to see where he was actually allowed to go.
+        const canFly = countOnBoard(game.board, game.turn) === 3;
+        const targets = canFly
+          ? game.board.map((v, i) => (v === null ? i : -1)).filter(i => i >= 0)
+          : ADJ[game.selected];
+        for (const adj of targets) {
           if (game.board[adj] === null) {
             const el = $svg.querySelector(`.intersection[data-pos="${adj}"]`);
             if (el && !el.className.baseVal.includes('cursor'))
@@ -1644,8 +1651,17 @@ function userAction() {
     if (game.selected === null) {
       // Select own piece
       if (game.board[pos] === game.turn) {
-        // Check if it has any legal moves
-        const hasMove = ADJ[pos].some(a => game.board[a] === null);
+        // Check if it has any legal moves. At three pieces the rules allow
+        // flying to ANY empty point, and the engine implements that for the AI
+        // (canFly, see the zug branch of legalMoves). The human input path only
+        // ever checked adjacency, so the patient's three-piece endgame could
+        // neither be played nor lost: every puff on his own piece left
+        // game.selected null while the position still had legal moves, so
+        // checkAndHandleWin() stayed false too.
+        const canFly = countOnBoard(game.board, game.turn) === 3;
+        const hasMove = canFly
+          ? game.board.some(v => v === null)
+          : ADJ[pos].some(a => game.board[a] === null);
         if (hasMove) {
           game.selected = pos;
           sndSelect();
@@ -1677,7 +1693,10 @@ function userAction() {
         }
         return;
       }
-      if (game.board[pos] === null && ADJ[game.selected].includes(pos)) {
+      // Flying at three pieces — same rule the engine applies to the AI.
+      const canFlyNow = countOnBoard(game.board, game.turn) === 3;
+      if (game.board[pos] === null &&
+          (canFlyNow || ADJ[game.selected].includes(pos))) {
         executeZug(game.selected, pos);
         renderBoard();
         updateStatus();

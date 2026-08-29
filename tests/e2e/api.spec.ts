@@ -10,11 +10,15 @@ test.describe('API endpoints', () => {
     expect(html).toContain('<title>MundMaus</title>');
   });
 
-  test('2. GET /api/info — valid JSON, version=4.1', async ({ page }) => {
+  test('2. GET /api/info — valid JSON with a semver-shaped version', async ({ page }) => {
     const { status, data } = await fetchJSON(page, '/api/info');
     expect(status).toBe(200);
     const info = data as Record<string, unknown>;
-    expect(info.version).toBe('4.1');
+    // Not a hard-coded number: this asserted '4.1' while the firmware reports
+    // 4.2.14, so it failed against real hardware and the wrong value was even
+    // repeated in the test title. The version comes from -DMUNDMAUS_VERSION and
+    // changes every release; the shape is what matters here.
+    expect(info.version).toMatch(/^\d+\.\d+(\.\d+)?$/);
     expect(info.board).toBeTruthy();
     expect(typeof info.mem_free).toBe('number');
     expect(info.mode).toBeTruthy();

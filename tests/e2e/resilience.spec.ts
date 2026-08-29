@@ -25,7 +25,8 @@ test.describe('Error handling & resilience', () => {
     const { status, data } = await fetchJSON(page, '/api/info');
     expect(status).toBe(200);
     const info = data as Record<string, unknown>;
-    expect(info.version).toBe('4.1');
+    // See api.spec.ts: '4.1' has not been the firmware version for a long time.
+    expect(info.version).toMatch(/^\d+\.\d+(\.\d+)?$/);
   });
 
   test('3. games load after portal load (navigation flow)', async ({ page }) => {

@@ -1111,6 +1111,10 @@ function renderBoard() {
 let lastNavTime = 0, navCooldown = 1000, kbSimMode = false;
 let charge = {active:false, dir:null, intensity:1.0, startTime:0, progress:0, target:null, source:null, animFrameId:null, wsSupported:false};
 let aiTimer = null;
+// Handle for the delayed game-over screen. Without it the four 400ms timers
+// below outlived the game that scheduled them and raised the previous result
+// over a freshly dealt board.
+let goTimer = null;
 fetch('/api/settings').then(r=>r.json()).then(d=>{if(d.current?.NAV_COOLDOWN_MS)navCooldown=d.current.NAV_COOLDOWN_MS;}).catch(()=>{});
 
 // ── Charge Navigation (hold-to-move) ─────────────────────
@@ -1417,7 +1421,7 @@ function action() {
     winLine = win;
     gameActive = false;
     renderBoard();
-    setTimeout(() => {
+    goTimer = setTimeout(() => {
       sndWin();
       const title = who === PLAYER ? 'Rot gewinnt!' : 'Gelb gewinnt!';
       const info = multiplayerMode ? 'Gut gespielt!' : 'Glueckwunsch!';
@@ -1430,7 +1434,7 @@ function action() {
   if (isBoardFull()) {
     gameActive = false;
     renderBoard();
-    setTimeout(() => {
+    goTimer = setTimeout(() => {
       sndDraw();
       showGameOver('Unentschieden', 'Brett voll');
     }, 400);
@@ -1512,7 +1516,7 @@ function scheduleAI() {
       winLine = win;
       gameActive = false;
       renderBoard();
-      setTimeout(() => {
+      goTimer = setTimeout(() => {
         sndLose();
         showGameOver('Gelb gewinnt!', 'Computer siegt');
       }, 400);
@@ -1523,7 +1527,7 @@ function scheduleAI() {
     if (isBoardFull()) {
       gameActive = false;
       renderBoard();
-      setTimeout(() => {
+      goTimer = setTimeout(() => {
         sndDraw();
         showGameOver('Unentschieden', 'Brett voll');
       }, 400);
@@ -1590,6 +1594,12 @@ function showDiffMenu() {
   if (typeof ui !== 'undefined') ui.aiThinking = false;
   ui.phase = 'menu';
   ui.menuCursor = Math.min(aiDifficulty - 1, 2);
+  // See chess.html: the win overlay was only hidden inside action()'s gameover
+  // branch, so pressing N left every following game running underneath it.
+  $gameOver.classList.add('hidden');
+  // A pending 400ms game-over timer from the finished game would otherwise fire
+  // into the new one and raise the old result over an empty board.
+  if (goTimer) { clearTimeout(goTimer); goTimer = null; }
   $diffMenu.classList.remove('hidden');
   $diffMenu.querySelectorAll('.diff-opt').forEach((el, i) =>
     el.classList.toggle('cursor', i === ui.menuCursor));
@@ -1597,6 +1607,11 @@ function showDiffMenu() {
 
 function startGame() {
   if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
+  // The game-over screen is delayed by 400ms so the winning pieces can pulse.
+  // Starting a new game inside that window used to let the finished game's
+  // result surface over the empty new board, with gameActive still true.
+  if (goTimer) { clearTimeout(goTimer); goTimer = null; }
+  $gameOver.classList.add('hidden');
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   createBoard();

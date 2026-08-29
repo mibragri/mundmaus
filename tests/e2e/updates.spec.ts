@@ -24,10 +24,11 @@ test.describe('OTA Update UI flow', () => {
     // Check API first (lightweight) before loading the full page
     const { data } = await fetchJSON(page, '/api/updates');
     const updates = data as { offline?: boolean; available: unknown[] };
-    if (updates.offline || updates.available.length > 0) {
-      // Skip if offline or updates available — button will be visible
-      return;
-    }
+    // test.skip(), not a bare return: Playwright reports a returned test as
+    // PASSED, so this counted as a green result on every run where the
+    // precondition did not hold — including the common one.
+    test.skip(updates.offline === true || updates.available.length > 0,
+              'device is offline or has updates pending — the button is meant to be visible');
     await gotoESP32(page, '/');
     // Wait for WS to connect and update_status to arrive
     await page.waitForTimeout(5000);
@@ -40,10 +41,8 @@ test.describe('OTA Update UI flow', () => {
     // Check API first to determine if device is offline
     const { data } = await fetchJSON(page, '/api/updates');
     const updates = data as { offline?: boolean; available: unknown[] };
-    if (!updates.offline) {
-      // Not offline — button won't exist, skip page load
-      return;
-    }
+    // See test 3: a bare return is reported as PASSED, not skipped.
+    test.skip(!updates.offline, 'device is online — the offline button does not exist');
     await gotoESP32(page, '/');
     const updBtn = page.locator('#upd-btn');
     await expect(updBtn).toBeVisible({ timeout: 15_000 });

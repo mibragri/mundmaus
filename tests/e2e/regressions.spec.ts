@@ -126,6 +126,101 @@ for (const game of ['solitaire', 'freecell'] as const) {
   });
 }
 
+// Same class as the memo win screen: the overlay was only ever hidden inside
+// action()'s gameover branch, which is unreachable once play resumes. Pressing
+// N — which the footer advertises — left every following game running under an
+// 85%-black win screen. The cursor was alive but invisible, and only a reload
+// by a second person freed the patient. muehle.html already did it right.
+for (const game of ['chess', 'vier-gewinnt'] as const) {
+  test.describe(`${game} — overlays`, () => {
+    test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+    test.beforeEach(async ({ page }) => {
+      await gotoGame(page, game);
+      await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+      await page.keyboard.press('Space');          // start at the default level
+      await page.waitForTimeout(300);
+    });
+
+    test('N clears the win overlay', async ({ page }) => {
+      await page.evaluate(`showGameOver('Test', 'Test')`);
+      await expect(page.locator('#game-over')).toBeVisible();
+
+      await page.keyboard.press('n');
+      await page.waitForTimeout(200);
+      await page.keyboard.press('Space');          // pick a level again
+      await page.waitForTimeout(300);
+
+      await expect(page.locator('#game-over')).toBeHidden();
+      const covered = await page.evaluate(
+        `!!document.elementFromPoint(innerWidth / 2, innerHeight / 2)?.closest('#game-over')`
+      );
+      expect(covered).toBe(false);
+    });
+  });
+}
+
+test.describe('chess — promotion overlay', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  test('N clears the promotion dialog', async ({ page }) => {
+    await gotoGame(page, 'chess');
+    await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
+
+    await page.evaluate(`document.getElementById('promo-overlay').classList.remove('hidden')`);
+    await expect(page.locator('#promo-overlay')).toBeVisible();
+
+    await page.keyboard.press('n');
+    await page.waitForTimeout(200);
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
+
+    await expect(page.locator('#promo-overlay')).toBeHidden();
+  });
+});
+
+// The engine lets the AI fly at three pieces (canFly); the human input path
+// only ever checked adjacency, so the patient's three-piece endgame could
+// neither be played nor lost.
+test.describe('muehle — flying at three pieces', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  test('a piece can move to a non-adjacent empty point', async ({ page }) => {
+    await gotoGame(page, 'muehle');
+    await page.waitForSelector('#main-menu', { timeout: 15_000 });
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
+
+    // Three white, four black, white to move, phase 'zug'.
+    const moved = await page.evaluate(`(() => {
+      game.board = new Array(24).fill(null);
+      [0, 2, 21].forEach(i => game.board[i] = 'W');
+      [1, 9, 14, 22].forEach(i => game.board[i] = 'B');
+      game.phase = 'zug';
+      game.turn = 'W';
+      game.selected = null;
+      game.toPlace = { W: 0, B: 0 };
+      renderBoard();
+
+      // A destination that is NOT adjacent to 0 — only reachable by flying.
+      const target = [...Array(24).keys()].find(
+        i => game.board[i] === null && !ADJ[0].includes(i));
+
+      ui.phase = 'playing';
+      ui.inBtnCol = false;
+      ui.cursor = 0;
+      userAction();                       // select the piece
+      if (game.selected !== 0) return { selected: game.selected, target, moved: false };
+      ui.cursor = target;
+      userAction();                       // fly there
+      return { selected: game.selected, target, moved: game.board[target] === 'W' };
+    })()`);
+
+    expect(moved.moved, `flying to ${moved.target} was rejected`).toBe(true);
+  });
+});
+
 test.describe('freecell — NEW button', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
   test.beforeEach(async ({ page }) => {
