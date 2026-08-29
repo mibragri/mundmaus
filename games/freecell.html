@@ -1159,7 +1159,10 @@ function renderTableau() {
     '↩',
     '<span style="display:inline-grid;grid-template-columns:1fr 1fr;width:1.2em;height:1.2em;line-height:1;font-size:.55em;text-align:center"><span>↖</span><span>↗</span><span>↙</span><span>↘</span></span>'
   ];
-  const actFns = [doHint, initGame, ()=>{window.location.href='/';}, doUndo, toggleKiosk];
+  // initGame() must be wrapped: as a bare handler it receives the click event
+  // as its `seed` argument, and mulberry32 turns that object into seed 0 — every
+  // mouse click would deal the identical board.
+  const actFns = [doHint, ()=>initGame(), ()=>{window.location.href='/';}, doUndo, toggleKiosk];
   for (let i = 0; i < ACTION_COUNT; i++) {
     const btn = document.createElement('div'); btn.className = 'action-btn';
     if (i === actIdx) btn.classList.add('nav-cursor');

@@ -746,6 +746,11 @@ function shuffle(arr) {
 function createBoard(levelIdx) {
   state.gen++; // invalidate any pending match/no-match setTimeouts
   if (typeof cancelCharge === 'function') cancelCharge();
+  // Dealing a board must always reveal it. The win screen is a full-screen
+  // opaque overlay and the ⟳ button comes straight here without going through
+  // showMenu(), which was the only place that hid it.
+  $winScreen.classList.add('hidden');
+  $diffMenu.classList.add('hidden');
   const level = LEVELS[levelIdx];
   state.level = levelIdx;
   state.cols = level.cols;
@@ -1391,6 +1396,36 @@ function wsConnect() {
     wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
   }
 }
+
+// ── Maus (Betreuer) ──────────────────────────────────────
+// Rotating carers operate the games with a mouse and get no training. Every
+// clickable element therefore moves the cursor and then goes through the very
+// same action() the puff uses, so mouse and mouth can never drift apart.
+$diffMenu.querySelectorAll('.diff-option').forEach((el, i) => {
+  el.onclick = () => {
+    if (state.phase !== 'menu') return;
+    state.menuCursor = i;
+    action();
+  };
+});
+
+document.getElementById('btn-new').onclick = () => {
+  if (state.phase !== 'playing') return;
+  state.inBtnCol = true; state.btnIdx = 0; updateCursor(); action();
+};
+document.getElementById('btn-kiosk').onclick = () => {
+  if (state.phase !== 'playing') return;
+  state.inBtnCol = true; state.btnIdx = 2; updateCursor(); action();
+};
+
+document.getElementById('btn-new-game').onclick = () => {
+  if (state.phase !== 'win') return;
+  state.winCursor = 0; action();
+};
+document.getElementById('btn-same').onclick = () => {
+  if (state.phase !== 'win') return;
+  state.winCursor = 1; action();
+};
 
 // ── Init ─────────────────────────────────────────────────
 showMenu();
