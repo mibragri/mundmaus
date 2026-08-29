@@ -90,13 +90,36 @@ if grep -q '"firmware.bin"' "$MANIFEST"; then
     echo -e "  ${GREEN}firmware.bin contains v$FW_EXPECT${NC}"
 fi
 
-# --- Game quality gate (skip with --skip-test) ---
+# --- Game quality gates (skip with --skip-test) ---
 if [[ "${1:-}" != "--skip-test" ]]; then
-    echo -e "\n${YELLOW}--- Running game quality gate ---${NC}"
+    echo -e "\n${YELLOW}--- Static game checks ---${NC}"
     python3 "$SCRIPT_DIR/test-game.py" --all || {
-        echo -e "${RED}Quality gate failed. Aborting deploy.${NC}"
+        echo -e "${RED}Static checks failed. Aborting deploy.${NC}"
         exit 1
     }
+
+    # test-game.py reads source text; it opens no browser. CLAUDE.md defines the
+    # gate as behavioural (start → play → win → new game → no state leak, undo to
+    # empty does not crash), and that suite lives in tests/e2e. Running only the
+    # static half meant a game that throws on first click, leaks state across
+    # newGame() or strands the cursor deployed cleanly to the patient.
+    E2E_DIR="$PROJECT_DIR/tests/e2e"
+    if [[ -d "$E2E_DIR/node_modules" ]]; then
+        echo -e "\n${YELLOW}--- Behavioural game tests (Playwright) ---${NC}"
+        # test:local, not the whole suite: six specs (api, ota-files, portal,
+        # resilience, updates, websocket) need a live ESP32 and would make every
+        # deploy fail here. Run those separately with ESP32_URL set.
+        (cd "$E2E_DIR" && npm run --silent test:local) || {
+            echo -e "${RED}Behavioural tests failed. Aborting deploy.${NC}"
+            exit 1
+        }
+    else
+        # Fail loudly rather than skipping the behavioural gate in silence.
+        echo -e "${RED}ERROR: $E2E_DIR/node_modules missing — the behavioural"
+        echo -e "       game tests cannot run. Install them (cd tests/e2e && npm ci)"
+        echo -e "       or deploy with --skip-test if you accept static checks only.${NC}"
+        exit 1
+    fi
 fi
 
 # --- Deploy ---

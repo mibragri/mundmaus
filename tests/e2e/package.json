@@ -1,15 +1,18 @@
 {
   "name": "mundmaus-e2e",
   "private": true,
+  "comment": "test:local is the behavioural gate deploy-ota.sh runs. It excludes the six specs that need a live ESP32 (api, ota-files, portal, resilience, updates, websocket) — run those with ESP32_URL set, via npm run test:device.",
   "scripts": {
     "test": "npx playwright test",
-    "test:local": "npx playwright test charge consistency solitaire ota-manifest",
+    "test:local": "npx playwright test charge chess consistency freecell idle memo muehle ota-manifest regressions settings solitaire vier-gewinnt",
+    "test:device": "npx playwright test",
     "test:portal": "npx playwright test portal",
     "test:chess": "npx playwright test chess",
     "test:memo": "npx playwright test memo",
     "test:solitaire": "npx playwright test solitaire",
     "test:consistency": "npx playwright test consistency",
     "test:charge": "npx playwright test charge",
+    "test:regressions": "npx playwright test regressions idle",
     "test:ota": "npx playwright test ota-manifest ota-files"
   },
   "devDependencies": {

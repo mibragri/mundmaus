@@ -1116,10 +1116,21 @@ function evaluate(board) {
 }
 
 let aiDepth = 3;
-let searchNodes = 0, searchStart = 0;
+let searchNodes = 0, searchStart = 0, searchTimedOut = false;
+const SEARCH_BUDGET_MS = 1200;
 
 function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
-  if (++searchNodes % 500 === 0 && performance.now() - searchStart > 2000) return evaluate(board);
+  // Sticky deadline. The old form looked at the clock on every 500th node and,
+  // when it tripped, pruned only that one node — the rest of the tree carried
+  // on regardless, so the 2000ms "limit" was decorative: level 4 was measured
+  // at ~2.9s in Chromium and ~3.6s in Node. The joystick and the puff are both
+  // dead for that whole time, which breaks the project's "AI must be
+  // cancelable" invariant on the one input path the patient has.
+  if (searchTimedOut) return evaluate(board);
+  if ((++searchNodes & 63) === 0 && performance.now() - searchStart > SEARCH_BUDGET_MS) {
+    searchTimedOut = true;
+    return evaluate(board);
+  }
   const color = maximizing ? W : B;
   const moves = legalMoves(board, color, enPassant, castling);
 
@@ -1194,7 +1205,7 @@ function minimax(board, depth, alpha, beta, maximizing, enPassant, castling) {
 }
 
 function aiMove() {
-  searchNodes = 0; searchStart = performance.now();
+  searchNodes = 0; searchStart = performance.now(); searchTimedOut = false;
   const moves = legalMoves(game.board, B, game.enPassant, game.castling);
   if (moves.length === 0) return null;
 
@@ -1230,6 +1241,9 @@ function aiMove() {
       bestVal = val;
       bestMove = m;
     }
+    // Leave the root loop too once the budget is spent, otherwise every
+    // remaining root move still pays a full (if shallow) search.
+    if (searchTimedOut) break;
   }
   return bestMove;
 }
@@ -2033,6 +2047,37 @@ function wsConnect() {
     wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
   }
 }
+
+// ── Maus (Betreuer) ──────────────────────────────────────
+// Rotating carers operate the games with a mouse and get no training. Only
+// btn-back and go-portal carried a handler, so NEW, Undo, Kiosk, the hint
+// button, the game-over NEW button and every difficulty option did nothing when
+// clicked — the carer sees a game that ignores them and reloads or calls for
+// help. Every element below moves the cursor and then goes through the very
+// same action() the puff uses, so mouse and mouth cannot drift apart.
+document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
+  el.onclick = () => {
+    if (ui.phase !== 'playing') return;
+    ui.inBtnCol = true;
+    ui.btnCursor = parseInt(el.dataset.btn, 10);
+    action();
+  };
+});
+
+document.querySelectorAll('.diff-opt[data-d]').forEach((el, i) => {
+  el.onclick = () => {
+    if (ui.phase !== 'menu') return;
+    ui.menuCursor = i;
+    action();
+  };
+});
+
+const _goNew = document.getElementById('go-new');
+if (_goNew) _goNew.onclick = () => {
+  if (ui.phase !== 'gameover') return;
+  ui.goCursor = 0;
+  action();
+};
 
 // ── Init ─────────────────────────────────────────────────
 showDiffMenu();

@@ -221,6 +221,81 @@ test.describe('muehle — flying at three pieces', () => {
   });
 });
 
+// Same omission as memo: only btn-back and go-portal had handlers, so NEW,
+// Undo, Kiosk, the hint button and every difficulty option were mouse-dead.
+// Carers are mouse users with no training and no way to know a keyboard was
+// required, so they reload the page or call for help.
+for (const game of ['chess', 'muehle', 'vier-gewinnt'] as const) {
+  test.describe(`${game} — mouse operation`, () => {
+    test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+    test.beforeEach(async ({ page }) => {
+      await gotoGame(page, game);
+      await page.waitForSelector('.action-btn', { timeout: 15_000 });
+    });
+
+    test('clicking a difficulty starts a game', async ({ page }) => {
+      const opt = page.locator(game === 'muehle' ? '.menu-opt' : '.diff-opt').first();
+      await opt.click();
+      await page.waitForTimeout(300);
+      expect(await page.evaluate('ui.phase')).toBe('playing');
+    });
+
+    test('clicking NEW returns to the menu', async ({ page }) => {
+      await page.locator(game === 'muehle' ? '.menu-opt' : '.diff-opt').first().click();
+      await page.waitForTimeout(300);
+      expect(await page.evaluate('ui.phase')).toBe('playing');
+
+      await page.locator('#btn-new').click();
+      await page.waitForTimeout(300);
+      expect(await page.evaluate('ui.phase')).toBe('menu');
+    });
+
+    test('every action button carries a click handler', async ({ page }) => {
+      const unwired = await page.evaluate(`
+        [...document.querySelectorAll('.action-btn[data-btn]')]
+          .filter(el => !el.onclick && !el.getAttribute('onclick'))
+          .map(el => el.id)
+      `);
+      expect(unwired, `buttons without a handler: ${JSON.stringify(unwired)}`).toEqual([]);
+    });
+  });
+}
+
+// The deadline check ran on every 500th node and only pruned that single node,
+// so the nominal 2000ms budget was decorative — level 4 was measured at ~2.9s.
+// Joystick and puff are both dead while the main thread searches, which breaks
+// the project's "AI must be cancelable" invariant on the patient's only input.
+test.describe('chess — AI search budget', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  test('level 4 returns a move well inside the budget', async ({ page }) => {
+    await gotoGame(page, 'chess');
+    await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+
+    const ms = await page.evaluate(`(() => {
+      aiDepth = 4;
+      // An open middlegame: 1.d4 d5 2.e4 e5 — the position the measurement used.
+      newGame();
+      const play = (fr, fc, tr, tc) => {
+        const r = applyMove(game.board, {fr, fc, tr, tc}, QUEEN);
+        game.board = r.board;
+      };
+      play(6, 3, 4, 3); play(1, 3, 3, 3);
+      play(6, 4, 4, 4); play(1, 4, 3, 4);
+
+      const t0 = performance.now();
+      const mv = aiMove();
+      const dt = performance.now() - t0;
+      return mv ? dt : -1;
+    })()`);
+
+    expect(ms, 'aiMove returned no move').toBeGreaterThan(0);
+    // Budget is 1200ms; allow generous headroom for a loaded CI machine but
+    // stay far below the ~2900ms the unbounded search took.
+    expect(ms).toBeLessThan(2000);
+  });
+});
+
 test.describe('freecell — NEW button', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
   test.beforeEach(async ({ page }) => {

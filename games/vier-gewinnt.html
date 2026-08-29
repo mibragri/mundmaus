@@ -1788,6 +1788,37 @@ function wsConnect() {
   }
 }
 
+// ── Maus (Betreuer) ──────────────────────────────────────
+// Rotating carers operate the games with a mouse and get no training. Only
+// btn-back and go-portal carried a handler, so NEW, Undo, Kiosk, the hint
+// button, the game-over NEW button and every difficulty option did nothing when
+// clicked — the carer sees a game that ignores them and reloads or calls for
+// help. Every element below moves the cursor and then goes through the very
+// same action() the puff uses, so mouse and mouth cannot drift apart.
+document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
+  el.onclick = () => {
+    if (ui.phase !== 'playing') return;
+    ui.inBtnCol = true;
+    ui.btnCursor = parseInt(el.dataset.btn, 10);
+    action();
+  };
+});
+
+document.querySelectorAll('.diff-opt[data-d]').forEach((el, i) => {
+  el.onclick = () => {
+    if (ui.phase !== 'menu') return;
+    ui.menuCursor = i;
+    action();
+  };
+});
+
+const _goNew = document.getElementById('go-new');
+if (_goNew) _goNew.onclick = () => {
+  if (ui.phase !== 'gameover') return;
+  ui.goCursor = 0;
+  action();
+};
+
 // ── Init ────────────────────────────────────────────────
 updateModeIndicator();
 showDiffMenu();
