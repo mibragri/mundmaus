@@ -265,6 +265,24 @@ for (const game of ['chess', 'muehle', 'vier-gewinnt'] as const) {
 // so the nominal 2000ms budget was decorative — level 4 was measured at ~2.9s.
 // Joystick and puff are both dead while the main thread searches, which breaks
 // the project's "AI must be cancelable" invariant on the patient's only input.
+// Navigating right out of the board sets btnCursor = 0 in every game, so index
+// 0 must be the harmless action. Vier Gewinnt had NEW there and Home at 1, so
+// the gesture a patient gets used to discarded his game and one step further
+// left the game entirely.
+test.describe('action column order is consistent', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  for (const game of ['chess', 'muehle', 'vier-gewinnt'] as const) {
+    test(`${game}: index 0 is Undo, not a destructive action`, async ({ page }) => {
+      await gotoGame(page, game);
+      await page.waitForSelector('.action-btn', { timeout: 15_000 });
+      const first = await page.evaluate(
+        `document.querySelector('.action-btn[data-btn="0"]')?.id`);
+      expect(first).toBe('btn-undo');
+    });
+  }
+});
+
 test.describe('chess — AI search budget', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
 

@@ -6,6 +6,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 REMOTE_HOST="mbs"
 REMOTE_DIR="/srv/mundmaus/ota"
+# Must stay in step with Config::OTA_BASE_URL in firmware/arduino/include/config.h
+# — this is the URL the patient's device actually fetches.
+OTA_URL="https://mundmaus.de/ota"
 MANIFEST="$PROJECT_DIR/manifest.json"
 
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
@@ -162,12 +165,54 @@ done
 rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
 
 # --- Verify ---
+#
+# The old check fetched the remote manifest, printed how many files it lists and
+# declared "Verify OK". It never compared that against the local manifest, never
+# looked at a version, and — the case that actually matters — never requested a
+# single one of the files the manifest points at. The failure mode of a partial
+# upload is precisely a reachable manifest with missing or stale payloads, which
+# it was blind to; on failure it printed a yellow warning and still exited 0.
 echo -e "\n${YELLOW}--- Verifying ---${NC}"
-if curl -sf "https://mundmaus.de/ota/manifest.json" | python3 -c 'import json,sys; m=json.load(sys.stdin); n=len(m["files"]); print(f"  Remote manifest: {n} files")'; then
-    echo -e "  ${GREEN}Verify OK${NC}"
-else
-    echo -e "  ${YELLOW}WARNING: Could not verify HTTPS endpoint${NC}"
+
+REMOTE_MANIFEST="$(mktemp)"
+trap 'rm -f "$REMOTE_MANIFEST"' EXIT
+
+if ! curl -sf "$OTA_URL/manifest.json" -o "$REMOTE_MANIFEST"; then
+    echo -e "${RED}ERROR: cannot fetch $OTA_URL/manifest.json after deploying.${NC}"
+    exit 1
+fi
+
+# The published manifest must be byte-identical to the one we just uploaded.
+if ! cmp -s "$MANIFEST" "$REMOTE_MANIFEST"; then
+    echo -e "${RED}ERROR: the published manifest differs from the local one.${NC}"
+    echo    "       A stale copy is being served, or the upload was partial."
+    diff <(python3 -m json.tool "$MANIFEST") \
+         <(python3 -m json.tool "$REMOTE_MANIFEST") | head -20 || true
+    exit 1
+fi
+echo -e "  ${GREEN}manifest matches local${NC}"
+
+# Every file the manifest points at must actually be retrievable.
+MISSING=0
+while read -r fname; do
+    if curl -sfI "$OTA_URL/$fname" > /dev/null; then
+        echo -e "  ${GREEN}ok${NC}   $fname"
+    else
+        echo -e "  ${RED}FEHLT${NC} $fname"
+        MISSING=$((MISSING + 1))
+    fi
+done < <(MANIFEST="$MANIFEST" python3 -c "
+import json, os
+m = json.load(open(os.environ['MANIFEST']))
+for name in m['files']:
+    print(name)
+")
+
+if [[ "$MISSING" -gt 0 ]]; then
+    echo -e "${RED}ERROR: $MISSING file(s) in the manifest are not retrievable.${NC}"
+    echo    "       Devices would record the new version against a failed download."
+    exit 1
 fi
 
 echo -e "\n${GREEN}=== OTA Deploy complete ===${NC}"
-echo "  URL: https://mundmaus.de/ota/manifest.json"
+echo "  URL: $OTA_URL/manifest.json"

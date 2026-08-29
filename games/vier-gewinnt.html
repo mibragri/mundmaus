@@ -510,9 +510,9 @@
       <div id="board"></div>
     </div>
     <div id="action-col">
-      <div class="action-btn" id="btn-new" data-btn="0"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
-      <div class="action-btn" id="btn-back" data-btn="1" onclick="window.location.href='/'">🏠</div>
-      <div class="action-btn disabled" id="btn-undo" data-btn="2">↩</div>
+      <div class="action-btn disabled" id="btn-undo" data-btn="0">↩</div>
+      <div class="action-btn" id="btn-new" data-btn="1"><span style="border:2px solid currentColor;border-radius:4px;padding:0 6px;font-size:.7em;font-weight:900;letter-spacing:1px">NEW</span></div>
+      <div class="action-btn" id="btn-back" data-btn="2" onclick="window.location.href='/'">🏠</div>
       <div class="action-btn" id="btn-kiosk" data-btn="3"><span style="display:inline-grid;grid-template-columns:1fr 1fr;width:1.2em;height:1.2em;line-height:1;font-size:.55em;text-align:center"><span>↖</span><span>↗</span><span>↙</span><span>↘</span></span></div>
     </div>
   </div>
@@ -1390,9 +1390,13 @@ function action() {
 
   // Button column action
   if (ui.inBtnCol) {
-    if (ui.btnCursor === 0) showDiffMenu();        // NEW
-    else if (ui.btnCursor === 1) window.location.href = '/'; // Home
-    else if (ui.btnCursor === 2) undo();            // Undo
+    // Order matches chess.html and muehle.html: Undo first, so navigating right
+    // out of the board lands on the harmless action. Vier Gewinnt used to put
+    // NEW at index 0 and Home at 1, so the gesture a patient gets used to
+    // discarded his game here and one step further left the game entirely.
+    if (ui.btnCursor === 0) undo();                 // Undo
+    else if (ui.btnCursor === 1) showDiffMenu();    // NEW
+    else if (ui.btnCursor === 2) window.location.href = '/'; // Home
     else if (ui.btnCursor === 3) toggleKiosk();     // Kiosk
     return;
   }

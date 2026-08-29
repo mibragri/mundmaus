@@ -897,15 +897,25 @@ void MundMausServer::sendPuffLevel(float value) {
 
 // I1: Drain queue and broadcast via WS (runs on loop() task, Core 1).
 //
-// P1-3 (mitigated): _ws.textAll() iterates AsyncWebSocket::_clients
-// (std::list) without a library mutex. AsyncTCP on Core 0 can
-// emplace_back concurrently. We mitigate via _broadcastText() which
-// uses makeBuffer() + textAll(buffer): the shared_ptr buffer lets
-// each client dequeue independently via the per-client lock, and
-// setCloseClientOnQueueFull(false) prevents list mutations from full
-// queues. The list-iteration race window is microseconds (small JSON,
-// 10Hz rate) and client connect/disconnect events are seconds apart.
-// A full fix requires library-level locking on _clients.
+// P1-3 (OPEN, only narrowed): _ws.textAll() iterates AsyncWebSocket::_clients
+// (std::list) without a library mutex, and cleanupClients() right below ERASES
+// from that same list on this task at ~100Hz while AsyncTCP emplace_backs on
+// every connect.
+//
+// The makeBuffer() + textAll(buffer) form in _broadcastText() does NOT address
+// this, contrary to what the previous version of this comment claimed: the
+// std::mutex inside the library belongs to AsyncWebSocketClient and guards only
+// that client's message queue, while textAll(SharedBuffer) still runs a bare
+// `for (auto& c : _clients)`. What the shared buffer buys is one allocation
+// instead of N, not safe iteration. An erase relinking the tail against a
+// concurrent insert can leave the sentinel pointing at freed memory —
+// a LoadProhibited panic, and it happens during reconnect churn, i.e. exactly
+// when WiFi is already unreliable.
+//
+// What HAS been done: the WiFi scan result no longer broadcasts from its own
+// worker task but is handed here through the sensor queue, so two tasks touch
+// the list instead of three. A full fix needs library-level locking on
+// _clients and is not available from application code.
 void MundMausServer::processSensorQueue() {
     _ws.cleanupClients();  // prune stale/disconnected WebSocket clients
 
@@ -979,6 +989,15 @@ void MundMausServer::processSensorQueue() {
             }
             continue;  // skip generic broadcast below
         }
+        case SensorEvent::WIFI_NETWORKS:
+            // Built by the scan task; broadcast here so only the loop task and
+            // AsyncTCP ever touch the client list.
+            if (_scanResultJson.length() > 0) {
+                _broadcastText(_scanResultJson);
+                _scanResultJson = "";
+            }
+            break;
+
         case SensorEvent::UPDATE_RESULT:
             // Result was already set by the caller (OTA task or periodic check).
             // Broadcast update_status to all WS clients so portal refreshes.
@@ -1059,12 +1078,14 @@ void MundMausServer::_sendJson200(AsyncWebServerRequest* req, JsonDocument& doc)
 }
 
 void MundMausServer::_broadcastText(const String& msg) {
-    // P1-3: Use makeBuffer + textAll(buffer) instead of textAll(String).
-    // The shared_ptr buffer lets each client dequeue independently, and the
-    // per-client text(buf) path acquires the client's own lock. This mitigates
-    // the _clients list-iteration race: while the iteration itself is not
-    // library-locked, the window is microseconds (small message, 10Hz rate)
-    // and _clients mutations (connect/disconnect) are seconds apart.
+    // makeBuffer + textAll(buffer) instead of textAll(String): one allocation
+    // shared by all clients rather than a copy per client, which matters on a
+    // device with this little heap.
+    //
+    // It does NOT make the client-list iteration safe — see the note above
+    // processSensorQueue(). textAll(SharedBuffer) still walks _clients with a
+    // bare range-for; the library's mutex guards a single client's send queue,
+    // not the list. Call this only from the loop task or AsyncTCP.
     auto buf = _ws.makeBuffer(msg.length());
     if (buf) {
         memcpy(buf->get(), msg.c_str(), msg.length());
@@ -1280,9 +1301,20 @@ void MundMausServer::_wifiScanTaskWrapper(void* param) {
     for (const auto& n : networks) {
         arr.add(n);
     }
-    String buf;
-    serializeJson(resp, buf);
-    self->_broadcastText(buf);
+    // Hand the result to the loop task instead of broadcasting from here.
+    // AsyncWebSocket::_clients is an unguarded std::list: cleanupClients()
+    // erases from it on the loop task at ~100Hz while AsyncTCP emplace_backs on
+    // every connect. A third task traversing it during that churn is how an
+    // erase relinking the tail against a concurrent insert leaves the sentinel
+    // pointing at freed memory. This cannot be fully fixed without patching the
+    // library, but routing the scan through the queue removes one of the three
+    // writers — and it is the one that fires exactly when WiFi is already flaky.
+    serializeJson(resp, self->_scanResultJson);
+
+    SensorEvent ev;
+    ev.type = SensorEvent::WIFI_NETWORKS;
+    ev.data[0] = '\0';
+    xQueueSend(self->sensorQueue(), &ev, 0);
 
     self->_wifiScanRunning = false;
     vTaskDelete(nullptr);

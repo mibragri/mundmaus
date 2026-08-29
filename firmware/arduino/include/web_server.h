@@ -31,7 +31,7 @@ class PuffSensor;
 struct SensorEvent {
     enum Type { NAV, NAV_HOLD, NAV_RELEASE, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
                 UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT,
-                DEBUG_JOYSTICK } type;
+                WIFI_NETWORKS, DEBUG_JOYSTICK } type;
     char data[64];   // see format contract above
     float value;     // for puff_level
     int intVal;      // for progress current/total, calibrate centerX
@@ -114,6 +114,12 @@ private:
                     AwsEventType type, void* arg, uint8_t* data, size_t len);
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
     /// True unless the request carries a foreign page's Origin/Referer.
+    /// Serialized wifi_networks payload, handed from the scan task to the
+    /// loop task through the sensor queue. Too large for SensorEvent::data,
+    /// and only one scan can be in flight (_wifiScanRunning), so the queue's
+    /// own ordering is all the synchronisation this needs.
+    String _scanResultJson;
+
     bool _sameOriginOk(AsyncWebServerRequest* req);
 
     void _sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc);
