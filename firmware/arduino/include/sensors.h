@@ -64,6 +64,21 @@ public:
     /// Detect puff/sip as sudden delta. Includes cooldown to prevent rebounds.
     bool detectPuff();
 
+    /// Current cached raw ADC reading (updated by poll()). For diagnostics.
+    int32_t lastRaw() const { return _lastRaw; }
+
+    /// Current absolute trigger threshold above baseline. For diagnostics.
+    int32_t rawThreshold() const { return _rawThreshold; }
+
+    /// How often the baseline had to be re-adopted after a sustained offset.
+    /// Non-zero means the sensor drifted far enough to have latched before —
+    /// surfaced in the health snapshot so it is visible without a site visit.
+    uint32_t rebaseCount() const { return _rebaseCount; }
+
+    /// True while the reading sits beyond the tracking window but has not yet
+    /// been held long enough to count as drift.
+    bool offBaseline() const { return _offBaselineSince != 0; }
+
     int32_t baseline;
 
 private:
@@ -73,6 +88,8 @@ private:
     int32_t _previousRaw;
     int32_t _rawThreshold;
     int32_t _lastRaw;
+    unsigned long _offBaselineSince;  // 0 = reading is within the tracking window
+    uint32_t _rebaseCount;
 
     /// Read if data ready (non-blocking). Returns 0 if not ready.
     int32_t _readRawNonblocking();

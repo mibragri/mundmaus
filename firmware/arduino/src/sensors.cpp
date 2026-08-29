@@ -258,6 +258,8 @@ PuffSensor::PuffSensor(int dataPin, int clkPin)
     , _previousRaw(0)
     , _rawThreshold(Config::PUFF_RAW_THRESHOLD)
     , _lastRaw(0)
+    , _offBaselineSince(0)
+    , _rebaseCount(0)
 {
     pinMode(_dataPin, INPUT_PULLDOWN);
     pinMode(_clkPin, OUTPUT);
@@ -344,7 +346,32 @@ void PuffSensor::poll() {
         // correction in ~5 seconds for small drift).
         int32_t drift = raw - baseline;
         if (abs(drift) < Config::PUFF_RAW_THRESHOLD / 2) {
-            baseline += drift / 256;
+            int32_t step = drift / 256;
+            // Integer division stalls below 256 counts; nudge by one so the
+            // baseline actually converges instead of parking a small offset.
+            if (step == 0 && drift != 0) step = (drift > 0) ? 1 : -1;
+            baseline += step;
+            _offBaselineSince = 0;
+        } else {
+            // Outside the tracking window the baseline used to be frozen for
+            // good, so a large step (tube moved, sensor re-seated, thermal
+            // jump) left the sensor permanently out of range — this is what
+            // silently cost the patient his only click until a reboot.
+            // Distinguish the two cases by duration: a puff is brief, a new DC
+            // level persists. Adopt the new level once it has held.
+            unsigned long now = millis();
+            if (_offBaselineSince == 0) {
+                _offBaselineSince = now;
+            } else if (now - _offBaselineSince > Config::PUFF_REBASE_MS) {
+                baseline = raw;
+                _maxRange = abs(baseline) / 2;
+                if (_maxRange == 0) _maxRange = 100000;
+                _previousRaw = raw;
+                _offBaselineSince = 0;
+                _rebaseCount++;
+                Serial.printf("  Drucksensor: Baseline neu uebernommen (%d, #%u)\n",
+                              (int)baseline, (unsigned)_rebaseCount);
+            }
         }
     }
 }

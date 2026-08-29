@@ -66,6 +66,13 @@ constexpr int DEFAULT_CALIBRATION_SAMPLES = 50;
 constexpr int DEFAULT_PUFF_COOLDOWN_MS  = 400;
 constexpr int DEFAULT_PUFF_RAW_THRESHOLD = 75000;
 
+// How long the raw reading may sit far from the baseline before the baseline is
+// re-adopted. Slow thermal tracking only runs near the baseline, so a large
+// step (tube moved, sensor re-seated, thermal jump) used to latch the sensor
+// out of range permanently and cost the patient his click until a reboot.
+// A puff is far shorter than this, so anything holding this long is drift.
+constexpr unsigned long PUFF_REBASE_MS = 15000;
+
 // Timing
 constexpr int DEFAULT_PUFF_SEND_INTERVAL_MS = 100;
 constexpr int DEFAULT_SENSOR_POLL_MS        = 20;

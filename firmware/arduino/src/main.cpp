@@ -42,7 +42,19 @@ static String _otaTelemetry() {
         t += "&cy=" + String(joystick->centerY);
     }
     if (t.length()) t += "&";
-    t += puffSensor ? ("p=" + String((int)puffSensor->getLevel())) : "p=na";
+    if (puffSensor) {
+        // Percent, not the bare 0.0-1.0 float: (int)getLevel() truncated every
+        // reading below 1.0 to "0", so a sensor latched at 25 % looked exactly
+        // like a healthy idle one. That is why the patient's dead click was
+        // invisible here and only surfaced when he reported it.
+        // baseline/raw/rebases make a stuck baseline diagnosable remotely.
+        t += "p="    + String((int)(puffSensor->getLevel() * 100.0f));
+        t += "&pb="  + String((int)puffSensor->baseline);
+        t += "&pr="  + String((int)puffSensor->lastRaw());
+        t += "&prb=" + String((unsigned)puffSensor->rebaseCount());
+    } else {
+        t += "p=na";
+    }
     return t;
 }
 
