@@ -34,8 +34,16 @@ public:
     /// Continuous state: direction + intensity (0-1). Returns nullptr if idle.
     const char* getState(float& outIntensity);
 
+    /// How often the center had to be auto-adopted after a stuck direction.
+    /// Non-zero means the joystick calibration had drifted — visible in the
+    /// health snapshot so it is diagnosable without a site visit.
+    uint32_t recenterCount() const { return _recenterCount; }
+
 private:
     int _pinX, _pinY, _pinSW;
+    const char* _stuckDir = nullptr;    // direction currently held, for auto-recenter
+    unsigned long _stuckSince = 0;      // when the current continuous hold began
+    uint32_t _recenterCount = 0;
     const char* _lastDir;
     char _lastAxis = 0;  // 'x', 'y', or 0 (for hysteresis in axis selection)
     float _lastIntensity = 0.0f;

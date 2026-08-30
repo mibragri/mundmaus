@@ -711,6 +711,13 @@ std::pair<String, String> WiFiManager::startup() {
     // for capacity. mode holds "station"/"ap"; ip holds up to "255.255.255.255".
     mode.reserve(16);
     ip.reserve(20);
+    // Same treatment for the credentials: the WS-connect handler and the
+    // AP-recovery gate read ssid unlocked from the AsyncTCP task, and a
+    // concurrent saveCredentials()/deleteCredentials() would otherwise realloc
+    // the buffer mid-read (use-after-free → crash). Reserving pins the buffer;
+    // 33 covers a max-length 32-char SSID/PSK plus NUL.
+    ssid.reserve(33);
+    password.reserve(65);
 
     // Credentials are already populated in RAM by main() (via loadCredentials
     // on boot, or saveCredentials during serial provisioning). Re-reading NVS

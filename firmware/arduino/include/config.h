@@ -56,6 +56,12 @@ constexpr const char* OTA_AUTH     = "";
 // ============================================================
 
 // Joystick
+// How long one direction may read continuously before the center is re-adopted.
+// A miscalibrated center (the patient's mouth on the stick at boot) reads as a
+// deflection that NEVER releases; a deliberate hold releases within seconds, so
+// 30 s continuous cleanly means "the rest position is off" — mirror of the puff
+// baseline rebase, so the patient is not locked out until someone recalibrates.
+constexpr unsigned long JOY_RECENTER_MS = 30000;
 constexpr int DEFAULT_DEADZONE          = 150;
 constexpr int DEFAULT_NAV_THRESHOLD     = 450;
 constexpr int DEFAULT_NAV_REPEAT_MS     = 400;

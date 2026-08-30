@@ -169,8 +169,9 @@ void MundMausServer::_setupHttpRoutes() {
             doc["joystick"]["raw_y"]    = _joystick->rawY;
             doc["joystick"]["center_x"] = _joystick->centerX;
             doc["joystick"]["center_y"] = _joystick->centerY;
-            doc["joystick"]["dx"]       = _joystick->rawX - _joystick->centerX;
-            doc["joystick"]["dy"]       = _joystick->rawY - _joystick->centerY;
+            doc["joystick"]["dx"]        = _joystick->rawX - _joystick->centerX;
+            doc["joystick"]["dy"]        = _joystick->rawY - _joystick->centerY;
+            doc["joystick"]["recenters"] = _joystick->recenterCount();  // auto-recenter count: nonzero = calibration had drifted
         } else {
             doc["joystick"]["error"] = "no joystick";
         }
@@ -492,6 +493,13 @@ void MundMausServer::_setupHttpRoutes() {
                     applied = Config::update(key, (int)input["value"].as<float>()) ? 1 : 0;
                 }
             }
+            // Arm the auto-revert. This HTTP endpoint is the OTHER live-preview
+            // path (the WS config_preview handlers are the first); a preview
+            // applied here that is never saved must also revert if the settings
+            // tab dies. Arming on a cancel-revert (which posts the saved values
+            // here too) is harmless — the later Config::load() reloads the same
+            // saved set.
+            if (applied > 0) { _previewActive = true; _lastPreviewMs = millis(); }
 
             JsonDocument doc;
             doc["ok"]      = (applied > 0);
@@ -799,6 +807,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
             // M3: Accept both int and float values (JS may send 1.0 for 1)
             if (msg["value"].is<int>() || msg["value"].is<float>()) {
                 Config::update(key, (int)msg["value"].as<float>());
+                _previewActive = true; _lastPreviewMs = millis();
             }
         }
         return;
@@ -807,12 +816,14 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
     if (strcmp(type, "config_preview_bulk") == 0) {
         if (msg["values"].is<JsonObjectConst>()) {
             _applyConfigValues(msg["values"].as<JsonObjectConst>());
+            _previewActive = true; _lastPreviewMs = millis();
         }
         return;
     }
 
     if (strcmp(type, "config_save") == 0) {
         Config::save();
+        _previewActive = false;  // saved — nothing to auto-revert
         JsonDocument resp;
         resp["type"] = "config_saved";
         resp["ok"]   = true;
@@ -1058,6 +1069,22 @@ void MundMausServer::processSensorQueue() {
 // ============================================================
 // REBOOT CHECK (call from loop)
 // ============================================================
+
+void MundMausServer::checkPreviewTimeout() {
+    // Live config previews (nav thresholds, deadzone, puff cooldown) are applied
+    // to the running globals immediately but not persisted; the settings page is
+    // supposed to revert them on unload. If that tab dies abnormally (browser
+    // crash, WiFi drop, the lid closed on the caretaker) an extreme-but-in-range
+    // value stays live and the sensor task keeps using it — degraded or dead
+    // input for the patient until someone reopens settings or reboots. After
+    // 60 s with no save and no further preview traffic, revert to the saved set.
+    if (!_previewActive) return;
+    if (millis() - _lastPreviewMs < 60000) return;
+    _previewActive = false;
+    Config::load();  // reloads the saved values from NVS into the live globals
+    Serial.println("  Preview abgelaufen — auf gespeicherte Werte zurueckgesetzt");
+    WifiLog::log("event=preview_auto_revert");
+}
 
 void MundMausServer::checkHeapHealth() {
     // Cheap (~1/5s), so it never itself pressures the loop.

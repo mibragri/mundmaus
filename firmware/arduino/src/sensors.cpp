@@ -167,6 +167,33 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
     }
 
     if (dir) {
+        // Auto-recenter: a direction that reads continuously without ever
+        // releasing is not a hold, it is a miscalibrated center (the patient's
+        // mouth was on the stick at boot). After JOY_RECENTER_MS of the SAME
+        // unbroken direction, adopt the current raw position as the new center
+        // so he is not locked out of navigating until a human recalibrates.
+        unsigned long now = millis();
+        if (dir == _stuckDir) {
+            if (_stuckSince != 0 && now - _stuckSince > Config::JOY_RECENTER_MS) {
+                centerX = rawX;
+                centerY = rawY;
+                _recenterCount++;
+                _stuckDir = nullptr;
+                _stuckSince = 0;
+                _lastAxis = 0;
+                _lastIntensity = 0;
+                outIntensity = 0;
+                Serial.printf("  Joystick: Center neu uebernommen (%d,%d, #%u) "
+                              "nach %lus Dauerausschlag\n",
+                              centerX, centerY, (unsigned)_recenterCount,
+                              Config::JOY_RECENTER_MS / 1000);
+                return nullptr;  // current position is now neutral
+            }
+        } else {
+            _stuckDir = dir;
+            _stuckSince = now;
+        }
+
         int maxTravel = 0;
         if (xDominant) {
             maxTravel = (dominant > 0) ? (4095 - centerX) : centerX;
@@ -184,9 +211,12 @@ const char* CalibratedJoystick::getState(float& outIntensity) {
         return dir;
     }
 
-    // No direction detected — clear axis lock so next direction starts fresh
+    // No direction detected — clear axis lock so next direction starts fresh,
+    // and reset the stuck-hold tracker (the stick returned to neutral).
     _lastAxis = 0;
     _lastIntensity = 0;
+    _stuckDir = nullptr;
+    _stuckSince = 0;
     outIntensity = 0;
     return nullptr;
 }

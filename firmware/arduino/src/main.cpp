@@ -433,7 +433,9 @@ void loop() {
         // I1: Process sensor events on main core (thread-safe WS broadcast)
         server->processSensorQueue();
 
-        // Self-heal before the heap runs out, then service any pending reboot.
+        // Self-heal: revert an abandoned settings preview, watch the heap, then
+        // service any pending reboot.
+        server->checkPreviewTimeout();
         server->checkHeapHealth();
         server->checkReboot();
     }
@@ -541,6 +543,21 @@ void loop() {
             WifiLog::log("event=task_create_failed task=ap_recover");
             wifiReconnecting = false;
         }
+    }
+
+    // AP-down retry, INDEPENDENT of credentials. The probe above is gated on
+    // stored credentials, and startAP() sets mode="ap" even when softAP() failed
+    // and the IP is 0.0.0.0. So an UNPROVISIONED device whose hotspot failed to
+    // come up has no interface and nothing retries it — a dead device needing a
+    // power-cycle. Re-assert the AP whenever we are in AP mode with no AP IP.
+    static unsigned long lastApDownCheck = 0;
+    if (wifi.mode == "ap" && !wifiReconnecting &&
+        millis() - lastApDownCheck > 30000 &&
+        WiFi.softAPIP().toString() == "0.0.0.0") {
+        lastApDownCheck = millis();
+        Serial.println("  AP ist unten (IP 0.0.0.0) — Hotspot neu starten");
+        WifiLog::log("event=ap_down_retry");
+        wifi.startAP();
     }
 
     // Periodic OTA check (every 3 hours, non-blocking)
