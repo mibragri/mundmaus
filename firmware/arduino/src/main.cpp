@@ -237,8 +237,11 @@ void setup() {
     if (!wifi.loadCredentials()) {
         Serial.println("  Keine WLAN-Daten. Serial-Provisioning (5s):");
         Serial.println("  Format: SSID:PASSWORD");
-        unsigned long deadline = millis() + 5000;
-        while (millis() < deadline) {
+        // Rollover-safe form (millis()-start), though at boot millis() is tiny
+        // and the additive form was harmless here — keeps the codebase free of
+        // the unsafe `millis() + x` pattern.
+        unsigned long start = millis();
+        while (millis() - start < 5000) {
             if (Serial.available()) {
                 String line = Serial.readStringUntil('\n');
                 line.trim();

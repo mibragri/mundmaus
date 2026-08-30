@@ -1287,6 +1287,10 @@ function toggleKiosk() {
 
 // ── Tastatur ─────────────────────────────────────────────
 document.addEventListener('keydown', (e) => {
+  // Dismiss the kiosk idle screen first, like the WS handler does. Without this
+  // a keypress during idle (e.g. N) acted on the game behind the idle screen
+  // (z-index 200) while the idle screen (z-index 300) still covered it.
+  resetIdle();
   switch (e.key) {
     case 'ArrowLeft':
     case 'ArrowRight':

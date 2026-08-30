@@ -410,6 +410,35 @@ test.describe('chess — AI search budget', () => {
   });
 });
 
+// A network name is attacker-chosen; the WiFi status line interpolated it into
+// innerHTML, so an SSID like `<img src=x onerror=...>` executed on the settings
+// page. It must be inserted as text.
+test.describe('settings — SSID is not HTML-injected', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  test('a malicious SSID renders as text, does not execute', async ({ page }) => {
+    let executed = false;
+    await page.exposeFunction('__pwned', () => { executed = true; });
+    await page.route('**/api/wifi', route => route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        connected: true,
+        ssid: '<img src=x onerror=window.__pwned()>EvilNet',
+        ip: '192.168.1.2', rssi: -50, rssi_label: 'gut',
+      }),
+    }));
+
+    await gotoGame(page, 'settings');
+    // loadWifiStatus runs on load; give the (never-firing) onerror a chance too.
+    await page.waitForTimeout(800);
+
+    expect(executed, 'SSID payload executed — innerHTML injection').toBe(false);
+    const txt = await page.locator('#wifi-status').textContent();
+    expect(txt).toContain('EvilNet');          // shown as text
+    expect(txt).toContain('<img');             // literal, not parsed
+  });
+});
+
 test.describe('freecell — NEW button', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
   test.beforeEach(async ({ page }) => {

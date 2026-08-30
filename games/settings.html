@@ -935,12 +935,21 @@ async function loadSettings() {
 function loadWifiStatus() {
   fetch('/api/wifi').then(r=>r.json()).then(d => {
     const el = document.getElementById('wifi-status');
+    // Build with textContent, not innerHTML: the SSID is an attacker-chosen
+    // string (a network name like "<img src=x onerror=...>") and interpolating
+    // it into innerHTML executed it. The bold name goes through a text node.
+    const strong = (label, name, tail) => {
+      el.textContent = label;
+      const b = document.createElement('b'); b.textContent = name;
+      el.appendChild(b);
+      el.appendChild(document.createTextNode(tail));
+    };
     if (d.connected) {
-      el.innerHTML = '✅ Verbunden mit <b>' + d.ssid + '</b> (IP: ' + d.ip + ', ' + d.rssi_label + ' ' + d.rssi + 'dBm)';
+      strong('✅ Verbunden mit ', d.ssid, ' (IP: ' + d.ip + ', ' + d.rssi_label + ' ' + d.rssi + 'dBm)');
     } else if (d.mode === 'ap') {
-      el.innerHTML = '📡 Hotspot-Modus: <b>' + d.ap_ssid + '</b> (IP: ' + d.ip + ')';
+      strong('📡 Hotspot-Modus: ', d.ap_ssid, ' (IP: ' + d.ip + ')');
     } else {
-      el.innerHTML = '❌ Nicht verbunden';
+      el.textContent = '❌ Nicht verbunden';
     }
   }).catch(() => {
     document.getElementById('wifi-status').textContent = '? Status unbekannt';

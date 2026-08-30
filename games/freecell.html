@@ -1738,7 +1738,15 @@ function connectWebSocket() {
       wsBackoff = Math.min(wsBackoff * 2, 30000);
     };
     ws.onerror = () => ws.close();
-  } catch(e) { console.log('WS not available'); updateWs(false); }
+  } catch(e) {
+    // See solitaire: the constructor can throw and onclose then never fires, so
+    // schedule the retry here too — otherwise the socket stays dead for the
+    // page's whole life and the patient loses joystick and puff until a reload.
+    console.log('WS not available'); updateWs(false);
+    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
+    wsReconnectTimer = setTimeout(() => { wsReconnectTimer = null; connectWebSocket(); }, wsBackoff);
+    wsBackoff = Math.min(wsBackoff * 2, 30000);
+  }
 }
 
 function updateWs(on) {
