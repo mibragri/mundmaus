@@ -372,6 +372,42 @@ test.describe('chess — AI search budget', () => {
     // stay far below the ~2900ms the unbounded search took.
     expect(ms).toBeLessThan(2000);
   });
+
+  test('a deep search still finds a hanging queen after timing out (root loop must not break early)', async ({ page }) => {
+    // The root loop must NOT break on timeout. It did, so level 4 — whose first
+    // move alone exceeds the budget — returned whatever move the shuffle put
+    // first, i.e. near-random, missing obvious material. Here Black can take a
+    // free white queen with Rxd4. A full search finds it on every run; a
+    // break-pinned search finds it only when the shuffle happens to place it
+    // first (~1/N). Five clean runs makes that overwhelmingly discriminating.
+    await gotoGame(page, 'chess');
+    await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+
+    const captures = await page.evaluate(`(() => {
+      aiDepth = 6;  // deep enough to blow past the budget on any machine
+      const setup = () => {
+        // A DENSE board so the level-4 search actually exceeds the 1200ms
+        // budget and the timeout path is exercised (a sparse board finishes too
+        // fast to trip it). Start from the full array, then hang White's queen
+        // on d4 where a Black pawn on e5 captures it for free.
+        newGame();                         // full 32-piece board, castling set
+        game.board[4][3] = {color: 'w', type: 'q'};  // white queen -> d4
+        game.board[7][3] = null;                       // ...off d1
+        game.board[3][4] = {color: 'b', type: 'p'};   // black pawn -> e5
+        game.board[1][4] = null;                       // ...off e7
+        game.turn = 'b'; game.enPassant = null; game.history = [];
+      };
+      let hits = 0;
+      for (let t = 0; t < 5; t++) {
+        setup();
+        const mv = aiMove();               // Black to move: pawn e5xd4 wins the queen
+        if (mv && mv.fr === 3 && mv.fc === 4 && mv.tr === 4 && mv.tc === 3) hits++;
+      }
+      return hits;
+    })()`);
+
+    expect(captures, 'AI missed a free queen — root loop is breaking early').toBe(5);
+  });
 });
 
 test.describe('freecell — NEW button', () => {

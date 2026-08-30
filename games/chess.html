@@ -1247,9 +1247,12 @@ function aiMove() {
       bestVal = val;
       bestMove = m;
     }
-    // Leave the root loop too once the budget is spent, otherwise every
-    // remaining root move still pays a full (if shallow) search.
-    if (searchTimedOut) break;
+    // Do NOT break here. Once the budget trips, minimax() returns evaluate() at
+    // its first line, so every remaining root move is now an O(1) static eval,
+    // not a full search — letting them run costs microseconds and lets the AI
+    // pick the best move it can see. Breaking instead returned whatever move
+    // happened to be first in the shuffled list (the deep search of move 1
+    // alone already exceeds the budget at level 4), i.e. a near-random move.
   }
   return bestMove;
 }
