@@ -479,7 +479,14 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
     WiFi.setHostname("mundmaus");
     WiFi.setAutoReconnect(true);
-    WiFi.persistent(true);
+    // persistent(false): the firmware owns its credentials (loadCreds/saveCreds
+    // in our own NVS "wifi" namespace) and re-supplies them on every boot via
+    // connectStation(), so the driver does not need to mirror them to the RF
+    // NVS partition. With persistent(true) each connect attempt rewrote that
+    // partition, and during a router outage the 30s reconnect loop plus the
+    // AP-recovery probe turn that into thousands of flash writes per day for no
+    // benefit. autoReconnect works from the in-RAM config regardless.
+    WiFi.persistent(false);
 
     // Adaptive TX-power: reduce peak TX current on long-cable/underpowered-PSU
     // setups to stay below the brownout threshold. First call per boot consumes
@@ -554,7 +561,18 @@ String WiFiManager::startAP() {
     // connections and brief outages every time the settings page scanned.
     WiFi.mode(WIFI_AP_STA);
 
-    WiFi.softAP(Config::AP_SSID, Config::AP_PASS);
+    // Check the return and retry once. This AP is the caretakers' only way back
+    // in when the router is down; softAP() ignored here meant a silent failure
+    // left the device with NO usable interface until a power cycle, which they
+    // cannot do meaningfully either. One re-assert of the mode + retry clears
+    // the common transient (radio still tearing down a prior STA attempt).
+    bool apOk = WiFi.softAP(Config::AP_SSID, Config::AP_PASS);
+    if (!apOk) {
+        WifiLog::log("event=ap_start_failed retry=1");
+        delay(200);
+        WiFi.mode(WIFI_AP_STA);
+        apOk = WiFi.softAP(Config::AP_SSID, Config::AP_PASS);
+    }
 
     // Wait for AP to become active
     unsigned long start = millis();
@@ -565,6 +583,11 @@ String WiFiManager::startAP() {
 
     ip   = WiFi.softAPIP().toString();
     mode = "ap";
+    if (!apOk || ip == "0.0.0.0") {
+        // Fail loudly: nothing downstream can recover an AP that never came up.
+        WifiLog::log("event=ap_start_failed final ip=" + ip);
+        Serial.println("  FEHLER: AP konnte nicht gestartet werden");
+    }
 
     // mDNS: mundmaus.local (also in AP mode)
     if (MDNS.begin("mundmaus")) {
@@ -673,6 +696,19 @@ void WiFiManager::getStatus(JsonDocument& doc) {
 // ============================================================
 
 std::pair<String, String> WiFiManager::startup() {
+    // Stabilise the ip/mode buffers ONCE, before any server task can read them.
+    // Both are written later by the reconnect / AP-recovery worker tasks and
+    // read unlocked by AsyncTCP handlers (getStatus, the portal). Reserving here
+    // — before the first assignment — pins each String's heap buffer so a write
+    // never reallocates under a concurrent reader. A torn read then yields a
+    // momentarily mixed but always-valid string, which the header already deems
+    // acceptable for display; what it removes is the use-after-free when a
+    // 15-char IP outgrows the small-string buffer and reallocates mid-read.
+    // reserve() only ever grows, so the later in-place assignments are no-ops
+    // for capacity. mode holds "station"/"ap"; ip holds up to "255.255.255.255".
+    mode.reserve(16);
+    ip.reserve(20);
+
     // Credentials are already populated in RAM by main() (via loadCredentials
     // on boot, or saveCredentials during serial provisioning). Re-reading NVS
     // here would mask a just-saved set if saveCredentials had a partial NVS

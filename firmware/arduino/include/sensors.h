@@ -3,6 +3,7 @@
 // Direct port of MicroPython sensors.py to Arduino/ESP32.
 
 #include <Arduino.h>
+#include "config.h"  // rawThreshold() reports the LIVE Config::PUFF_RAW_THRESHOLD
 
 class CalibratedJoystick {
 public:
@@ -68,7 +69,7 @@ public:
     int32_t lastRaw() const { return _lastRaw; }
 
     /// Current absolute trigger threshold above baseline. For diagnostics.
-    int32_t rawThreshold() const { return _rawThreshold; }
+    int32_t rawThreshold() const { return Config::PUFF_RAW_THRESHOLD; }
 
     /// How often the baseline had to be re-adopted after a sustained offset.
     /// Non-zero means the sensor drifted far enough to have latched before —
@@ -90,7 +91,6 @@ private:
     int32_t _maxRange;
     unsigned long _lastPuffTime;
     int32_t _previousRaw;
-    int32_t _rawThreshold;
     int32_t _lastRaw;
     unsigned long _offBaselineSince;  // 0 = reading is within the tracking window
     uint32_t _rebaseCount;
