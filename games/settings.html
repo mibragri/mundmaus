@@ -985,19 +985,23 @@ function doWifiConnect() {
       const selectedSsid = document.getElementById('wifi-ssid').value;
       const wifiCard = document.getElementById('wifi-card');
       if (wifiCard) {
+        // Fixed structure via innerHTML, but the SSID (attacker-chosen, from the
+        // scanned dropdown) goes into placeholders via textContent — same
+        // injection class as the status line above, second occurrence.
         wifiCard.innerHTML = `
           <div style="text-align:center;padding:16px">
             <h3 style="color:var(--gold);margin-bottom:12px">⏳ Neustart läuft...</h3>
             <p style="margin:8px 0">Das Gerät verbindet sich mit dem WLAN:</p>
-            <p style="font-weight:bold;color:var(--gold);font-size:1.5em;margin:12px 0">${selectedSsid}</p>
+            <p style="font-weight:bold;color:var(--gold);font-size:1.5em;margin:12px 0"><span class="ssid-slot"></span></p>
             <hr style="border-color:var(--card-border);margin:16px 0">
             <p style="margin:8px 0">1. Warte ca. 30 Sekunden</p>
-            <p style="margin:8px 0">2. Verbinde dein Gerät mit dem WLAN <b>${selectedSsid}</b></p>
+            <p style="margin:8px 0">2. Verbinde dein Gerät mit dem WLAN <b class="ssid-slot"></b></p>
             <p style="margin:8px 0">3. Öffne <a href="http://mundmaus.local" style="color:var(--gold)">mundmaus.local</a></p>
             <hr style="border-color:var(--card-border);margin:16px 0">
             <p style="color:var(--text-dim);font-size:0.9em">Bei Problemen: Das Gerät startet im Hotspot-Modus "<b>MundMaus</b>" neu (Passwort: <b>mundmaus1</b>)</p>
           </div>
         `;
+        wifiCard.querySelectorAll('.ssid-slot').forEach(el => { el.textContent = selectedSsid; });
       }
     } else {
       if (btn) btn.disabled = false;  // re-enable on error
