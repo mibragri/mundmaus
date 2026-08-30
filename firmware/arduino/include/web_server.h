@@ -49,6 +49,14 @@ public:
     /// Check pending reboot timer, call from loop()
     void checkReboot();
 
+    /// Reboot before the heap runs out. Call from loop(). If free heap or the
+    /// largest allocatable block stays critically low for ~30s — a slow leak or
+    /// fragmentation over weeks of uptime — schedule a graceful reboot so the
+    /// device self-heals instead of silently failing to allocate (AsyncTCP/TLS)
+    /// and stranding the patient. The reboot goes through _pendingReboot, so it
+    /// still defers around an OTA, and the games reconnect on their own after.
+    void checkHeapHealth();
+
     // -- Sensors (set by main after sensor init) --
     void setSensors(CalibratedJoystick* joy, PuffSensor* puff);
 
@@ -89,6 +97,8 @@ private:
     AsyncWebSocket _ws;
     WiFiManager&   _wifi;
     volatile unsigned long _pendingReboot;  // 0 = none, else millis() when requested (M5: volatile)
+    unsigned long _lastHeapCheck = 0;        // millis() of last heap health check
+    uint8_t _lowHeapStreak = 0;              // consecutive low-heap checks (~5s each)
 
     // Thread-safe sensor->WS queue (I1)
     QueueHandle_t _sensorQueue;

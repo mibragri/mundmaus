@@ -129,7 +129,8 @@ void MundMausServer::_setupHttpRoutes() {
         doc["board"]    = BOARD_NAME;
         doc["ip"]       = _wifi.ip;
         doc["mode"]     = _wifi.mode;
-        doc["mem_free"] = ESP.getFreeHeap();
+        doc["mem_free"]  = ESP.getFreeHeap();
+        doc["mem_block"] = ESP.getMaxAllocHeap();  // largest contiguous block — fragmentation shows here before mem_free does
         _sendJson200(req, doc);
     });
 
@@ -1057,6 +1058,39 @@ void MundMausServer::processSensorQueue() {
 // ============================================================
 // REBOOT CHECK (call from loop)
 // ============================================================
+
+void MundMausServer::checkHeapHealth() {
+    // Cheap (~1/5s), so it never itself pressures the loop.
+    if (millis() - _lastHeapCheck < 5000) return;
+    _lastHeapCheck = millis();
+
+    // Two signals: total free, and the largest single block. AsyncTCP and the
+    // TLS handshake need a contiguous block, so fragmentation strands the device
+    // even when total free still looks OK — track both. The device boots with
+    // ~150 KB free and ~100 KB largest block, so these thresholds are deep in
+    // the danger zone, not near normal operation.
+    const uint32_t freeHeap = ESP.getFreeHeap();
+    const uint32_t maxBlock = ESP.getMaxAllocHeap();
+    const bool critical = (freeHeap < 15000) || (maxBlock < 8000);
+
+    if (!critical) { _lowHeapStreak = 0; return; }
+
+    // Require persistence (~30s of consecutive low checks) so a transient dip —
+    // a large scan buffer, a burst of WS traffic — does not trigger a reboot.
+    // An OTA download's buffers are excluded already: checkReboot() defers while
+    // _updateRunning, and a fresh boot restores a full heap so this cannot loop.
+    if (++_lowHeapStreak < 6) {
+        Serial.printf("  Heap niedrig: frei=%u maxBlock=%u (Streak %u/6)\n",
+                      (unsigned)freeHeap, (unsigned)maxBlock, _lowHeapStreak);
+        return;
+    }
+
+    Serial.printf("  Heap kritisch (frei=%u maxBlock=%u) — geplanter Neustart "
+                  "zur Selbstheilung\n", (unsigned)freeHeap, (unsigned)maxBlock);
+    WifiLog::log(String("event=heap_reboot free=") + freeHeap + " maxblock=" + maxBlock);
+    if (_pendingReboot == 0) _pendingReboot = millis() | 1;  // ensure nonzero
+    _lowHeapStreak = 0;
+}
 
 void MundMausServer::checkReboot() {
     if (_pendingReboot > 0 && (millis() - _pendingReboot) > 2000) {

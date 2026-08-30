@@ -390,7 +390,8 @@ void loop() {
         // I1: Process sensor events on main core (thread-safe WS broadcast)
         server->processSensorQueue();
 
-        // Check pending reboot
+        // Self-heal before the heap runs out, then service any pending reboot.
+        server->checkHeapHealth();
         server->checkReboot();
     }
 
