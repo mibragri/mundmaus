@@ -41,6 +41,9 @@ enclosure/bambu-profiles/printer.env
 
 # OTA authentication (contains credentials)
 ota_auth.py
+# OTA Basic-Auth token read by tests/e2e/ota-files.spec.ts. Same class as .env
+# above: referenced but not previously ignored, so `git add -A` would commit it.
+.ota_auth_b64
 
 # Project agent config (not for public)
 PROJECT.md

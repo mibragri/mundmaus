@@ -7,7 +7,12 @@ test.describe('WebSocket connectivity', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
 
   test('1. connect to ws://host:81 and receive initial message', async ({ page }) => {
-    await page.goto('about:blank');
+    // Open the socket from the device's OWN page, not about:blank. Chromium does
+    // not reliably open an insecure ws:// from an opaque/null-origin blank page
+    // (these two tests failed the same way before any origin guard existed), and
+    // no real client does that anyway — the games and portal are all served by
+    // the device. This mirrors how the patient's games actually connect.
+    await page.goto(`http://${ESP32_HOST}/`, { waitUntil: 'domcontentloaded' });
     const message = await page.evaluate(async (host) => {
       return new Promise<Record<string, unknown>>((resolve, reject) => {
         const ws = new WebSocket(`ws://${host}:81`);
@@ -32,7 +37,8 @@ test.describe('WebSocket connectivity', () => {
   });
 
   test('2. initial wifi_status message has required fields', async ({ page }) => {
-    await page.goto('about:blank');
+    // Served-page origin, as in test 1 — see the note there.
+    await page.goto(`http://${ESP32_HOST}/`, { waitUntil: 'domcontentloaded' });
     const message = await page.evaluate(async (host) => {
       return new Promise<Record<string, unknown>>((resolve, reject) => {
         const ws = new WebSocket(`ws://${host}:81`);
