@@ -542,6 +542,14 @@ void MundMausServer::_setupHttpRoutes() {
 
     // --- POST /api/updates/check --- Fresh manifest check (non-blocking background task)
     _httpServer.on("/api/updates/check", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        // Same-origin gate. Missed when its siblings were gated: a foreign page
+        // cannot flash or reboot through this (install and reboot are gated) but
+        // could force outbound manifest polls and mutate the broadcast update
+        // state. Completeness is the control, so gate it too.
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json", "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         JsonDocument doc;
         doc["ok"]      = true;
         doc["message"] = "Pruefe...";
