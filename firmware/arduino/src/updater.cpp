@@ -678,6 +678,71 @@ int fetchRemoteSettings() {
 // BOOT VALIDATION
 // ============================================================
 
+// Boot-crash-loop guard. markBootOk() cancels the bootloader rollback at the end
+// of setup(), so an image that survives setup() but then panics in loop() or on
+// Core 0 reboots into the SAME image forever with no rollback — an on-site
+// re-flash, which nobody at the patient's bedside can do. This is the second
+// safety net: a persistent counter, bumped early each boot and cleared once the
+// image proves it can run (bootCrashCounterReset() at ~60 s uptime). Five
+// consecutive boots that never reach that reset means a boot loop; if the other
+// OTA partition holds a KNOWN-GOOD image, boot into it.
+//
+// A power blip is a single reboot: it bumps the counter to 1, then the image
+// reaches 60 s and clears it — so it never accumulates, which is why this does
+// not risk a spurious rollback. Runs before WifiLog/LittleFS, so Serial only.
+static constexpr uint32_t BOOT_CRASH_LIMIT = 5;
+
+void checkBootCrashLoop() {
+    Preferences prefs;
+    if (!prefs.begin("sys", false)) return;
+    uint32_t crashes = prefs.getUInt("boot_crashes", 0);
+
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    const bool onOta = running &&
+        running->subtype >= ESP_PARTITION_SUBTYPE_APP_OTA_0 &&
+        running->subtype <= ESP_PARTITION_SUBTYPE_APP_OTA_15;
+
+    if (crashes >= BOOT_CRASH_LIMIT && onOta) {
+        const esp_partition_t* other = esp_ota_get_next_update_partition(nullptr);
+        esp_ota_img_states_t st;
+        if (other && esp_ota_get_state_partition(other, &st) == ESP_OK &&
+            st == ESP_OTA_IMG_VALID) {
+            // Only roll back to a partition proven good before. Clear the counter
+            // first so the good image does not immediately see a loop.
+            Serial.printf("  BOOT-LOOP (%u Crashes) — Rueckfall auf %s\n",
+                          (unsigned)crashes, other->label);
+            prefs.putUInt("boot_crashes", 0);
+            prefs.end();
+            if (esp_ota_set_boot_partition(other) == ESP_OK) {
+                esp_restart();
+            }
+            return;
+        }
+        Serial.printf("  BOOT-LOOP (%u Crashes), aber keine gueltige "
+                      "Rueckfall-Partition — weiter mit aktuellem Image\n",
+                      (unsigned)crashes);
+        // No fallback: nothing better to boot. Keep the counter capped so it
+        // does not grow unbounded, and keep running the current image.
+        prefs.putUInt("boot_crashes", BOOT_CRASH_LIMIT);
+        prefs.end();
+        return;
+    }
+
+    // Arm for this boot. Cleared by bootCrashCounterReset() if the image runs.
+    prefs.putUInt("boot_crashes", crashes + 1);
+    prefs.end();
+}
+
+void bootCrashCounterReset() {
+    Preferences prefs;
+    if (!prefs.begin("sys", false)) return;
+    if (prefs.getUInt("boot_crashes", 0) != 0) {
+        prefs.putUInt("boot_crashes", 0);
+        Serial.println("  Boot-Crash-Zaehler zurueckgesetzt (Image stabil)");
+    }
+    prefs.end();
+}
+
 void markBootOk() {
     // P1-5: Capture the OTA image state BEFORE marking the partition valid.
     // esp_ota_mark_app_valid_cancel_rollback() transitions the state from

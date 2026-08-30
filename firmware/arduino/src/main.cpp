@@ -23,6 +23,25 @@ static PuffSensor* puffSensor = nullptr;
 // Heartbeat timestamp for WDT (written by sensor task, read by loop)
 static volatile unsigned long sensorHeartbeat = 0;
 
+// Core-0 liveness heartbeat. AsyncTCP and the WiFi driver run on Core 0, which
+// nothing watches (CONFIG_ASYNC_TCP_USE_WDT=0, and only the Core-1 loop task is
+// WDT-subscribed). If Core 0 wedges — a WiFi-driver deadlock, or the AsyncTCP
+// client-list corrupting into a cycle during reconnect churn — HTTP and WS die
+// while loop() keeps feeding the WDT, so the patient is silently and
+// permanently locked out with no reboot. A tiny 1 Hz task pinned to Core 0
+// bumps this; loop() stops feeding the WDT once it goes stale, exactly like the
+// sensor heartbeat. A low-priority 1 Hz task only fails to run for 30 s if
+// Core 0 genuinely cannot schedule it, so this does not false-trigger during
+// normal (millisecond) AsyncTCP activity.
+static volatile unsigned long core0Heartbeat = 0;
+
+static void core0HeartbeatTask(void*) {
+    for (;;) {
+        core0Heartbeat = millis();
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+
 // Timestamp of the last station-recovery probe while in AP fallback. File scope
 // so the reconnect task can stamp it the moment the fallback engages: otherwise
 // it stayed 0, the "> 5 min" test was already true when the fallback happened
@@ -216,6 +235,12 @@ void setup() {
     esp_task_wdt_reconfigure(&wdtCfg);
     esp_task_wdt_add(nullptr);
 
+    // Boot-crash-loop guard — FIRST, before any crash-prone init. If a freshly
+    // OTA'd image keeps crashing after setup() (where markBootOk cancels the
+    // bootloader rollback), this rolls back to the last known-good partition so
+    // the device self-heals instead of needing an on-site re-flash.
+    Updater::checkBootCrashLoop();
+
     // Load saved settings from NVS
     Config::load();
 
@@ -327,6 +352,16 @@ void setup() {
     );
     Serial.println("\n[Sensor-Task] gestartet (Core 1, 50Hz)");
 
+    // Core-0 liveness watch: 1 Hz, low priority, pinned to Core 0. See the note
+    // on core0Heartbeat. Started with a fresh stamp so the first loop() checks
+    // do not see it stale.
+    core0Heartbeat = millis();
+    if (xTaskCreatePinnedToCore(core0HeartbeatTask, "core0hb", 1536, nullptr,
+                                1, nullptr, 0) != pdPASS) {
+        Serial.println("  WARNUNG: core0hb-Task nicht erstellbar");
+        core0Heartbeat = 0;  // 0 = disabled, loop() won't gate on it
+    }
+
     Serial.printf("\n[Start] Heap frei: %lu bytes\n", (unsigned long)ESP.getFreeHeap());
     Serial.println("Bereit.\n");
 
@@ -379,9 +414,17 @@ void setup() {
 // ============================================================
 
 void loop() {
-    // N6: Only feed WDT if sensor task is alive
+    // N6: Only feed WDT if the sensor task is alive...
     if (millis() - sensorHeartbeat > 30000) {
         Serial.println("  WDT: sensor task hung, NOT feeding");
+        return;  // Let WDT reset the device
+    }
+    // ...and Core 0 (AsyncTCP + WiFi) is alive. A wedged Core 0 kills HTTP+WS —
+    // the patient's whole input path — while this Core-1 loop keeps running, so
+    // without this the WDT would never fire. core0Heartbeat==0 means the watch
+    // task could not start; skip the gate then rather than reboot-loop.
+    if (core0Heartbeat != 0 && millis() - core0Heartbeat > 30000) {
+        Serial.println("  WDT: Core 0 (AsyncTCP) haengt, NOT feeding");
         return;  // Let WDT reset the device
     }
     esp_task_wdt_reset();
@@ -393,6 +436,15 @@ void loop() {
         // Self-heal before the heap runs out, then service any pending reboot.
         server->checkHeapHealth();
         server->checkReboot();
+    }
+
+    // Once the image has run for 60 s it has cleared setup() and is stable in
+    // loop() — clear the boot-crash counter so a later power blip does not
+    // accumulate toward a spurious rollback.
+    static bool crashCounterCleared = false;
+    if (!crashCounterCleared && millis() > 60000) {
+        crashCounterCleared = true;
+        Updater::bootCrashCounterReset();
     }
 
     // I6: WiFi reconnect (check every 30s, non-blocking background task)

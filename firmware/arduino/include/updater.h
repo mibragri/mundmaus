@@ -55,6 +55,15 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 /// Call after successful boot in setup().
 void markBootOk();
 
+/// Boot-crash-loop guard. Call FIRST in setup(), before any crash-prone init.
+/// Bumps a persistent counter; if an OTA image boot-loops (never reaches
+/// bootCrashCounterReset), rolls back to the known-good partition.
+void checkBootCrashLoop();
+
+/// Clear the boot-crash counter once the image has proven stable. Call from
+/// loop() after ~60 s of uptime.
+void bootCrashCounterReset();
+
 /// Fetch remote settings from OTA server and apply (non-locally-overridden).
 /// Returns number of settings applied, or -1 on fetch error.
 int fetchRemoteSettings();
