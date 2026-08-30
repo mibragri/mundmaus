@@ -151,6 +151,15 @@ void MundMausServer::_setupHttpRoutes() {
             doc["puff"]["threshold"]      = thresh;
             doc["puff"]["over_threshold"] = (delta > thresh) || (-delta > thresh);
             doc["puff"]["level"]          = _puffSensor->getLevel();
+            // Health flags for remote diagnosis (the accessors existed but were
+            // never surfaced): stale = no sample (cable/power lost), off_baseline
+            // = sitting outside the tracking window, rebases = how often the
+            // baseline had to be re-adopted after a sustained drift. This is what
+            // lets us tell a dead click from a healthy idle sensor without a
+            // site visit — the failure that took the patient's device out once.
+            doc["puff"]["stale"]          = _puffSensor->stale();
+            doc["puff"]["off_baseline"]   = _puffSensor->offBaseline();
+            doc["puff"]["rebases"]        = _puffSensor->rebaseCount();
         } else {
             doc["puff"]["error"] = "no puff sensor";
         }
