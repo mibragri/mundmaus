@@ -283,6 +283,66 @@ test.describe('action column order is consistent', () => {
   }
 });
 
+// Round-2 regressions: the mouse-wiring commit (7c7ae40) broke several paths.
+test.describe('strategy games — mouse-wiring did not break Home or dialogs', () => {
+  test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
+
+  for (const game of ['chess', 'vier-gewinnt', 'muehle'] as const) {
+    test(`${game}: Home button keeps its unconditional navigation`, async ({ page }) => {
+      await gotoGame(page, game);
+      await page.waitForSelector('.action-btn', { timeout: 15_000 });
+      // The wiring loop must not have overwritten btn-back's inline onclick with
+      // a phase-gated closure (which went dead during the AI's turn).
+      const inline = await page.evaluate(
+        `document.getElementById('btn-back')?.getAttribute('onclick')`);
+      expect(inline).toContain("location.href");
+    });
+  }
+
+  test('chess: promotion choices are clickable by mouse', async ({ page }) => {
+    await gotoGame(page, 'chess');
+    await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
+    await page.evaluate('showPromoDialog()');
+    const wired = await page.evaluate(
+      `[...document.querySelectorAll('.promo-choice')].every(el => typeof el.onclick === 'function')`);
+    expect(wired).toBe(true);
+  });
+
+  test('muehle: clicking the mode-toggle option moves the visible cursor to it', async ({ page }) => {
+    await gotoGame(page, 'muehle');
+    await page.waitForSelector('#main-menu', { timeout: 15_000 });
+    const opts = page.locator('.menu-opt');
+    const n = await opts.count();
+    await opts.nth(n - 1).click();          // the mode-toggle option (last)
+    await page.waitForTimeout(150);
+    const cursorOnLast = await page.evaluate(
+      `document.querySelectorAll('.menu-opt')[document.querySelectorAll('.menu-opt').length-1].classList.contains('cursor')`);
+    expect(cursorOnLast).toBe(true);
+  });
+
+  test('muehle: at three pieces a piece can fly to a non-adjacent point (reselect path)', async ({ page }) => {
+    await gotoGame(page, 'muehle');
+    await page.waitForSelector('#main-menu', { timeout: 15_000 });
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(300);
+    const ok = await page.evaluate(`(() => {
+      game.board = new Array(24).fill(null);
+      [0, 2, 21].forEach(i => game.board[i] = 'W');
+      [1, 9, 14].forEach(i => game.board[i] = 'B');
+      game.phase = 'zug'; game.turn = 'W'; game.toPlace = { W: 0, B: 0 };
+      // First select piece 2, THEN reselect the surrounded piece 0 (reselect path).
+      game.selected = 2;
+      ui.phase = 'playing'; ui.inBtnCol = false;
+      ui.cursor = 0;
+      userAction();                         // reselect 0 — must succeed at 3 pieces
+      return game.selected === 0;
+    })()`);
+    expect(ok).toBe(true);
+  });
+});
+
 test.describe('chess — AI search budget', () => {
   test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
 

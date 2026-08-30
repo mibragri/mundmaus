@@ -157,7 +157,16 @@ for name in m['files']:
     if name.startswith('www/'):
         print(name)
 " | while read -r fname; do
-    src="$PROJECT_DIR/games/$(basename "$fname")"
+    # Ship the TRACKED, freshness-checked archive (firmware/arduino/data/www/),
+    # not the gitignored games/*.gz build intermediate. check-games.sh verifies
+    # exactly this copy against the source, so what is gated is what is shipped;
+    # uploadfs bundles the same file. Previously deploy uploaded games/*.gz,
+    # which nothing gated — a stale one would be pinned onto the device forever.
+    src="$PROJECT_DIR/firmware/arduino/data/www/$(basename "$fname")"
+    if [[ ! -f "$src" ]]; then
+        echo -e "${RED}ERROR: $src missing — run tools/check-games.sh${NC}"
+        exit 1
+    fi
     rsync -avz "$src" "$REMOTE_HOST:$REMOTE_DIR/$fname"
 done
 

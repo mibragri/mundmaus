@@ -463,7 +463,12 @@ void loop() {
         WifiLog::log("event=ap_recovery_probe");
         if (xTaskCreate([](void* param) {
             WiFiManager* w = static_cast<WiFiManager*>(param);
-            String ip = w->connectStation();
+            // Only 2 attempts (not the cold-boot 5): this fires every 5 min while
+            // the caretaker is on the hotspot, and the full cascade tied up the
+            // radio for ~100 s each time. The scan still runs, so a router back
+            // on a new BSSID is still found; it just recovers over a couple of
+            // probes instead of hammering on the first.
+            String ip = w->connectStation(15000, 2);
             if (ip.length() > 0) {
                 Serial.printf("  AP-Recovery: Station wieder verbunden (%s)\n", ip.c_str());
                 WifiLog::log(String("event=ap_recovery_ok ip=") + ip);

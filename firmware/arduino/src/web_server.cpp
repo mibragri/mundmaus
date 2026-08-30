@@ -301,6 +301,15 @@ void MundMausServer::_setupHttpRoutes() {
             // patient loses both the games and the WebSocket that drives them.
             constexpr size_t MAX_BODY = 1024;
             if (index == 0) {
+                // Same-origin gate: this is the HTTP twin of the WS wifi_config
+                // message. A text/plain POST is CORS-safelisted (no preflight),
+                // so without this any LAN page could overwrite the credentials
+                // and reboot the device onto a network that does not exist.
+                if (!_sameOriginOk(req)) {
+                    req->send(403, "application/json",
+                              "{\"ok\":false,\"error\":\"fremde Origin\"}");
+                    return;
+                }
                 if (total == 0 || total > MAX_BODY) {
                     req->send(413, "application/json",
                               "{\"ok\":false,\"error\":\"Body zu gross\"}");
@@ -429,6 +438,13 @@ void MundMausServer::_setupHttpRoutes() {
             // size bound, so a bogus Content-Length cannot grow this forever.
             constexpr size_t MAX_BODY = 1024;
             if (index == 0) {
+                // Same-origin gate: a foreign LAN page must not push live config
+                // previews (nav thresholds, cooldowns) into the patient's game.
+                if (!_sameOriginOk(req)) {
+                    req->send(403, "application/json",
+                              "{\"ok\":false,\"error\":\"fremde Origin\"}");
+                    return;
+                }
                 if (total == 0 || total > MAX_BODY) {
                     req->send(413, "application/json",
                               "{\"ok\":false,\"error\":\"Body zu gross\"}");
@@ -547,6 +563,12 @@ void MundMausServer::_setupHttpRoutes() {
 
     // --- POST /api/update/start --- I5: spawn FreeRTOS task (non-blocking)
     _httpServer.on("/api/update/start", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        // Same-origin gate: a foreign LAN page must not be able to start a
+        // firmware flash on the patient's device.
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json", "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         // Atomic test-and-set: prevents TOCTOU race on concurrent requests
         bool expected = false;
         if (!_updateRunning.compare_exchange_strong(expected, true)) {
@@ -640,21 +662,11 @@ void MundMausServer::_setupWsRoutes() {
     // them would cost more than it buys. Known gap: a sandboxed iframe on a
     // hostile page also produces "null", so this stops the drive-by case, not a
     // determined attacker already running code in the browser.
+    // Same rule as the state-changing HTTP endpoints (a WS carries the opening
+    // PAGE's origin, i.e. http://<ip> on port 80, not :81). Unified so the two
+    // cannot drift apart again — they had different, both-flawed logic before.
     _ws.handleHandshake([this](AsyncWebServerRequest* request) -> bool {
-        if (!request->hasHeader("Origin")) return true;
-        const String origin = request->header("Origin");
-        if (origin.length() == 0 || origin == "null") return true;
-
-        const String ip = _wifi.ip;
-        if ((ip.length() > 0 && (origin == "http://" + ip ||
-                                 origin == "http://" + ip + ":81")) ||
-            origin == "http://mundmaus.local" ||
-            origin == "http://mundmaus.local:81" ||
-            origin == "http://" + String(Config::AP_SSID) + ".local") {
-            return true;
-        }
-        Serial.printf("  WS: Handshake abgelehnt, fremde Origin '%s'\n", origin.c_str());
-        return false;
+        return _sameOriginOk(request);
     });
 
     _wsHttpServer.addHandler(&_ws);
@@ -1001,7 +1013,10 @@ void MundMausServer::processSensorQueue() {
                 _broadcastText(_scanResultJson);
                 _scanResultJson = "";
             }
-            break;
+            continue;  // already broadcast — break would fall through to the
+                       // generic broadcast below and send a bare `null` frame
+                       // (doc is empty for this event), which portal.cpp parses
+                       // without a guard and throws on.
 
         case SensorEvent::UPDATE_RESULT:
             // Result was already set by the caller (OTA task or periodic check).
@@ -1053,22 +1068,51 @@ void MundMausServer::checkReboot() {
 // buys on a device whose read-only API is deliberately open. What this stops is
 // the drive-by case — a page on the patient's LAN quietly issuing a destructive
 // request from a browser, which always carries its own origin.
+// True when `value` (an Origin "http://host" or a Referer "http://host/path")
+// belongs to an address the device serves its OWN pages from. Boundary-matched,
+// not prefix-matched: "http://<ip>.evil.example" must NOT pass, so after the
+// host the next character has to be end-of-string, '/', or ':'. Any port on the
+// device's own host is fine — an attacker cannot serve content there.
+bool MundMausServer::_originAllowed(const String& value) {
+    auto matches = [&](const String& host) -> bool {
+        if (host.length() == 0) return false;
+        const String base = "http://" + host;
+        return value == base || value.startsWith(base + "/") || value.startsWith(base + ":");
+    };
+    // The page origins the device answers on: the current station/AP IP, the
+    // softAP IP whenever the hotspot is up (after AP-recovery the station IP and
+    // the softAP IP are BOTH live and a caretaker may still be on 192.168.4.1),
+    // and the mDNS name.
+    if (matches(_wifi.ip)) return true;
+    if ((WiFi.getMode() & WIFI_MODE_AP) && matches(WiFi.softAPIP().toString())) return true;
+    if (matches("mundmaus.local")) return true;
+    return false;
+}
+
+// Same-origin gate for state-changing endpoints and the WS handshake.
+//
+// No Origin AND no Referer at all → allowed: curl and non-browser clients send
+// neither, and the read-only diagnostics are deliberately open. But a header
+// that is PRESENT and opaque ("null" or empty) is a browser deliberately hiding
+// its origin — a sandboxed iframe or a data: document, which is exactly the
+// drive-by CSRF case — and is rejected. Anything else must match one of the
+// device's own origins exactly.
 bool MundMausServer::_sameOriginOk(AsyncWebServerRequest* req) {
-    String origin;
+    String value;
     if (req->hasHeader("Origin")) {
-        origin = req->header("Origin");
+        value = req->header("Origin");
     } else if (req->hasHeader("Referer")) {
-        origin = req->header("Referer");
+        value = req->header("Referer");
     } else {
-        return true;
+        return true;  // no header at all — curl / native client
     }
-    if (origin.length() == 0 || origin == "null") return true;
+    if (value.length() == 0 || value == "null") {
+        Serial.println("  API: opake Origin (null) abgelehnt");
+        return false;
+    }
+    if (_originAllowed(value)) return true;
 
-    const String ip = _wifi.ip;
-    if (ip.length() > 0 && origin.startsWith("http://" + ip)) return true;
-    if (origin.startsWith("http://mundmaus.local")) return true;
-
-    Serial.printf("  API: fremde Origin abgelehnt: '%s'\n", origin.c_str());
+    Serial.printf("  API: fremde Origin abgelehnt: '%s'\n", value.c_str());
     return false;
 }
 

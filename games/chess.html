@@ -1861,6 +1861,10 @@ function showPromoDialog() {
     const el = document.createElement('div');
     el.className = 'promo-choice' + (i === 0 ? ' cursor' : '');
     el.textContent = p.ch;
+    // Mouse path: the promotion overlay covers everything else at z-index 200,
+    // so without a handler here a caretaker who reaches promotion by mouse has
+    // no way forward and no way out but reload. Same action() the puff uses.
+    el.onclick = () => { ui.promoCursor = i; action(); };
     $promoChoices.appendChild(el);
   });
   $promoOverlay.classList.remove('hidden');
@@ -2067,6 +2071,10 @@ function wsConnect() {
 // help. Every element below moves the cursor and then goes through the very
 // same action() the puff uses, so mouse and mouth cannot drift apart.
 document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
+  // Skip buttons that carry their own inline onclick (Home): those navigate
+  // unconditionally and must keep working during the AI's turn, when the
+  // phase-gated closure below would swallow the click.
+  if (el.getAttribute('onclick')) return;
   el.onclick = () => {
     if (ui.phase !== 'playing') return;
     ui.inBtnCol = true;

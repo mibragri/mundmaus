@@ -24,7 +24,13 @@ public:
     void deleteCredentials();
 
     /// Try connecting to saved SSID. Returns IP or empty string on failure.
-    String connectStation(unsigned long timeoutMs = 15000);
+    /// maxAttempts bounds the scan+connect retry cascade: the default 5 is tuned
+    /// for cold boot (the patient's router often rejects the first 2-3 tries);
+    /// the periodic AP-recovery probe passes a smaller value so it does not tie
+    /// up the radio for ~100 s out of every 5 min while the caretaker is on the
+    /// hotspot. The scan still runs, so a router that came back on a new BSSID
+    /// is still found.
+    String connectStation(unsigned long timeoutMs = 15000, int maxAttempts = 5);
 
     /// Start AP mode. Returns AP IP address.
     String startAP();
@@ -119,6 +125,6 @@ private:
     /// backoff. Returns true on success. `outBeginMs` is set to the
     /// millis() of the WiFi.begin() that finally succeeded.
     bool _scanAndConnect(const String& ssid, const String& pw,
-                         unsigned long timeoutMs,
+                         unsigned long timeoutMs, int maxAttempts,
                          unsigned long& outBeginMs);
 };

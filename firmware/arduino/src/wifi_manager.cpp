@@ -305,7 +305,7 @@ bool WiFiManager::_tryConnectWithBssid(const String& ssid, const String& pw,
 }
 
 bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
-                                  unsigned long timeoutMs,
+                                  unsigned long timeoutMs, int maxAttempts,
                                   unsigned long& outBeginMs) {
     // Scan first so the strongest matching BSSID can be pinned on each
     // attempt. Plain WiFi.begin(ssid, pw) in a Fritz-Repeater mesh lets
@@ -362,7 +362,10 @@ bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
     // panic-recovery flow we are trying to avoid.
     // Using disconnect(false) preserves internal WiFi storage — our NVS "wifi" namespace
     // keeps credentials persistent regardless, but we avoid wiping ESP32's internal cache.
-    constexpr int MAX_ATTEMPTS = 5;
+    // Cold boot passes 5; the AP-recovery probe passes fewer to keep the radio
+    // free for the caretaker's hotspot. Clamp so a bad caller cannot loop 0 or
+    // spin forever.
+    const int MAX_ATTEMPTS = (maxAttempts < 1) ? 1 : (maxAttempts > 5 ? 5 : maxAttempts);
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         int idx = attempt - 1;
         bool pinned = (idx < static_cast<int>(matches.size()));
@@ -423,7 +426,7 @@ bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
     return false;
 }
 
-String WiFiManager::connectStation(unsigned long timeoutMs) {
+String WiFiManager::connectStation(unsigned long timeoutMs, int maxAttempts) {
     _ensureMutex();
 
     // Bug 4: Copy credentials to locals under the mutex BEFORE entering the
@@ -514,7 +517,7 @@ String WiFiManager::connectStation(unsigned long timeoutMs) {
 
     // Scan + retry only if the cached fast-path did not connect.
     if (!WiFi.isConnected()) {
-        _scanAndConnect(localSsid, localPw, timeoutMs, beginMs);
+        _scanAndConnect(localSsid, localPw, timeoutMs, maxAttempts, beginMs);
     }
 
     if (!WiFi.isConnected()) {

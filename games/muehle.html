@@ -1695,8 +1695,14 @@ function userAction() {
         return;
       }
       if (game.board[pos] === game.turn) {
-        // Reselect different own piece
-        const hasMove = ADJ[pos].some(a => game.board[a] === null);
+        // Reselect different own piece. The fourth human path — the flying fix
+        // also has to apply here, or at three pieces the patient cannot switch
+        // to a surrounded piece without deselecting first (undiscoverable, and
+        // the error beep is inaudible to him).
+        const canFlyR = countOnBoard(game.board, game.turn) === 3;
+        const hasMove = canFlyR
+          ? game.board.some(v => v === null)
+          : ADJ[pos].some(a => game.board[a] === null);
         if (hasMove) {
           game.selected = pos;
           sndSelect();
@@ -1802,6 +1808,11 @@ function handleMenuSelect() {
     multiplayerMode = !multiplayerMode;
     updateModeLabels();
     beep(700, 60);
+    // Repaint: a mouse click set menuCursor to this option but nothing moved the
+    // gold cursor here, so the patient — who is deaf and cannot hear the beep —
+    // saw it still on the old option and would toggle the mode again instead of
+    // starting a game.
+    updateMenuCursor();
   }
 }
 
@@ -2290,6 +2301,10 @@ function wsConnect() {
 // help. Every element below moves the cursor and then goes through the very
 // same userAction() the puff uses, so mouse and mouth cannot drift apart.
 document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
+  // Skip buttons that carry their own inline onclick (Home): those navigate
+  // unconditionally and must keep working during the AI's turn, when the
+  // phase-gated closure below would swallow the click.
+  if (el.getAttribute('onclick')) return;
   el.onclick = () => {
     if (ui.phase !== 'playing') return;
     ui.inBtnCol = true;

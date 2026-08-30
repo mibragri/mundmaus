@@ -121,6 +121,7 @@ private:
     String _scanResultJson;
 
     bool _sameOriginOk(AsyncWebServerRequest* req);
+    bool _originAllowed(const String& value);
 
     void _sendJson(AsyncWebServerRequest* req, int status, JsonDocument& doc);
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);

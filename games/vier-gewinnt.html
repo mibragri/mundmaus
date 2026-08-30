@@ -1800,6 +1800,10 @@ function wsConnect() {
 // help. Every element below moves the cursor and then goes through the very
 // same action() the puff uses, so mouse and mouth cannot drift apart.
 document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
+  // Skip buttons that carry their own inline onclick (Home): those navigate
+  // unconditionally and must keep working during the AI's turn, when the
+  // phase-gated closure below would swallow the click.
+  if (el.getAttribute('onclick')) return;
   el.onclick = () => {
     if (ui.phase !== 'playing') return;
     ui.inBtnCol = true;

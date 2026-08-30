@@ -8,8 +8,8 @@
       "size": 1338096
     },
     "www/chess.html.gz": {
-      "version": 27,
-      "sha256": "680a936c19fb5096331a004ad576d3c663b0dca4ecca3b56f1438d0e2910d675"
+      "version": 28,
+      "sha256": "171395b9d433bdc0ee3db3663afd25889bb30110c03353ece8d13b39ae1b298f"
     },
     "www/freecell.html.gz": {
       "version": 26,
@@ -20,8 +20,8 @@
       "sha256": "af2d12683a75c199fd2e3235b979a90519e12cdf4b9d6bb232bbfb166018fcee"
     },
     "www/muehle.html.gz": {
-      "version": 17,
-      "sha256": "5a6c2c37cf3a481d3850e6806a8fefe5eb82568cd9a0feb97b702705fc5d7596"
+      "version": 18,
+      "sha256": "8b2c5f3c688aa4bb3cbf75f2873dd2aad2d4188618c1635106b83d3f9ce38767"
     },
     "www/settings.html.gz": {
       "version": 13,
@@ -32,8 +32,8 @@
       "sha256": "252faab1fd1ea59702424c0f60fa0fac6da40e01183f6f27340dbe9e013dd14e"
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 25,
-      "sha256": "d63405cbb0b17e73aa2cd4d69d74e583deefb599910b24cfaae6dde3e1a8b54e"
+      "version": 26,
+      "sha256": "47ee7942f47a003b4003ec2095e4a2a1979b9f3b8a8aa9033116dc5ae135f923"
     }
   }
 }
