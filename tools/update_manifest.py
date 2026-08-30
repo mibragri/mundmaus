@@ -48,6 +48,14 @@ def scan_files(project_dir):
                 'path': p,
                 'firmware': False,
             })
+        # Shared JS assets (games/*.js → www/*.js.gz on ESP32), e.g. conn-guard.js.
+        # Same delivery path as the games so OTA ships them to deployed devices.
+        for p in games_dir.glob('*.js'):
+            files.append({
+                'name': f'www/{p.name}.gz',
+                'path': p,
+                'firmware': False,
+            })
 
     return files
 

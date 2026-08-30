@@ -290,7 +290,9 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     // Script
     html += FPSTR(PORTAL_SCRIPT);
 
-    html += F("</body></html>");
+    // Connection guard: same caretaker-facing "device unreachable" overlay as
+    // the games. Absolute path — the portal is served from "/", not "/www/".
+    html += F("<script src=\"/www/conn-guard.js\"></script></body></html>");
 
     return html;
 }

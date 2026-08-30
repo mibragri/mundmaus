@@ -29,11 +29,15 @@ test.describe('OTA Manifest Validation', () => {
     }
   });
 
-  test('all manifest game files exist as source HTML', () => {
-    const gameFiles = Object.keys(manifest.files).filter(f => f.startsWith('www/'));
-    for (const f of gameFiles) {
-      const name = f.replace('www/', '').replace('.html.gz', '');
-      const srcPath = path.join(PROJECT, 'games', `${name}.html`);
+  test('all manifest www assets exist as source files', () => {
+    const wwwFiles = Object.keys(manifest.files).filter(f => f.startsWith('www/'));
+    for (const f of wwwFiles) {
+      // Map a manifest name to its repo source by stripping only the trailing
+      // .gz: www/solitaire.html.gz -> games/solitaire.html, and
+      // www/conn-guard.js.gz -> games/conn-guard.js (shared JS assets ship the
+      // same way as the games).
+      const src = f.replace(/^www\//, '').replace(/\.gz$/, '');
+      const srcPath = path.join(PROJECT, 'games', src);
       expect(fs.existsSync(srcPath), `${srcPath} missing`).toBe(true);
     }
   });
@@ -53,20 +57,20 @@ test.describe('OTA Manifest Validation', () => {
   // every file the same mtime. It now compares the CONTENT of the artefact that
   // actually ships (firmware/arduino/data/www/, which is tracked) against the
   // source, which is decisive and works on a fresh clone.
-  test('shipped .gz archives match their source HTML exactly', () => {
-    const gameFiles = Object.keys(manifest.files).filter(f => f.startsWith('www/'));
-    expect(gameFiles.length, 'manifest lists no games').toBeGreaterThan(0);
+  test('shipped .gz archives match their source exactly', () => {
+    const wwwFiles = Object.keys(manifest.files).filter(f => f.startsWith('www/'));
+    expect(wwwFiles.length, 'manifest lists no www assets').toBeGreaterThan(0);
 
-    for (const f of gameFiles) {
-      const name = f.replace('www/', '').replace('.html.gz', '');
-      const srcPath = path.join(PROJECT, 'games', `${name}.html`);
-      const gzPath = path.join(PROJECT, 'firmware/arduino/data/www', `${name}.html.gz`);
+    for (const f of wwwFiles) {
+      const src = f.replace(/^www\//, '').replace(/\.gz$/, '');   // solitaire.html | conn-guard.js
+      const srcPath = path.join(PROJECT, 'games', src);
+      const gzPath = path.join(PROJECT, 'firmware/arduino/data/www', `${src}.gz`);
 
       expect(fs.existsSync(srcPath), `${srcPath} missing`).toBe(true);
       expect(fs.existsSync(gzPath), `${gzPath} missing`).toBe(true);
 
       const shipped = zlib.gunzipSync(fs.readFileSync(gzPath)).toString('utf8');
-      expect(shipped, `${name}.html.gz does not match games/${name}.html — regenerate it`)
+      expect(shipped, `${src}.gz does not match games/${src} — regenerate it`)
         .toBe(fs.readFileSync(srcPath, 'utf8'));
     }
   });
