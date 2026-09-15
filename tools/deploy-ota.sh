@@ -44,7 +44,12 @@ m = json.load(open(os.environ['MANIFEST']))
 project = Path(os.environ['PROJECT_DIR'])
 missing = []
 for name in m['files']:
-    src = name.replace('www/', 'games/') if name.startswith('www/') else name
+    # www/<name>.gz ships from firmware/arduino/data/www/, but its repo SOURCE is
+    # games/<name> — strip only the trailing .gz: games/solitaire.html for the
+    # games, games/conn-guard.js for shared JS assets. The old
+    # replace('www/','games/') looked for games/<name>.gz and so demanded a
+    # gzipped intermediate that shared .js assets never produce.
+    src = ('games/' + name[len('www/'):].removesuffix('.gz')) if name.startswith('www/') else name
     if not (project / src).exists():
         missing.append(f'{name} (source: {src})')
 if missing:
@@ -81,7 +86,12 @@ if grep -q '"firmware.bin"' "$MANIFEST"; then
         echo    "         cp '$FW_BUILT' '$FW_BIN'"
         exit 1
     fi
-    if ! strings "$FW_BIN" | grep -Fxq "$FW_EXPECT"; then
+    # NB: no `grep -q` here. With `set -o pipefail`, grep -q closes the pipe on
+    # its first match, `strings` (still writing a 1.3 MB binary) takes SIGPIPE
+    # (exit 141), and pipefail then reports the whole pipeline as failed even
+    # though the version WAS found — a false NOMATCH that blocks every deploy.
+    # Letting grep read to EOF keeps strings from being killed mid-write.
+    if ! strings "$FW_BIN" | grep -Fx "$FW_EXPECT" >/dev/null; then
         FOUND="$(strings "$FW_BIN" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -u | tr '\n' ' ')"
         echo -e "${RED}ERROR: firmware.bin does not contain version $FW_EXPECT (found: ${FOUND:-none}).${NC}"
         echo    "       It would still be published as v$FW_EXPECT, and the patient's"

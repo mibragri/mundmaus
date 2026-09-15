@@ -64,3 +64,6 @@ tests/e2e/test-results/
 tools/.micropython-firmware.bin
 docs/plans/
 docs/specs/
+
+# OTA deploy artifact: built by pio, copied to root for deploy-ota.sh, 1.3 MB — never commit
+/firmware.bin
