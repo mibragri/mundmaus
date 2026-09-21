@@ -23,10 +23,41 @@
   var TIMEOUT_MS   = cfg.timeoutMs   || 3000;
   var THRESHOLD_MS = cfg.thresholdMs || 25000; // above a self-heal reboot (~10-15s) so a normal reboot never alarms
   var PING_URL     = cfg.pingUrl     || '/api/info';
+  // The games heartbeat ({"type":"hb"}) every 2s and the device answers, so a
+  // healthy socket is never silent for long. Silence this far past that, while
+  // HTTP still answers, means the socket is dead in a way the game's own
+  // reconnect loop has already failed to repair.
+  var WS_DEAD_MS   = cfg.wsDeadMs    || 30000;
+  var RELOAD_GAP_MS = cfg.reloadGapMs || 120000;  // never reload-loop faster than this
 
   var downSince = null;   // ms of the first failed poll in the current outage; null while reachable
   var shown = false;
   var overlay = null;
+  var lastWsMsg = 0;      // ms of the last message seen on ANY WebSocket this page opened
+  var wsEverSeen = false; // only judge a socket that actually worked at least once
+
+  // Observe every inbound WebSocket message without touching a single game
+  // file: the games assign ws.onmessage = fn, so wrapping the prototype's
+  // setter catches every socket they open, including reconnects. Requires this
+  // script to run before the game creates its socket (it is loaded in <head>).
+  (function patchWebSocket() {
+    var proto = window.WebSocket && window.WebSocket.prototype;
+    var desc  = proto && Object.getOwnPropertyDescriptor(proto, 'onmessage');
+    if (!desc || !desc.set) return;   // exotic engine: skip, the HTTP check still works
+    Object.defineProperty(proto, 'onmessage', {
+      configurable: true,
+      enumerable: desc.enumerable,
+      get: desc.get,
+      set: function (fn) {
+        var self = this;
+        desc.set.call(self, typeof fn === 'function' ? function () {
+          lastWsMsg = Date.now();
+          wsEverSeen = true;
+          return fn.apply(self, arguments);
+        } : fn);
+      }
+    });
+  })();
 
   function inject() {
     var style = document.createElement('style');
@@ -70,7 +101,23 @@
   function show() { if (!shown) { shown = true; overlay.classList.add('mm-on'); } }
   function hide() { if (shown) { shown = false; overlay.classList.remove('mm-on'); } }
 
-  function onOk()   { downSince = null; hide(); }
+  // HTTP answered, so the device is alive and reachable. If the WebSocket has
+  // nevertheless gone silent, the game's socket is dead in a way its own
+  // close/reconnect loop did not repair — observed 2026-09-21, when an 8s WiFi
+  // blip left the patient's device unusable for 80 minutes while the page kept
+  // reconnecting and showing "connected". A reload is what actually fixed it,
+  // so escalate to that instead of leaving him stranded.
+  function checkWsLiveness() {
+    if (!wsEverSeen) return;                          // no socket yet: nothing to judge
+    if (Date.now() - lastWsMsg < WS_DEAD_MS) return;  // still receiving: healthy
+    var now = Date.now(), last = 0;
+    try { last = parseInt(sessionStorage.getItem('mmGuardReload') || '0', 10) || 0; } catch (e) {}
+    if (now - last < RELOAD_GAP_MS) { show(); return; }  // already reloaded and it did not help
+    try { sessionStorage.setItem('mmGuardReload', String(now)); } catch (e) {}
+    location.reload();
+  }
+
+  function onOk()   { downSince = null; hide(); checkWsLiveness(); }
   function onFail() {
     if (downSince === null) downSince = Date.now();
     if (Date.now() - downSince >= THRESHOLD_MS) show();
