@@ -71,7 +71,9 @@
       'box-shadow:0 14px 56px rgba(0,0,0,.6)}',
       '.mm-cl-ic{font-size:68px;line-height:1}',
       '.mm-cl-tt{font-size:32px;font-weight:800;margin:18px 0 10px;letter-spacing:.5px}',
-      '.mm-cl-ms{font-size:23px;line-height:1.45;color:#fff}',
+      '.mm-cl-ms{font-size:22px;line-height:1.4;color:#fff}',
+      '.mm-cl-step{text-align:left;margin:12px 0}',
+      '.mm-cl-step b{color:#ffb300;margin-right:8px}',
       '.mm-cl-hi{color:#ffd54a;font-weight:700}',
       '.mm-cl-sb{font-size:19px;margin-top:26px;color:#a9c2e0}',
       '.mm-cl-dots{display:inline-block;margin-left:6px}',
@@ -89,8 +91,16 @@
       '<div class="mm-cl-card">' +
         '<div class="mm-cl-ic">&#9888;</div>' +
         '<div class="mm-cl-tt">KEINE VERBINDUNG ZUR MUNDMAUS</div>' +
-        '<div class="mm-cl-ms">Bitte den WLAN-Router (<span class="mm-cl-hi">FRITZ!Box</span>) ' +
-        'aus- und wieder einschalten<br>und etwa 1 Minute warten.</div>' +
+        // Ordered by what is most likely and cheapest to check. The old text sent
+        // carers straight to the router, which is wrong and disruptive whenever
+        // the device itself is simply switched off — the actual case on
+        // 2026-09-21, when the banner was correct but its advice was not.
+        '<div class="mm-cl-ms">' +
+          '<div class="mm-cl-step"><b>1.</b> Ist die MundMaus <span class="mm-cl-hi">eingeschaltet</span>? ' +
+          'Steckt das Stromkabel fest?</div>' +
+          '<div class="mm-cl-step"><b>2.</b> Wenn ja: WLAN-Router (<span class="mm-cl-hi">FRITZ!Box</span>) ' +
+          'aus- und wieder einschalten, ca. 1 Minute warten.</div>' +
+        '</div>' +
         '<div class="mm-cl-sb">Verbindung wird automatisch wiederhergestellt' +
         '<span class="mm-cl-dots"><i></i><i></i><i></i></span></div>' +
       '</div>';

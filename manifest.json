@@ -12,8 +12,8 @@
       "sha256": "6ef836a18da381919dbb2ee880a5623b93684c556bf7f071f62987a349cc59a4"
     },
     "www/conn-guard.js.gz": {
-      "version": 2,
-      "sha256": "09c1f45538b21dfea4d5336088a06abefd2cae908922f2a7a73f48efc2119ef5"
+      "version": 3,
+      "sha256": "a1441d47395892b9d9f5c522698f9a30fc50b5462cfcd1cfd55cd80c6cd3b302"
     },
     "www/freecell.html.gz": {
       "version": 29,
