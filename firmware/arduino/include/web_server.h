@@ -54,6 +54,20 @@ public:
     /// sensor thresholds mis-set until a reboot. Call from loop().
     void checkPreviewTimeout();
 
+    /// Install pending www/game updates without anyone pressing a button.
+    /// Returns true if an install task was started.
+    ///
+    /// Updates used to reach the patient's device only when a human POSTed
+    /// /api/update/start — on a device whose whole point is that nobody has to
+    /// touch it, and whose carers cannot. Game and asset files are safe to apply
+    /// unattended: they are written to LittleFS, need no reboot, and a bad one
+    /// costs a page, not the device.
+    ///
+    /// FIRMWARE IS DELIBERATELY EXCLUDED. If any pending file is firmware this
+    /// does nothing at all: flashing a new image and rebooting is a decision, not
+    /// a background chore, and it stays manual.
+    bool startAutoGameUpdate();
+
     /// Reboot before the heap runs out. Call from loop(). If free heap or the
     /// largest allocatable block stays critically low for ~30s — a slow leak or
     /// fragmentation over weeks of uptime — schedule a graceful reboot so the

@@ -403,6 +403,17 @@ void setup() {
                 if (applied > 0) {
                     Serial.printf("[OTA] %d Remote-Settings angewendet\n", applied);
                 }
+                // Apply pending game/asset files at boot — the least disruptive
+                // moment there is, since nobody is mid-game yet. Firmware is
+                // excluded inside and stays a deliberate act.
+                //
+                // Strictly AFTER fetchRemoteSettings(): the install task opens
+                // its own TLS connection, and two concurrent handshakes cost
+                // ~30-40 KB of heap each. Started before this line, the first
+                // download died with HTTP -1 while the settings fetch still held
+                // its socket, and that one game stayed stale until the next
+                // check (measured on the bench, 2026-09-21).
+                s->startAutoGameUpdate();
                 vTaskDelete(nullptr);
             },
             "ota_boot", 12288, server, 1, nullptr, 1);
@@ -579,6 +590,13 @@ void loop() {
             }
             MundMausServer* srv = static_cast<MundMausServer*>(param);
             srv->setUpdateResult(result);
+            // Apply game/asset updates by ourselves. They used to sit here
+            // announced but uninstalled until a human POSTed /api/update/start —
+            // which, on a device meant to need no handling and whose carers
+            // cannot do it, meant never. Firmware is excluded inside; that stays
+            // a deliberate act. Runs in its own 16 KB task (TLS needs the stack,
+            // this one has 8 KB).
+            srv->startAutoGameUpdate();
             // Push WS notification to connected clients
             SensorEvent ev;
             ev.type = SensorEvent::UPDATE_RESULT;

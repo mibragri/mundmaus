@@ -1067,6 +1067,47 @@ void MundMausServer::processSensorQueue() {
 }
 
 // ============================================================
+// UNATTENDED GAME/ASSET UPDATES
+// ============================================================
+
+bool MundMausServer::startAutoGameUpdate() {
+    // Snapshot the pending list under the mutex — the periodic ota_check task
+    // is what writes it.
+    std::vector<Updater::UpdateFile> pending;
+    bool offline = true;
+    if (_updateResultMutex &&
+        xSemaphoreTake(_updateResultMutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        pending = _updateResult.available;
+        offline = _updateResult.offline;
+        xSemaphoreGive(_updateResultMutex);
+    }
+    if (offline || pending.empty()) return false;
+
+    // Firmware pending: do nothing at all. Writing a new image and rebooting the
+    // patient's only input device is a decision, not a background chore.
+    for (const auto& uf : pending) {
+        if (uf.firmware) return false;
+    }
+
+    // The same atomic test-and-set /api/update/start uses, so an unattended
+    // install and a carer pressing "Aktualisieren" can never run at once.
+    bool expected = false;
+    if (!_updateRunning.compare_exchange_strong(expected, true)) return false;
+
+    // The install task re-reads the list under the mutex. It cannot have grown a
+    // firmware entry in between: only the single, serialized ota_check task ever
+    // writes it, and that task is our caller.
+    if (xTaskCreate(_updateTaskWrapper, "ota_install", 16384, this, 1, nullptr) != pdPASS) {
+        Serial.println("  FEHLER: Task ota_install (automatisch) nicht erstellbar");
+        _updateRunning = false;
+        return false;
+    }
+    Serial.printf("  OTA: %u Spieldatei(en) werden automatisch installiert\n",
+                  (unsigned)pending.size());
+    return true;
+}
+
+// ============================================================
 // REBOOT CHECK (call from loop)
 // ============================================================
 
