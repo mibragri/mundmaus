@@ -72,6 +72,9 @@ VRy      ────── GPIO35
 SW       ────── GPIO21
 ```
 
+Mechanisch: PCB 34×26mm, vier M4-Bohrungen im Raster **26.67×20.32mm** — diese
+Masse legen die Saeulenpositionen im 3D-Gehaeuse fest.
+
 ### Drucksensor MPS20N0040D-S + HX710B
 
 ```
@@ -289,7 +292,17 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
   bei fehlgeschlagenem Firmware-Update
 - **MicroPython**: `.bak`-Dateien + `boot.py` Counter + Recovery-AP
 
-Deploy-Workflow: siehe README.md ("Neues Spiel hinzufuegen" Checkliste).
+### Deploy-Workflow
+
+1. Code committen
+2. `tools/update_manifest.py` — Versionen bumpen
+3. Arduino-Firmware (nur wenn sie sich geaendert hat):
+   `OTA_AUTH_B64=... pio run -e esp32` → `scp firmware.bin mbs:/srv/mundmaus/ota/`
+4. `tools/deploy-ota.sh` — Manifest + Dateien auf mundmaus.de deployen
+5. Das Geraet prueft beim naechsten Boot und danach alle 3 Stunden
+
+**Basic-Auth-Zugangsdaten** liegen je Variante woanders: Arduino als Build-Flag
+`OTA_AUTH_B64`, MicroPython in `ota_auth.py` (gitignored, nicht im Repo).
 
 ---
 
