@@ -16,17 +16,10 @@ Persistenter Agent fuer MundMaus. Versteht Hardware-Constraints, MicroPython/Ard
 
 ---
 
-## Hier stehen Regeln, keine Fakten
-Fakten veralten in einer Anweisungsdatei unbemerkt, weil niemand sie gegenliest.
-Wer hier Hardware, Masse, Versionen oder Architektur ergaenzen will: in die Doku
-schreiben und von dort verlinken. *(Anlass 22.09.2026: Hardware, Architektur,
-Endnutzer-Kontext und Gehaeusemasse standen doppelt hier und in PROJECT.md — die
-Gehaeuse-Version war in **beiden** Kopien drei Generationen alt, und der hier
-notierte Generieren-Befehl haette ein laengst ersetztes Gehaeuse erzeugt.)*
-
+## Wo das Wissen steht
 - **PROJECT.md** — Hardware, Firmware-Varianten, Endnutzer-Kontext, Gehaeuse, Drucker,
-  interner Betrieb. **Nur lokal** (gitignored, absichtlich nicht im oeffentlichen Repo):
-  interne Hostnamen und Pfade gehoeren dorthin, nicht in diese Datei hier.
+  interner Betrieb. **Nur lokal** (gitignored): interne Hostnamen und Pfade gehoeren
+  dorthin, nicht in diese oeffentliche Datei.
 - **TECHNICAL.md** — Pinout, Verkabelung, HTTP-API, WebSocket-Protokoll, OTA inkl. Deploy-Workflow, Flash-Layout
 - **README.md** — Setup, Einkaufsliste, Inbetriebnahme, Shortcuts, FAQ
 - **games/STANDARDS.md** — Visual + Interaction Standards der Spiele
