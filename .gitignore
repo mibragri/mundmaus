@@ -49,6 +49,8 @@ ota_auth.py
 PROJECT.md
 CLAUDE.md
 TASKS.md
+TASKS-archiv-*.md
+aufgaben/
 project.toml
 pyproject.toml
 uv.lock
