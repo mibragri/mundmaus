@@ -63,6 +63,11 @@ JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
 JOY_PLATFORM_H = 21.0  # was 21.5 — 0.5mm lower per user feedback
 JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
 JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
+# Pillar feet under the four holes. Module-level so validate_enclosure.py reads
+# them instead of keeping its own copies, which had drifted to two different sizes.
+JOY_PILLAR_D = 6.0          # shaft, thin for USB plug clearance (1.7mm/side)
+JOY_PILLAR_FLARE_D = 9.0    # wider foot for stability
+JOY_PILLAR_FLARE_H = 3.0
 JOY_OPENING = 16.3  # was 17.0 — snug fit to center housing (0.15mm/side)
 JOY_LID_HOLE_D = 14.0   # circular lid opening — rotation circle + 1mm clearance/side
 JOY_LID_HOLE_OFFSET_X = 1.1   # calculated from measured housing center X=-17.9 vs JOY_POS=-19
@@ -120,8 +125,11 @@ EXT_X, EXT_Y = CAV_X + 2 * WALL, CAV_Y + 2 * WALL  # 136 x 50
 EXT_H_BASE, EXT_H_LID = FLOOR_T + BASE_INNER_H, CEIL_T + LID_INNER_H
 OUTER_POS_X = EXT_X / 2    # +68
 OUTER_POS_Y = EXT_Y / 2    # +25
-INNER_POS_X = CAV_X / 2    # +65
-INNER_POS_Y = EXT_Y / 2 - WALL  # +22
+INNER_POS_X = CAV_X / 2    # +66
+INNER_POS_Y = EXT_Y / 2 - WALL  # +23
+# Vent slot centres in the -Y wall; module-level so the validator probes the same spots.
+VENT_CENTER_XS = [(idx - (VENT_N - 1) / 2.0) * VENT_PITCH for idx in range(VENT_N)]  # -15..+15
+VENT_CENTER_Z = EXT_H_BASE * 0.55  # = 16.5
 
 # Collar sits on floor: center = FLOOR_T + radius, top must clear lip (EXT_H_BASE - LIP_H)
 MIC_POS_Z = FLOOR_T + MIC_COLLAR_D / 2 - 0.5  # 13.5mm, collar top = 25.5mm (0.5mm below lip at 26mm)
@@ -207,6 +215,10 @@ if PRES_ESP_Z_GAP < 0 and PRES_ESP_X_GAP < 0:
 
 # Schraub-Säulen-Geometrie (Base- und Lid-Hänger-Positionen identisch)
 PILLAR_BASE_TOP_Z = EXT_H_BASE - LIP_H - PILLAR_BASE_TOP_Z_OFFSET  # 26.8mm in base coords
+# Thread that actually reaches the base pillar: the countersunk head sits inside
+# the lid body, so the lid, the lip and the gap are spent before the pillar starts.
+SCREW_ACTUAL_PENETRATION = SCREW_LEN - (EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET)  # = 7.8
+MIN_THREAD_ENGAGEMENT = 6.0
 PILLAR_POSITIONS = [(PILLAR_X, PILLAR_Y), (PILLAR_X, -PILLAR_Y),
                     (-PILLAR_X, PILLAR_Y), (-PILLAR_X, -PILLAR_Y)]
 # Sanity: Säule darf die Innenwand-Eckkurve (INNER_R=10) nicht durchstechen
@@ -347,9 +359,7 @@ def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
 def _add_joystick_pillars(base: cq.Workplane) -> cq.Workplane:
     """4 pillar feet — USB cable routes between pillars (plug first, then seat joystick)."""
     _floor_overlap = 0.5
-    pillar_d = 6.0       # thinner for USB plug clearance (1.7mm/side)
-    base_flare_d = 9.0   # wider base for stability
-    base_flare_h = 3.0   # flare height
+    pillar_d, base_flare_d, base_flare_h = JOY_PILLAR_D, JOY_PILLAR_FLARE_D, JOY_PILLAR_FLARE_H
 
     for dx in [-1, 1]:
         for dy in [-1, 1]:
@@ -488,10 +498,9 @@ def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
 
 def _cut_vent_slots(base: cq.Workplane) -> cq.Workplane:
     """Cut vent slots through -Y wall (offset positive, extrude negative)."""
-    for idx in range(VENT_N):
-        slot_x = (idx - (VENT_N - 1) / 2.0) * VENT_PITCH
+    for slot_x in VENT_CENTER_XS:
         vent = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
-            slot_x, EXT_H_BASE * 0.55
+            slot_x, VENT_CENTER_Z
         ).rect(VENT_W, VENT_LEN).extrude(-(WALL + 0.02))
         base = base.cut(vent)
     return base
@@ -772,11 +781,11 @@ def write_report(report_path: Path) -> None:
     # counted twice. Harmless on the bench (the screw reaches 7.8 mm instead of
     # the nominal 8.0), but a build document that tells an assembler a 20 mm
     # screw needs 22.1 mm of travel is not.
-    screw_actual_penetration = SCREW_LEN - (EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET)
-    if screw_actual_penetration < 6.0:
+    screw_actual_penetration = SCREW_ACTUAL_PENETRATION
+    if screw_actual_penetration < MIN_THREAD_ENGAGEMENT:
         raise ValueError(
             f"Schraube zu kurz: nur {screw_actual_penetration:.1f}mm Gewindeeingriff "
-            f"in der Säule (SCREW_LEN={SCREW_LEN}). Mindestens 6mm nötig.")
+            f"in der Säule (SCREW_LEN={SCREW_LEN}). Mindestens {MIN_THREAD_ENGAGEMENT:.0f}mm nötig.")
     report = textwrap.dedent(
         f"""\
         # MundMaus v5.8 Enclosure — Schraub-Verschluss (Spax 3.5x20)
