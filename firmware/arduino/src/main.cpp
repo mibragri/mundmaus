@@ -23,12 +23,11 @@ static PuffSensor* puffSensor = nullptr;
 // Heartbeat timestamp for WDT (written by sensor task, read by loop)
 static volatile unsigned long sensorHeartbeat = 0;
 
-// Core-0 liveness heartbeat. AsyncTCP and the WiFi driver run on Core 0, which
-// nothing watches (CONFIG_ASYNC_TCP_USE_WDT=0, and only the Core-1 loop task is
-// WDT-subscribed). If Core 0 wedges — a WiFi-driver deadlock, or the AsyncTCP
-// client-list corrupting into a cycle during reconnect churn — HTTP and WS die
-// while loop() keeps feeding the WDT, so the patient is silently and
-// permanently locked out with no reboot. A tiny 1 Hz task pinned to Core 0
+// Core-0 liveness heartbeat. A blocked or deadlocked AsyncTCP handler is caught
+// by the task watchdog AsyncTCP subscribes its own task to (library default
+// CONFIG_ASYNC_TCP_USE_WDT=1; verified on the bench, test A3 in
+// tests/e2e/bench.spec.ts). This covers the other case: Core 0 not scheduling
+// at all, because something there spins. A tiny 1 Hz task pinned to Core 0
 // bumps this; loop() stops feeding the WDT once it goes stale, exactly like the
 // sensor heartbeat. A low-priority 1 Hz task only fails to run for 30 s if
 // Core 0 genuinely cannot schedule it, so this does not false-trigger during

@@ -654,6 +654,16 @@ void MundMausServer::_setupHttpRoutes() {
         req->send(204);
     });
 
+#ifdef MUNDMAUS_TEST_HOOKS
+    // Bench only (env:esp32_testhooks, never deployed). Blocks the AsyncTCP task
+    // forever, the way a deadlocked handler would, to prove that its task
+    // watchdog reboots the device instead of leaving HTTP and WS dead.
+    _httpServer.on("/api/test/wedge-asynctcp", HTTP_POST, [](AsyncWebServerRequest*) {
+        Serial.println("[TEST] AsyncTCP-Task absichtlich blockiert");
+        vTaskDelay(portMAX_DELAY);
+    });
+#endif
+
     // --- Default handler --- 404
     _httpServer.onNotFound([](AsyncWebServerRequest* req) {
         req->send(404, "text/plain", "404 Not Found");
