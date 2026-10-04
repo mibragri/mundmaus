@@ -1,6 +1,14 @@
 {
   "manifest_version": 1,
   "files": {
+    "www/conn-guard.js.gz": {
+      "version": 4,
+      "sha256": "01150e2a335b682071187a6eb1ac7aa168798ddcdb06d3a9b3899fd2c92c5ce9"
+    },
+    "www/device-link.js.gz": {
+      "version": 1,
+      "sha256": "d03b6fc38ae568af830b9190985d47c877fd70e5215d54c47c4f3a4c8c313756"
+    },
     "firmware.bin": {
       "version": 4214,
       "firmware": true,
@@ -8,36 +16,32 @@
       "size": 1346400
     },
     "www/chess.html.gz": {
-      "version": 31,
-      "sha256": "6ef836a18da381919dbb2ee880a5623b93684c556bf7f071f62987a349cc59a4"
-    },
-    "www/conn-guard.js.gz": {
-      "version": 3,
-      "sha256": "a1441d47395892b9d9f5c522698f9a30fc50b5462cfcd1cfd55cd80c6cd3b302"
+      "version": 32,
+      "sha256": "bc9afc8c2dd8ab7e0dee85f0356ac34ac011a60631cb762eca96508e34fca417"
     },
     "www/freecell.html.gz": {
-      "version": 29,
-      "sha256": "c1fa0af65984ccffa9f3da6e5f7d90d016e79e3880e4ed057338dca7e72378d2"
+      "version": 30,
+      "sha256": "0e5969154100c0f065b5da8f488f4e162350ee5653dac8adb053cec5ba87a277"
     },
     "www/memo.html.gz": {
-      "version": 24,
-      "sha256": "42ca64757c12d2bc42595828b6dd2adece91185c5b97eee02dd0815aec216b04"
+      "version": 25,
+      "sha256": "9f43e60b8a795d2152fd4fb18a85ea4815b910b93ad64ca796ca1201f059739d"
     },
     "www/muehle.html.gz": {
-      "version": 20,
-      "sha256": "9253407f0c6ab9070471a949189d125cb77e07a48cb7113b40904648a7190e9e"
+      "version": 21,
+      "sha256": "593cf514cb9a5e09d273e9241f00c440994ea8a57e946b27a079d27f050c6229"
     },
     "www/settings.html.gz": {
-      "version": 18,
-      "sha256": "91420af443856f3c824c6d0ba38ff2c5b0a5256edd524be41303b5ae9c3be908"
+      "version": 19,
+      "sha256": "53e91e25ab2e381165e1886f0dd08de53669f0a329509e5195d169b39928e6cb"
     },
     "www/solitaire.html.gz": {
-      "version": 41,
-      "sha256": "52c7b0140a4b0ab67c2ba54cb206fa2fd210c661ae060e7a72734c2dfd2e5945"
+      "version": 42,
+      "sha256": "8633c60fb0d5d7771f91bd23ee697ca8ea54e6f7ed61c6ab0bed6bb0439cb29f"
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 28,
-      "sha256": "0a378773c9eb2f336d7f9ef267ce36a2eb8efc8074e086f76ce2631996a1045c"
+      "version": 29,
+      "sha256": "33e45bf99c794541987ab0ab89c14481e6478274d577e2ba9ebfeacebf1d9322"
     }
   }
 }

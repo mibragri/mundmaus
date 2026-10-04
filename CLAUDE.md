@@ -44,6 +44,6 @@ Vorzeichen-Fehler bei Workplane-Offsets sind der haeufigste 3D-Bug.
 
 ## Spiele — Definition of Done
 - **Success**: `tools/check-games.sh` zeigt ALL OK, Playwright-Test besteht (start → spielen → gewinnen → neues Spiel → kein State-Leak, Undo bis leer crasht nicht), Screenshot in mid-game (nicht leerer Start), 1920x1080 ohne Overflow
-- **Vorlage**: bestehendes Spiel klonen (z.B. `games/freecell.html`) — Charge-Navigation, WS-Reconnect mit Backoff, Keyboard-Dual-Mode (`J`-Toggle), AI-cancelable, Settings-Fetch (`/api/settings` fuer `NAV_COOLDOWN_MS`) wandern automatisch mit
-- **Invarianten** (beim Refactoring nicht brechen): `navigate()` und `newGame()` rufen als ERSTES `cancelCharge()`; AI-`setTimeout`-Handles speichern + `clearTimeout` in `newGame`/`showMenu`; WS-Reconnect via *einem* `wsReconnectTimer`-Handle (nicht stacken); Direct-Mode-Cooldown 120ms (nicht `navCooldown`)
+- **Vorlage**: bestehendes Spiel klonen (z.B. `games/freecell.html`) — Charge-Navigation, Geraeteverbindung (`device-link.js`), Keyboard-Dual-Mode (`J`-Toggle), AI-cancelable, Settings-Fetch (`/api/settings` fuer `NAV_COOLDOWN_MS`) wandern automatisch mit
+- **Invarianten** (beim Refactoring nicht brechen): `navigate()` und `newGame()` rufen als ERSTES `cancelCharge()`; AI-`setTimeout`-Handles speichern + `clearTimeout` in `newGame`/`showMenu`; WebSocket nur ueber `device-link.js`; Direct-Mode-Cooldown 120ms (nicht `navCooldown`)
 - **Integration** (von `check-games.sh` geprueft): screenshot, README, manifest, website, LittleFS-`.gz`, Anzeigename in `tools/check-games.sh DISPLAY_NAMES`

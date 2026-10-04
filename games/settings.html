@@ -375,6 +375,7 @@
     opacity: 0.6;
   }
 </style>
+<script src="device-link.js"></script>
 <script src="conn-guard.js"></script>
 </head>
 <body>
@@ -818,119 +819,62 @@ function showToast(msg, cls) {
 }
 
 // ── WebSocket ────────────────────────────────────────────
-let ws = null;
-let wsReconnectTimer = null;
-let wsHbInterval = null, wsWatchdogInterval = null, wsLastActivity = 0;
-let wsBackoff = 3000;
-const WS_BACKOFF_INIT = 3000;
-const WS_BACKOFF_MAX = 30000;
-
 // Returns false when the device is not reachable. It used to return nothing and
 // drop the message, while the caller still showed a progress toast that simply
 // faded — so a carer saving the patient's puff threshold during a reboot or a
 // WiFi drop walked away believing it was stored.
 function wsSend(obj) {
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(obj));
-    return true;
-  }
-  return false;
+  return window.DeviceLink ? DeviceLink.send(obj) : false;
 }
 
-function wsConnect() {
-  const host = location.hostname || '192.168.4.1';
-  const url = `ws://${host}:81`;
-
-  try {
-    ws = new WebSocket(url);
-
-    ws.onopen = () => {
-      wsLastActivity = Date.now();
-      if (wsHbInterval) clearInterval(wsHbInterval);
-      wsHbInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send('{"type":"hb"}'); } catch(e) {} }
-      }, 2000);
-      if (wsWatchdogInterval) clearInterval(wsWatchdogInterval);
-      wsWatchdogInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN && (Date.now() - wsLastActivity) > 10000) {
-          console.warn('WS heartbeat timeout, forcing reconnect');
-          try { ws.close(); } catch(e) {}
-        }
-      }, 1000);
-      $wsStatus.className = 'connected';
-      $wsStatus.title = 'ESP32 ✓';
-      wsBackoff = WS_BACKOFF_INIT;
-    };
-
-    ws.onmessage = (evt) => { wsLastActivity = Date.now(); 
-      try {
-        const msg = JSON.parse(evt.data);
-
-        if (msg.type === 'config_saved') {
-          if (msg.ok) {
-            configSaved = Object.assign({}, configCurrent);
-            configLoaded = Object.assign({}, configCurrent);  // saved: nothing left for Cancel
-            changedKeys.clear();
-            checkUnsaved();
-            showToast('✓ Gespeichert / Saved', 'success');
-          } else {
-            showToast('✗ Fehler / Error', 'error');
-          }
-        } else if (msg.type === 'config_values') {
-          // After a reset the device sends its full set (current, defaults, saved),
-          // after every POST /api/settings/preview only "current".
-          if (msg.current) configCurrent = msg.current;
-          if (msg.defaults) {
-            configDefaults = msg.defaults;
-            configSaved = msg.saved || {};
-            configLoaded = Object.assign({}, configCurrent);
-            changedKeys.clear();
-            setLocked(false);
-            showToast('✓ Zurückgesetzt / Reset done', 'success');
-          }
-          applyFullConfig(configCurrent);
-        } else if (msg.type === 'wifi_networks') {
-          const sel = document.getElementById('wifi-ssid');
-          const current = sel.value;
-          sel.innerHTML = '<option value="">WLAN wählen...</option>';
-          (msg.networks || []).forEach(n => {
-            const opt = document.createElement('option');
-            opt.value = n;
-            opt.textContent = n;
-            if (n === current) opt.selected = true;
-            sel.appendChild(opt);
-          });
-        } else if (msg.type === 'wifi_scan_started') {
-          // scan is running, results arrive as wifi_networks
-        } else if (msg.type === 'calibrate_done') {
-          const cx = msg.joy_center ? msg.joy_center.join(', ') : '?';
-          const pb = msg.puff_baseline !== undefined ? msg.puff_baseline : '?';
-          showToast(`✓ Kalibriert: Joy(${cx}) Puff(${pb})`, 'success');
-        }
-      } catch (err) {
-        console.warn('[WS] Parse error:', err);
-      }
-    };
-
-    ws.onclose = () => {
-      if (wsHbInterval) { clearInterval(wsHbInterval); wsHbInterval = null; }
-      if (wsWatchdogInterval) { clearInterval(wsWatchdogInterval); wsWatchdogInterval = null; }
-      $wsStatus.className = '';
-      $wsStatus.title = 'ESP32 ✗';
-      ws = null;
-      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-      wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
-      wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
-    };
-
-    ws.onerror = () => {
-      ws?.close();
-    };
-  } catch (e) {
-    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-    wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
-    wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+// The connection itself (heartbeat, watchdog, backoff) lives in device-link.js.
+function onDeviceMessage(msg) {
+  if (msg.type === 'config_saved') {
+    if (msg.ok) {
+      configSaved = Object.assign({}, configCurrent);
+      configLoaded = Object.assign({}, configCurrent);  // saved: nothing left for Cancel
+      changedKeys.clear();
+      checkUnsaved();
+      showToast('✓ Gespeichert / Saved', 'success');
+    } else {
+      showToast('✗ Fehler / Error', 'error');
+    }
+  } else if (msg.type === 'config_values') {
+    // After a reset the device sends its full set (current, defaults, saved),
+    // after every POST /api/settings/preview only "current".
+    if (msg.current) configCurrent = msg.current;
+    if (msg.defaults) {
+      configDefaults = msg.defaults;
+      configSaved = msg.saved || {};
+      configLoaded = Object.assign({}, configCurrent);
+      changedKeys.clear();
+      setLocked(false);
+      showToast('✓ Zurückgesetzt / Reset done', 'success');
+    }
+    applyFullConfig(configCurrent);
+  } else if (msg.type === 'wifi_networks') {
+    const sel = document.getElementById('wifi-ssid');
+    const current = sel.value;
+    sel.innerHTML = '<option value="">WLAN wählen...</option>';
+    (msg.networks || []).forEach(n => {
+      const opt = document.createElement('option');
+      opt.value = n;
+      opt.textContent = n;
+      if (n === current) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  } else if (msg.type === 'wifi_scan_started') {
+    // scan is running, results arrive as wifi_networks
+  } else if (msg.type === 'calibrate_done') {
+    const cx = msg.joy_center ? msg.joy_center.join(', ') : '?';
+    const pb = msg.puff_baseline !== undefined ? msg.puff_baseline : '?';
+    showToast(`✓ Kalibriert: Joy(${cx}) Puff(${pb})`, 'success');
   }
+}
+
+function showLink(connected) {
+  $wsStatus.className = connected ? 'connected' : '';
+  $wsStatus.title = connected ? 'ESP32 ✓' : 'ESP32 ✗';
 }
 
 // ── Initial load via HTTP ────────────────────────────────
@@ -998,9 +942,7 @@ function doWifiScan() {
   const sel = document.getElementById('wifi-ssid');
   sel.innerHTML = '<option value="">Scanne...</option>';
   // Send scan request via WebSocket (async, result comes as wifi_networks broadcast)
-  if (ws && ws.readyState === 1) {
-    ws.send(JSON.stringify({type: 'wifi_scan'}));
-  }
+  wsSend({type: 'wifi_scan'});
 }
 
 function doWifiConnect() {
@@ -1068,7 +1010,8 @@ function doWifiReset() {
 setLocked(true);
 loadSettings();
 loadWifiStatus();
-wsConnect();
+if (window.DeviceLink) DeviceLink.start({ onMessage: onDeviceMessage, onChange: showLink });
+else { console.error('device-link.js missing (update cut short?)'); setTimeout(() => location.reload(), 30000); }
 </script>
 </body>
 </html>

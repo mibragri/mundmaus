@@ -44,10 +44,15 @@ Kein Keyboard, keine Maus, kein Touch.
 - **Triple-Encoding** (Memory): Symbol + Farbe + Text-Label
 
 ## WebSocket
-- Verbindung zu ws://{host}:81
-- Fallback: ws://192.168.4.1:81 (ESP32 AP-Mode)
-- Exponential Backoff: 3s -> 6s -> 12s -> 24s -> max 30s
-- Status-Dot: gruen=verbunden, grau=getrennt (oben rechts)
+- Eine Datei fuer alle Seiten: `device-link.js`, im `<head>` vor `conn-guard.js` geladen und mit
+  `DeviceLink.start({ onMessage, onChange })` gestartet. Keine Seite oeffnet einen eigenen WebSocket
+  (`tools/test-game.py` prueft das).
+- Verbindung zu ws://{host}:81, Fallback ws://192.168.4.1:81 (ESP32 AP-Mode)
+- Heartbeat `{"type":"hb"}` alle 2 s. 10 s ohne Nachricht: Punkt sofort grau, neuer Socket nach
+  Backoff 3s -> 6s -> 12s -> 24s -> max 30s; antwortet HTTP wieder, sofort (conn-guard.js)
+- Status-Dot: gruen = es kommen Daten, grau = getrennt (oben rechts)
+- conn-guard.js laedt die Seite nur neu, wenn mehrere Sockets hintereinander oeffnen und nichts liefern,
+  waehrend HTTP antwortet
 
 ## Kiosk-Mode (K)
 - Taste K oder WS action "kiosk"
@@ -94,7 +99,7 @@ Der Nutzer selbst braucht nur Joystick + Pusten.
 
 ## WebSocket-Verbindungsindikator
 - Position: oben rechts, fixed
-- Gruener Punkt = verbunden, grauer Punkt = getrennt
+- Gruener Punkt = es kommen Daten, grauer Punkt = getrennt
 - Identisch in ALLEN Spielen (gleiche CSS-Klasse, gleiche Position)
 
 ## Betreuer-Hinweise

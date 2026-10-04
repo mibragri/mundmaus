@@ -263,7 +263,7 @@ Alle Nachrichten sind JSON.
 
 ### In Spielen (Browser-seitig)
 
-Spiele verbinden sich zu `ws://${location.hostname}:81` und reagieren auf
+Spiele verbinden sich ueber `games/device-link.js` zu `ws://${location.hostname}:81` und reagieren auf
 `nav`- und `action`-Events. Tastatur-Fallback funktioniert ohne WebSocket.
 
 ```

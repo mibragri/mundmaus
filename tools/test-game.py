@@ -47,7 +47,7 @@ class StaticChecker:
         self._check_cancel_charge()
         self._check_keyboard_mode()
         self._check_ws_handler()
-        self._check_ws_reconnect()
+        self._check_device_link()
         self._check_settings_fetch()
         self._check_direct_cooldown()
         self._check_footer_icons()
@@ -128,10 +128,14 @@ class StaticChecker:
         if "wsSupported" not in self.content:
             self.warnings.append("MISSING: charge.wsSupported — legacy nav fallback may not work")
 
-    def _check_ws_reconnect(self):
-        if "wsReconnectTimer" not in self.content and "reconnectTimer" not in self.content:
-            if "WebSocket" in self.content:
-                self.errors.append("MISSING: wsReconnectTimer — WebSocket reconnect not deduped, will stack connections")
+    def _check_device_link(self):
+        # The connection to the device lives in games/device-link.js, one copy for every page.
+        if '<script src="device-link.js"></script>' not in self.content:
+            self.errors.append('MISSING: <script src="device-link.js"> — the page has no connection to the device')
+        if "DeviceLink.start(" not in self.content:
+            self.errors.append("MISSING: DeviceLink.start(...) — the page never connects to the device")
+        if "new WebSocket" in self.content:
+            self.errors.append("Own WebSocket in the page — the connection belongs in device-link.js")
 
     def _check_settings_fetch(self):
         if "NAV_COOLDOWN_MS" not in self.content:

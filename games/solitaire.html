@@ -548,6 +548,7 @@
   }
 
 </style>
+<script src="device-link.js"></script>
 <script src="conn-guard.js"></script>
 </head>
 <body>
@@ -1250,65 +1251,23 @@ function updateKbMode(){
 // WEBSOCKET - ESP32 Connection
 // ============================================================
 
-let ws=null;
-let wsBackoff=3000;
-let wsReconnectTimer=null;
-let wsHbInterval = null, wsWatchdogInterval = null, wsLastActivity = 0;
-
-function connectWebSocket() {
-  const host=location.hostname===''||location.hostname==='localhost'?'localhost':location.hostname;
-  const wsUrl=`ws://${host}:81`;
-  try{
-    ws=new WebSocket(wsUrl);
-    ws.onopen=()=>{
-      wsLastActivity = Date.now();
-      if (wsHbInterval) clearInterval(wsHbInterval);
-      wsHbInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send('{"type":"hb"}'); } catch(e) {} }
-      }, 2000);
-      if (wsWatchdogInterval) clearInterval(wsWatchdogInterval);
-      wsWatchdogInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN && (Date.now() - wsLastActivity) > 10000) {
-          console.warn('WS heartbeat timeout, forcing reconnect');
-          try { ws.close(); } catch(e) {}
-        }
-      }, 1000);
-      console.log('ESP32 connected');
-      updateWs(true);
-      wsBackoff=3000;
-      charge.wsSupported=false; // re-detect on reconnect
-    };
-    ws.onmessage=(ev)=>{ wsLastActivity = Date.now(); try{const m=JSON.parse(ev.data);initAudio();resetIdleTimer();
-      if(m.type==='nav_hold'){
-        charge.wsSupported=true;
-        if(!charge.active||charge.dir!==m.dir)startCharge(m.dir,parseFloat(m.intensity)||1.0,'ws');
-        else if(charge.active)charge.intensity=parseFloat(m.intensity)||1.0;
-      }
-      else if(m.type==='nav_release'){if(charge.active&&charge.source==='ws')cancelCharge();}
-      else if(m.type==='nav'){if(!charge.wsSupported)navigate(m.dir);}
-      else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':case'press':doPuff();break;case'new_game':initGame();break;}}
-      else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
-    }catch(err){console.log('WS parse error',err);}};
-    ws.onclose=()=>{
-      if (wsHbInterval) { clearInterval(wsHbInterval); wsHbInterval = null; }
-      if (wsWatchdogInterval) { clearInterval(wsWatchdogInterval); wsWatchdogInterval = null; }
-      console.log('WS disconnected');
-      updateWs(false);
-      if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
-      wsReconnectTimer=setTimeout(()=>{wsReconnectTimer=null;connectWebSocket();},wsBackoff);
-      wsBackoff=Math.min(wsBackoff*2,30000);
-    };
-    ws.onerror=()=>ws.close();
-  }catch(e){
-    // The constructor itself can throw (resource pressure, bad state). onclose
-    // never fires in that case, so without scheduling a retry here the socket
-    // stays dead for the page's whole life — the patient loses joystick and
-    // puff with no way back but a reload. memo/settings already retry here.
-    console.log('WS not available');updateWs(false);
-    if(wsReconnectTimer)clearTimeout(wsReconnectTimer);
-    wsReconnectTimer=setTimeout(()=>{wsReconnectTimer=null;connectWebSocket();},wsBackoff);
-    wsBackoff=Math.min(wsBackoff*2,30000);
+// The connection itself (heartbeat, watchdog, backoff) lives in device-link.js.
+function onDeviceMessage(m) {
+  initAudio();resetIdleTimer();
+  if(m.type==='nav_hold'){
+    charge.wsSupported=true;
+    if(!charge.active||charge.dir!==m.dir)startCharge(m.dir,parseFloat(m.intensity)||1.0,'ws');
+    else if(charge.active)charge.intensity=parseFloat(m.intensity)||1.0;
   }
+  else if(m.type==='nav_release'){if(charge.active&&charge.source==='ws')cancelCharge();}
+  else if(m.type==='nav'){if(!charge.wsSupported)navigate(m.dir);}
+  else if(m.type==='action'){switch(m.kind){case'puff':case'short_puff':case'long_puff':case'press':doPuff();break;case'new_game':initGame();break;}}
+  else if(m.type==='puff_level'){document.getElementById('puff-bar').style.width=(m.value*100)+'%';}
+}
+
+function onLinkChange(connected) {
+  if (connected) charge.wsSupported = false; // re-detect on reconnect
+  updateWs(connected);
 }
 
 function updateWs(on) {
@@ -1321,7 +1280,8 @@ function updateWs(on) {
 
 // Start
 initGame();
-connectWebSocket();
+if (window.DeviceLink) DeviceLink.start({ onMessage: onDeviceMessage, onChange: onLinkChange });
+else { console.error('device-link.js missing (update cut short?)'); setTimeout(() => location.reload(), 30000); }
 updateKbMode();
 </script>
 </body>

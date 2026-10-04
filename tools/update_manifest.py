@@ -141,9 +141,12 @@ def update_manifest(project_dir, manifest_path=None):
             entry['size'] = firmware_path.stat().st_size
         new_files[FIRMWARE_NAME] = entry
 
+    # The device installs in this order and keeps going past a failed download
+    # (updater.cpp installGameUpdates), so the shared scripts the pages load
+    # (games/*.js) come first: a page must not arrive before them.
     manifest = {
         'manifest_version': 1,
-        'files': dict(sorted(new_files.items())),
+        'files': dict(sorted(new_files.items(), key=lambda kv: (not kv[0].endswith('.js.gz'), kv[0]))),
     }
 
     # Atomic: a reader (deploy-ota.sh parses this file) must never observe a

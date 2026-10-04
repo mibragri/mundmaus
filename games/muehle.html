@@ -537,6 +537,7 @@
   }
   @keyframes idle-p { 0%,100%{opacity:0.5} 50%{opacity:1} }
 </style>
+<script src="device-link.js"></script>
 <script src="conn-guard.js"></script>
 </head>
 <body>
@@ -2219,79 +2220,37 @@ function updateKbMode() {
 }
 
 // ── WebSocket ────────────────────────────────────────────
-let ws = null;
-let wsReconnectTimer = null;
-let wsHbInterval = null, wsWatchdogInterval = null, wsLastActivity = 0;
-let wsBackoff = 3000;
-const WS_BACKOFF_INIT = 3000;
-const WS_BACKOFF_MAX = 30000;
-
-function wsConnect() {
-  const host = location.hostname || '192.168.4.1';
-  try {
-    ws = new WebSocket(`ws://${host}:81`);
-    ws.onopen = () => {
-      wsLastActivity = Date.now();
-      if (wsHbInterval) clearInterval(wsHbInterval);
-      wsHbInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN) { try { ws.send('{"type":"hb"}'); } catch(e) {} }
-      }, 2000);
-      if (wsWatchdogInterval) clearInterval(wsWatchdogInterval);
-      wsWatchdogInterval = setInterval(() => {
-        if (ws && ws.readyState === WebSocket.OPEN && (Date.now() - wsLastActivity) > 10000) {
-          console.warn('WS heartbeat timeout, forcing reconnect');
-          try { ws.close(); } catch(e) {}
-        }
-      }, 1000);
-      $wsStatus.className = 'connected';
-      $wsStatus.title = 'ESP32 verbunden';
-      wsBackoff = WS_BACKOFF_INIT;
-    };
-    ws.onmessage = (evt) => { wsLastActivity = Date.now(); 
-      try {
-        const msg = JSON.parse(evt.data);
-        ensureAudio();
-        resetIdle();
-        if (msg.type === 'nav_hold') {
-          charge.wsSupported = true;
-          if (!charge.active || charge.dir !== msg.dir) startCharge(msg.dir, parseFloat(msg.intensity) || 1.0, 'ws');
-          else charge.intensity = parseFloat(msg.intensity) || 1.0;
-        } else if (msg.type === 'nav_release') {
-          if (charge.active && charge.source === 'ws') cancelCharge();
-        } else if (msg.type === 'nav') {
-          if (!charge.wsSupported) navigate(msg.dir);
-        } else if (msg.type === 'action') {
-          if (msg.kind === 'puff' || msg.kind === 'press' || msg.kind === 'short_puff' || msg.kind === 'long_puff') {
-            cancelCharge();
-            userAction();
-          } else if (msg.kind === 'undo') {
-            undo();
-          } else if (msg.kind === 'new_game') {
-            showMenu();
-          } else if (msg.kind === 'kiosk') {
-            toggleKiosk();
-          }
-        } else if (msg.type === 'puff_level') {
-          document.getElementById('puff-bar').style.width = (msg.value * 100) + '%';
-        }
-      } catch (e) {}
-    };
-    ws.onclose = () => {
-      if (wsHbInterval) { clearInterval(wsHbInterval); wsHbInterval = null; }
-      if (wsWatchdogInterval) { clearInterval(wsWatchdogInterval); wsWatchdogInterval = null; }
-      $wsStatus.className = '';
-      $wsStatus.title = 'ESP32 nicht verbunden';
-      ws = null;
-      if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-      wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
-      wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
-    };
-    ws.onerror = () => ws?.close();
-  } catch (e) {
-    if (wsReconnectTimer) clearTimeout(wsReconnectTimer);
-    wsReconnectTimer = setTimeout(wsConnect, wsBackoff);
-    wsBackoff = Math.min(wsBackoff * 2, WS_BACKOFF_MAX);
+// The connection itself (heartbeat, watchdog, backoff) lives in device-link.js.
+function onDeviceMessage(msg) {
+  ensureAudio();
+  resetIdle();
+  if (msg.type === 'nav_hold') {
+    charge.wsSupported = true;
+    if (!charge.active || charge.dir !== msg.dir) startCharge(msg.dir, parseFloat(msg.intensity) || 1.0, 'ws');
+    else charge.intensity = parseFloat(msg.intensity) || 1.0;
+  } else if (msg.type === 'nav_release') {
+    if (charge.active && charge.source === 'ws') cancelCharge();
+  } else if (msg.type === 'nav') {
+    if (!charge.wsSupported) navigate(msg.dir);
+  } else if (msg.type === 'action') {
+    if (msg.kind === 'puff' || msg.kind === 'press' || msg.kind === 'short_puff' || msg.kind === 'long_puff') {
+      cancelCharge();
+      userAction();
+    } else if (msg.kind === 'undo') {
+      undo();
+    } else if (msg.kind === 'new_game') {
+      showMenu();
+    } else if (msg.kind === 'kiosk') {
+      toggleKiosk();
+    }
+  } else if (msg.type === 'puff_level') {
+    document.getElementById('puff-bar').style.width = (msg.value * 100) + '%';
   }
+}
+
+function showLink(connected) {
+  $wsStatus.className = connected ? 'connected' : '';
+  $wsStatus.title = connected ? 'ESP32 verbunden' : 'ESP32 nicht verbunden';
 }
 
 // ── Maus (Betreuer) ──────────────────────────────────────
@@ -2336,7 +2295,8 @@ renderBoard();
 updateStatus();
 showMenu();
 updateKbMode();
-wsConnect();
+if (window.DeviceLink) DeviceLink.start({ onMessage: onDeviceMessage, onChange: showLink });
+else { console.error('device-link.js missing (update cut short?)'); setTimeout(() => location.reload(), 30000); }
 </script>
 </body>
 </html>

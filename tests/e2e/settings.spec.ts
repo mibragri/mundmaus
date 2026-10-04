@@ -174,8 +174,11 @@ test.describe('Settings page — values come from the device', () => {
       return route.fulfill({ json: { ok: true, applied: 1 } });
     });
     await page.routeWebSocket(/:81\/?$/, ws => {
+      ws.send(JSON.stringify({ type: 'wifi_status', connected: true }));  // as the firmware does on connect
       ws.onMessage(raw => {
-        if (JSON.parse(String(raw)).type === 'config_save') ws.send(JSON.stringify({ type: 'config_saved', ok: true }));
+        const type = JSON.parse(String(raw)).type;
+        if (type === 'hb') ws.send('{"type":"hb"}');
+        if (type === 'config_save') ws.send(JSON.stringify({ type: 'config_saved', ok: true }));
       });
     });
     await gotoGame(page, 'settings');

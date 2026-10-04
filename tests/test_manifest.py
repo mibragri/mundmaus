@@ -204,3 +204,19 @@ def test_unreadable_firmware_version_fails_loudly(project_dir):
     (project_dir / 'firmware.bin').write_bytes(b'\x00' * 64)   # no platformio.ini
     with pytest.raises(SystemExit):
         update_manifest(project_dir, project_dir / 'manifest.json')
+
+
+def test_shared_scripts_come_before_the_pages_that_load_them(project_dir):
+    """The device installs game files one by one, in manifest order, and keeps going past a failed
+    download (updater.cpp installGameUpdates). A page that arrives before the script it loads has no
+    connection to the device; listed first, the scripts are in place before any page needs them."""
+    (project_dir / 'games' / 'device-link.js').write_text('// link')
+    (project_dir / 'games' / 'conn-guard.js').write_text('// guard')
+    manifest_path = project_dir / 'manifest.json'
+    update_manifest(project_dir, manifest_path)
+
+    names = list(json.loads(manifest_path.read_text())['files'])
+    scripts = [i for i, n in enumerate(names) if n.endswith('.js.gz')]
+    pages = [i for i, n in enumerate(names) if n.endswith('.html.gz')]
+    assert scripts and pages
+    assert max(scripts) < min(pages), names
