@@ -68,9 +68,6 @@ void bootCrashCounterReset();
 /// Returns number of settings applied, or -1 on fetch error.
 int fetchRemoteSettings();
 
-/// Load local version tracking from NVS (Preferences "ota_ver").
-void loadVersions();
-
 /// Save local version tracking to NVS.
 void saveVersions();
 

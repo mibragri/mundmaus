@@ -95,7 +95,6 @@ static void sensorTask(void* param) {
     for (;;) {
         unsigned long now = millis();
         const char* holdState = nullptr;
-        float holdIntensity = 0.0f;
 
         // Sample ADC once per iteration -- all joystick methods use cached values
         if (joystick) joystick->sampleRaw();
@@ -141,10 +140,11 @@ static void sensorTask(void* param) {
         // -- Continuous nav state for charge-based games --
         if (joystick) {
             static bool wasNavigating = false;
-            static unsigned long lastHoldSend = 0;
             static unsigned long releaseStart = 0;
+            float holdIntensity = 0.0f;
             holdState = joystick->getState(holdIntensity);
             if (holdState) {
+                static unsigned long lastHoldSend = 0;
                 releaseStart = 0;  // cancel any pending release
                 // Throttle nav_hold to ~10Hz (every 100ms)
                 if ((now - lastHoldSend) >= 100) {
@@ -221,6 +221,7 @@ static void sensorTask(void* param) {
 // SETUP
 // ============================================================
 
+// cppcheck-suppress unusedFunction -- the Arduino core calls it (cores/esp32/main.cpp, core 3.3.7)
 void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 2000) { delay(10); }
@@ -421,6 +422,7 @@ void setup() {
 // LOOP
 // ============================================================
 
+// cppcheck-suppress unusedFunction -- the Arduino core calls it (cores/esp32/main.cpp, core 3.3.7)
 void loop() {
     // N6: Only feed WDT if the sensor task is alive...
     if (millis() - sensorHeartbeat > 30000) {

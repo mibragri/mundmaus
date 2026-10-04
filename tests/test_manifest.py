@@ -10,14 +10,11 @@ that had no coverage at all â€” the firmware version and the hash-driven bump â€
 are covered.
 """
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
-# Import the module under test
-sys.path.insert(0, str(Path(__file__).parent.parent / 'tools'))
-from update_manifest import scan_files, compute_hash, update_manifest  # noqa: E402
+from update_manifest import scan_files, compute_hash, update_manifest
 
 
 @pytest.fixture

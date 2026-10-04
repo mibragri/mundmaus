@@ -16,7 +16,7 @@
 namespace WifiLog {
 
 /// Initialize: mount LittleFS, increment NVS boot counter, create /logs dir,
-/// allocate mutex. Must be called once from setup() before any log()/read().
+/// allocate mutex. Must be called once from setup() before any log()/stream().
 void init();
 
 /// Start the SNTP background task (Fritzbox primary, pool.ntp.org fallback,
@@ -27,11 +27,6 @@ void startNtp();
 /// Append an event line "<timestamp> <event>\n" to /logs/wifi.log. Rotates
 /// to /logs/wifi.log.old when the file grows past 8 KB. Thread-safe.
 void log(const String& event);
-
-/// Read the full log (.old followed by .log). Returns "" on read failure.
-/// Allocates a single String — prefer stream() for HTTP handlers to avoid
-/// a 16 KB heap allocation in the AsyncTCP task.
-String read();
 
 /// Stream the full log (.old followed by .log) into a Print target. Holds
 /// the log mutex during the write. Intended for AsyncResponseStream so the

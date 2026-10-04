@@ -23,7 +23,7 @@ constexpr time_t      MIN_VALID_T = 1700000000;   // 2023-11-14: any sync past t
 
 // AsyncTCP (Core 0) reads via the HTTP endpoint; connectStation() and the
 // reconnect task on Core 1 write. A single mutex serializes both. Created
-// exactly once in init() — do not lazy-create from log()/read()/clear(), a
+// exactly once in init() — do not lazy-create from log()/stream()/clear(), a
 // concurrent first-call race there would leak one handle.
 SemaphoreHandle_t _mutex = nullptr;
 
@@ -143,35 +143,6 @@ void log(const String& event) {
     }
 
     xSemaphoreGive(_mutex);
-}
-
-static void _appendFile(const char* path, String& out) {
-    File f = LittleFS.open(path, "r");
-    if (!f) return;
-    // Reserve once so we don't reallocate per chunk; the rotation cap means
-    // each file is at most ~8 KB which fits well within heap.
-    out.reserve(out.length() + f.size());
-    char chunk[256];
-    while (f.available()) {
-        int n = f.readBytes(chunk, sizeof(chunk));
-        if (n <= 0) break;
-        out.concat(chunk, n);
-    }
-    f.close();
-}
-
-String read() {
-    String out;
-    if (_mutex == nullptr) return out;
-    if (xSemaphoreTake(_mutex, pdMS_TO_TICKS(500)) != pdTRUE) {
-        return out;
-    }
-
-    if (LittleFS.exists(LOG_OLD))  _appendFile(LOG_OLD,  out);
-    if (LittleFS.exists(LOG_PATH)) _appendFile(LOG_PATH, out);
-
-    xSemaphoreGive(_mutex);
-    return out;
 }
 
 static void _streamFile(const char* path, Print& out) {

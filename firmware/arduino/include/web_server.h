@@ -142,7 +142,7 @@ private:
     void _setupHttpRoutes();
     void _setupWsRoutes();
     void _onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
-                    AwsEventType type, void* arg, uint8_t* data, size_t len);
+                    AwsEventType type, const void* arg, uint8_t* data, size_t len);
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
     /// True unless the request carries a foreign page's Origin/Referer.
     bool _sameOriginOk(AsyncWebServerRequest* req);

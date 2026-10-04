@@ -190,7 +190,7 @@ bool update(const char* key, int value) {
 
 void getAll(JsonDocument& doc) {
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
-        volatile int* ptr = _globalPtr(i);
+        const volatile int* ptr = _globalPtr(i);
         if (ptr) doc[CONFIGURABLE_KEYS[i]] = *ptr;
     }
 }

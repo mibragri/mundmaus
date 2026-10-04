@@ -309,6 +309,7 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 Ein ESP32 per USB am Entwicklungsrechner, nie das Geraet des Patienten.
 
 - Host-Tests der Firmware (Updater, Config gegen Stubs): `firmware/arduino/test_host/run.sh`
+- Lint, laeuft auch vor jedem Build mit geaenderten Quellen: `~/.platformio/penv/bin/python tools/lint_firmware.py [env]`
 - Spiele ohne Geraet: `cd tests/e2e && npm run test:local`
 - Alles gegen den Pruefstand: `ESP32_URL=http://<pruefstand> npm run test:device`
 - Watchdog-Probe: Build `pio run -e esp32_testhooks -t upload`, dann

@@ -22,6 +22,13 @@ if ! bash "$SCRIPT_DIR/check-games.sh"; then
     exit 1
 fi
 
+# --- Pre-flight: every suppression names its rule and a reason ---
+echo -e "\n${YELLOW}--- Suppressions ---${NC}"
+if ! python3 "$SCRIPT_DIR/check_suppressions.py"; then
+    echo -e "${RED}Suppression check failed. Name the rule and the reason, or remove the suppression.${NC}"
+    exit 1
+fi
+
 if [[ ! -f "$MANIFEST" ]]; then
     echo -e "${RED}ERROR: manifest.json not found. Run tools/update_manifest.py first.${NC}"
     exit 1

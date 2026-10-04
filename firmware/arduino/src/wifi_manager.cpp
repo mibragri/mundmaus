@@ -369,14 +369,13 @@ bool WiFiManager::_scanAndConnect(const String& ssid, const String& pw,
     for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
         int idx = attempt - 1;
         bool pinned = (idx < static_cast<int>(matches.size()));
-        char bssidBuf[20] = "-";
-        int  attemptCh    = 0;
         if (pinned) {
             const BssMatch& m = matches[idx];
+            char bssidBuf[20];
             snprintf(bssidBuf, sizeof(bssidBuf), "%02x:%02x:%02x:%02x:%02x:%02x",
                      m.bssid[0], m.bssid[1], m.bssid[2],
                      m.bssid[3], m.bssid[4], m.bssid[5]);
-            attemptCh = static_cast<int>(m.channel);
+            const int attemptCh = static_cast<int>(m.channel);
             Serial.printf("  Verbinde mit '%s' (Versuch %d/%d: BSSID %s Ch %d RSSI %d)...\n",
                           ssid.c_str(), attempt, MAX_ATTEMPTS,
                           bssidBuf, attemptCh, m.rssi);
@@ -635,10 +634,7 @@ std::vector<String> WiFiManager::scanNetworks() {
     // Deduplicate
     std::vector<String> result;
     for (const auto& e : entries) {
-        bool seen = false;
-        for (const auto& r : result) {
-            if (r == e.ssid) { seen = true; break; }
-        }
+        const bool seen = std::find(result.begin(), result.end(), e.ssid) != result.end();
         if (!seen) {
             result.push_back(e.ssid);
             if (result.size() >= 15) break;

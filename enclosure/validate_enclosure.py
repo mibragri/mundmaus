@@ -57,7 +57,7 @@ VALIDATED_MODEL = "mundmaus_v58_enclosure"
 
 # The generator's own guards raise ValueError at import: a finding, not a crash.
 try:
-    from mundmaus_v58_enclosure import *  # noqa: E402, F403
+    from mundmaus_v58_enclosure import *  # noqa: F403 - all names of the model are under test
 except ValueError as _e:
     print(f"\n🔴 ERROR: the generator rejects its own geometry: {_e}\n")
     sys.exit(1)

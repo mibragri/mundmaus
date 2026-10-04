@@ -110,12 +110,6 @@ static void _saveVersionsLocked() {
     prefs.end();
 }
 
-void loadVersions() {
-    if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
-    _loadVersionsLocked();
-    xSemaphoreGive(_versionsMutex);
-}
-
 void saveVersions() {
     if (xSemaphoreTake(_versionsMutex, portMAX_DELAY) != pdTRUE) return;
     _saveVersionsLocked();
@@ -231,7 +225,9 @@ CheckResult checkManifest(const String& telemetry) {
 
     for (JsonPair kv : files) {
         String fname = kv.key().c_str();
+        // cppcheck-suppress badBitmaskCheck -- ArduinoJson's operator| returns the default for a missing key; cppcheck sees no library headers
         int remoteVer = kv.value()["version"] | 0;
+        // cppcheck-suppress badBitmaskCheck -- ArduinoJson's operator| returns the default for a missing key; cppcheck sees no library headers
         bool isFirmware = kv.value()["firmware"] | false;
         int localVer = 0;
 
@@ -790,7 +786,7 @@ void markBootOk() {
     }
 
     // First boot after OTA: promote pending_fw in _versions.
-    // Bug 4: DO NOT unconditionally call loadVersions() here. The previous
+    // Bug 4: DO NOT unconditionally call _loadVersionsLocked() here. The previous
     // version re-entered the fresh-flash-detection path, which with an
     // LittleFS-based marker could wipe all NVS version tracking. Even with
     // the schema_version fix (Bug 2), re-loading is unnecessary work and

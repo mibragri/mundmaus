@@ -230,10 +230,8 @@ static void discoverGames(std::vector<GameEntry>& out) {
         String htmlName = raw + ".html";
 
         // Deduplicate (gz + non-gz both present)
-        bool exists = false;
-        for (const auto& g : out) {
-            if (g.filename == htmlName) { exists = true; break; }
-        }
+        const bool exists = std::any_of(out.begin(), out.end(),
+                                        [&](const GameEntry& g) { return g.filename == htmlName; });
         if (!exists) {
             out.push_back({htmlName, label});
         }
@@ -262,6 +260,7 @@ String generatePortal(WiFiManager& wifi, const PortalHwStatus& hw) {
     // Build game buttons
     String btns;
     for (const auto& g : games) {
+        // cppcheck-suppress useStlAlgorithm -- std::accumulate (C++17) assigns acc = acc + x and copies the growing String on every step
         btns += "<a href=\"/www/" + g.filename + "\" class=\"g\">" + g.label + "</a>";
     }
 

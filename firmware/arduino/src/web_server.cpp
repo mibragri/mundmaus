@@ -9,6 +9,7 @@
 #include <LittleFS.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include <algorithm>
 
 // ============================================================
 // CONSTRUCTOR
@@ -679,7 +680,7 @@ void MundMausServer::_setupHttpRoutes() {
 
 void MundMausServer::_setupWsRoutes() {
     _ws.onEvent([this](AsyncWebSocket* server, AsyncWebSocketClient* client,
-                       AwsEventType type, void* arg, uint8_t* data, size_t len) {
+                       AwsEventType type, const void* arg, uint8_t* data, size_t len) {
         _onWsEvent(server, client, type, arg, data, len);
     });
     // Reject cross-origin WebSocket handshakes.
@@ -709,7 +710,7 @@ void MundMausServer::_setupWsRoutes() {
 }
 
 void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* client,
-                                 AwsEventType type, void* arg, uint8_t* data, size_t len) {
+                                 AwsEventType type, const void* arg, uint8_t* data, size_t len) {
     if (type == WS_EVT_CONNECT) {
         // Drop messages instead of disconnecting when queue full.
         // Prevents patient losing joystick control during WiFi hiccups.
@@ -745,7 +746,7 @@ void MundMausServer::_onWsEvent(AsyncWebSocket* server, AsyncWebSocketClient* cl
         }
 
     } else if (type == WS_EVT_DATA) {
-        AwsFrameInfo* info = static_cast<AwsFrameInfo*>(arg);
+        const AwsFrameInfo* info = static_cast<const AwsFrameInfo*>(arg);
         if (info->final && info->index == 0 && info->len == len && info->opcode == WS_TEXT) {
             // Complete text frame
             JsonDocument msg;
@@ -874,6 +875,7 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
     }
 
     if (strcmp(type, "debug_joy") == 0) {
+        // cppcheck-suppress clarifyCondition -- ArduinoJson's operator| returns the default for a missing key; cppcheck sees no library headers
         bool enable = msg["enable"] | !debugJoystick;  // explicit or toggle
         debugJoystick = enable;
         debugJoystickClientId = enable ? client->id() : 0;
@@ -1070,9 +1072,7 @@ bool MundMausServer::startAutoGameUpdate() {
 
     // Firmware pending: do nothing at all. Writing a new image and rebooting the
     // patient's only input device is a decision, not a background chore.
-    for (const auto& uf : pending) {
-        if (uf.firmware) return false;
-    }
+    if (std::any_of(pending.begin(), pending.end(), [](const auto& uf) { return uf.firmware; })) return false;
 
     // The same atomic test-and-set /api/update/start uses, so an unattended
     // install and a carer pressing "Aktualisieren" can never run at once.

@@ -35,11 +35,10 @@ if not ota_auth:
 env.Append(CPPDEFINES=[('OTA_AUTH_B64', env.StringifyMacro(ota_auth))])
 
 # ── Guard: lint check before build ───────────────────────────────────
-# Run cppcheck + clang-tidy. Fail build on any defects.
-import shutil
+# tools/lint_firmware.py: suppressions with rule and reason, cppcheck over every source file.
+# Fail the build on any finding.
 import subprocess
 _lint_marker = os.path.join(env.subst("$BUILD_DIR"), ".lint_passed")
-_pio_bin = shutil.which("pio") or os.path.expanduser("~/.platformio/penv/bin/pio")
 # Both trees: this used to look at src/ alone, which holds only .cpp files —
 # every header lives in include/. Editing a header therefore never invalidated
 # the marker, so lint was silently skipped and the build still reported success.
@@ -49,6 +48,9 @@ def _src_newer_than_marker():
     if not os.path.exists(_lint_marker):
         return True
     marker_mtime = os.path.getmtime(_lint_marker)
+    # The checkers' configuration lives in platformio.ini: changing it has to re-lint as well.
+    if os.path.getmtime(os.path.join(env.subst("$PROJECT_DIR"), "platformio.ini")) > marker_mtime:
+        return True
     for d in _lint_dirs:
         for root, _dirs, files in os.walk(d):
             for f in files:
@@ -57,15 +59,13 @@ def _src_newer_than_marker():
                         return True
     return False
 
-if _src_newer_than_marker() and "PIOTEST" not in os.environ and "_MUNDMAUS_LINT" not in os.environ:
-    print("  Running lint (cppcheck + clang-tidy)...")
-    lint_env = os.environ.copy()
-    lint_env["_MUNDMAUS_LINT"] = "1"
-    result = subprocess.run(
-        [_pio_bin, "check", "-e", env.subst("$PIOENV"), "--fail-on-defect=low"],
-        cwd=env.subst("$PROJECT_DIR"),
-        env=lint_env,
-    )
+if _src_newer_than_marker() and "PIOTEST" not in os.environ:
+    print("  Running lint (suppressions + cppcheck)...")
+    result = subprocess.run([
+        env.subst("$PYTHONEXE"),
+        os.path.join(env.subst("$PROJECT_DIR"), "..", "..", "tools", "lint_firmware.py"),
+        env.subst("$PIOENV"),
+    ])
     if result.returncode != 0:
         print("\n" + "=" * 60)
         print("  FATAL: Lint check failed! Fix defects before building.")

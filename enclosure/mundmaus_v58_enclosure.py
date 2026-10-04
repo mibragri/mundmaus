@@ -29,8 +29,8 @@ from itertools import pairwise
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-import cadquery as cq  # type: ignore[import-not-found]
-from PIL import Image, ImageDraw  # type: ignore[import-not-found]
+import cadquery as cq  # type: ignore[import-not-found]  # only the CadQuery mamba env has cadquery, not the workspace venv mypy runs in
+from PIL import Image, ImageDraw
 
 warnings.filterwarnings("ignore")
 logging.getLogger("OCC").setLevel(logging.ERROR)
