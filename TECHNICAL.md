@@ -304,6 +304,19 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 **Basic-Auth-Zugangsdaten** liegen je Variante woanders: Arduino als Build-Flag
 `OTA_AUTH_B64`, MicroPython in `ota_auth.py` (gitignored, nicht im Repo).
 
+### Pruefstand vor jedem OTA
+
+Ein ESP32 per USB am Entwicklungsrechner, nie das Geraet des Patienten.
+
+- Host-Tests der Firmware (Updater, Config gegen Stubs): `firmware/arduino/test_host/run.sh`
+- Spiele ohne Geraet: `cd tests/e2e && npm run test:local`
+- Alles gegen den Pruefstand: `ESP32_URL=http://<pruefstand> npm run test:device`
+- Watchdog-Probe: Build `pio run -e esp32_testhooks -t upload`, dann
+  `MUNDMAUS_TEST_HOOKS=1 ESP32_URL=... npx playwright test bench -g A3`
+- Reconnect-Last: `MUNDMAUS_STRESS_MINUTES=30 ESP32_URL=... npx playwright test bench -g C1`.
+  Vorher einen seriellen Logger starten, der den Port einmal oeffnet und mitschreibt:
+  Das Oeffnen der Schnittstelle setzt den ESP32 zurueck, ein Haenger waere danach weg.
+
 ---
 
 ## Flash-Speicher

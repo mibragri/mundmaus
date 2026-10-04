@@ -31,7 +31,7 @@ class PuffSensor;
 struct SensorEvent {
     enum Type { NAV, NAV_HOLD, NAV_RELEASE, ACTION, PUFF_LEVEL, CALIBRATE_DONE,
                 UPDATE_PROGRESS, UPDATE_COMPLETE, UPDATE_ERROR, UPDATE_RESULT,
-                WIFI_NETWORKS, DEBUG_JOYSTICK } type;
+                DEBUG_JOYSTICK } type;
     char data[64];   // see format contract above
     float value;     // for puff_level
     int intVal;      // for progress current/total, calibrate centerX
@@ -145,12 +145,6 @@ private:
                     AwsEventType type, void* arg, uint8_t* data, size_t len);
     void _handleWsMessage(AsyncWebSocketClient* client, JsonDocument& msg);
     /// True unless the request carries a foreign page's Origin/Referer.
-    /// Serialized wifi_networks payload, handed from the scan task to the
-    /// loop task through the sensor queue. Too large for SensorEvent::data,
-    /// and only one scan can be in flight (_wifiScanRunning), so the queue's
-    /// own ordering is all the synchronisation this needs.
-    String _scanResultJson;
-
     bool _sameOriginOk(AsyncWebServerRequest* req);
     bool _originAllowed(const String& value);
 
@@ -158,9 +152,8 @@ private:
     void _sendJson200(AsyncWebServerRequest* req, JsonDocument& doc);
     int _applyConfigValues(JsonObjectConst values);
 
-    // P1-3: Thread-safe broadcast via shared buffer. Uses makeBuffer() so
-    // each client dequeues at its own pace via ref-counted buffer. Mitigates
-    // the _clients list-iteration race (see processSensorQueue comment).
+    // Broadcast to all WS clients through one shared, ref-counted buffer.
+    // Callable from any task: the library locks its client list (ESPAsyncWebServer >= 3.10.3).
     void _broadcastText(const String& msg);
 
     // Build JSON for update status (shared by HTTP + WS)

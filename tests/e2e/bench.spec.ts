@@ -46,8 +46,9 @@ test.describe('Bench', () => {
     console.log(`  back after ${back} ms, reset_reason of the new boot: ${after.reason}`);
   });
 
-  // Finding C1: AsyncWebSocket 3.6.0 iterates and erases its client list without a lock while new
-  // clients are appended (LoadProhibited panic under reconnect churn). Churn plus broadcasts.
+  // Finding C1: in ESPAsyncWebServer 3.6.0 cleanupClients() erases from the client list on the loop task
+  // while AsyncTCP appends to it and textAll() walks it, without a lock (AsyncWebSocket.cpp 3.6.0: :782,
+  // :821-830, :945). Reconnect churn plus broadcasts; the device must neither reboot nor stop answering.
   test('C1: reconnect churn with broadcasts does not crash the device', async ({ request }) => {
     const minutes = Number(process.env.MUNDMAUS_STRESS_MINUTES || 0);
     test.skip(!minutes, 'set MUNDMAUS_STRESS_MINUTES');
@@ -79,7 +80,9 @@ test.describe('Bench', () => {
         await new Promise(r => setTimeout(r, 50));
       }
     };
-    await Promise.all([churner(), churner(), churner(), churner(), churner(), churner(), broadcaster()]);
+    // 3.6.0 erases on the loop task while the HTTP handler walks the list in textAll(): the more
+    // clients and broadcasts at once, the likelier the two overlap.
+    await Promise.all([...Array(8)].map(churner).concat([...Array(3)].map(broadcaster)));
 
     const back = await waitForInfo(request, 60_000);
     expect(back, 'device still answers').not.toBeNull();
