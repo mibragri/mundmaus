@@ -10,10 +10,10 @@
       "sha256": "d03b6fc38ae568af830b9190985d47c877fd70e5215d54c47c4f3a4c8c313756"
     },
     "firmware.bin": {
-      "version": 4214,
+      "version": 4216,
       "firmware": true,
-      "sha256": "cf6f9ba4c71dc8a46e4200c5e74b5530900e8bad64b013bcae326705b2b3cf88",
-      "size": 1346400
+      "sha256": "3eb43db7916097e864300e3092996ae3c2eea79c52700005623cae9d7603cdbf",
+      "size": 1342656
     },
     "www/chess.html.gz": {
       "version": 33,
