@@ -1222,39 +1222,42 @@ function aiMove() {
     return moves[Math.floor(Math.random() * moves.length)];
   }
 
-  let bestVal = Infinity;
-  let bestMove = moves[0];
-
   // Shuffle for variety
   for (let i = moves.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [moves[i], moves[j]] = [moves[j], moves[i]];
   }
 
-  for (const m of moves) {
-    const {board: nb} = applyMove(game.board, m, QUEEN);
-    let newEp = null;
-    if (m.flag === 'double') newEp = [(m.fr+m.tr)/2, m.fc];
-    let nc = game.castling;
-    if (game.board[m.fr][m.fc]?.type === KING) nc = nc.replace(/[kq]/g, '');
-    if (m.fr===0&&m.fc===0) nc=nc.replace('q','');
-    if (m.fr===0&&m.fc===7) nc=nc.replace('k','');
-    if (m.tr===7&&m.tc===0) nc=nc.replace('Q','');
-    if (m.tr===7&&m.tc===7) nc=nc.replace('K','');
-    if (m.tr===0&&m.tc===0) nc=nc.replace('q','');
-    if (m.tr===0&&m.tc===7) nc=nc.replace('k','');
+  // Iterative deepening: depth 1, 2, ... aiDepth, and the move played is the
+  // best of the last depth that finished inside the budget. A depth the budget
+  // cuts short is thrown away, because its root moves were searched to
+  // different depths and their values do not compare.
+  let bestMove = moves[0];
+  for (let depth = 1; depth <= aiDepth; depth++) {
+    let bestVal = Infinity, bestAtDepth = bestMove;
+    // The last depth's best goes first; its value then bounds the others.
+    for (const m of [bestMove, ...moves.filter(x => x !== bestMove)]) {
+      const {board: nb} = applyMove(game.board, m, QUEEN);
+      let newEp = null;
+      if (m.flag === 'double') newEp = [(m.fr+m.tr)/2, m.fc];
+      let nc = game.castling;
+      if (game.board[m.fr][m.fc]?.type === KING) nc = nc.replace(/[kq]/g, '');
+      if (m.fr===0&&m.fc===0) nc=nc.replace('q','');
+      if (m.fr===0&&m.fc===7) nc=nc.replace('k','');
+      if (m.tr===7&&m.tc===0) nc=nc.replace('Q','');
+      if (m.tr===7&&m.tc===7) nc=nc.replace('K','');
+      if (m.tr===0&&m.tc===0) nc=nc.replace('q','');
+      if (m.tr===0&&m.tc===7) nc=nc.replace('k','');
 
-    const val = minimax(nb, aiDepth - 1, -Infinity, Infinity, true, newEp, nc);
-    if (val < bestVal) {
-      bestVal = val;
-      bestMove = m;
+      const val = minimax(nb, depth - 1, -Infinity, bestVal, true, newEp, nc);
+      if (searchTimedOut) break;
+      if (val < bestVal) {
+        bestVal = val;
+        bestAtDepth = m;
+      }
     }
-    // Do NOT break here. Once the budget trips, minimax() returns evaluate() at
-    // its first line, so every remaining root move is now an O(1) static eval,
-    // not a full search — letting them run costs microseconds and lets the AI
-    // pick the best move it can see. Breaking instead returned whatever move
-    // happened to be first in the shuffled list (the deep search of move 1
-    // alone already exceeds the budget at level 4), i.e. a near-random move.
+    if (searchTimedOut) break;
+    bestMove = bestAtDepth;
   }
   return bestMove;
 }
@@ -1699,7 +1702,6 @@ function action() {
   if (ui.phase === 'menu') {
     const depth = [1, 2, 3, 4][ui.menuCursor];
     aiDepth = depth;
-    $diffMenu.classList.add('hidden');
     startGame();
     return;
   }
@@ -1709,7 +1711,6 @@ function action() {
       window.location.href = '/';
       return;
     }
-    $gameOver.classList.add('hidden');
     showDiffMenu();
     return;
   }
@@ -1717,17 +1718,11 @@ function action() {
   if (ui.phase === 'promoting') {
     const types = [QUEEN, ROOK, BISHOP, KNIGHT];
     const promoType = types[ui.promoCursor];
-    $promoOverlay.classList.add('hidden');
-    execMove(ui.promoMove, promoType);
-    // The normal move path sets this; the promoting branch never did, so the
-    // yellow "last move" marker stayed on the previous move until the AI
-    // replied. The patient works purely visually — that marker is how he sees
-    // what just happened.
-    ui.lastMove = ui.promoMove;
+    playMove(ui.promoMove, promoType);
     ui.promoMove = null;
     ui.selected = null;
     ui.legalForSelected = [];
-    ui.phase = 'playing';
+    setPhase('playing');
     sndMove();
     renderBoard();
     updateStatus();
@@ -1768,8 +1763,7 @@ function action() {
       }
 
       const isCapture = move.flag === 'capture' || move.flag === 'en-passant' || move.flag === 'promo-capture';
-      execMove(move);
-      ui.lastMove = move;
+      playMove(move);
       ui.selected = null;
       ui.legalForSelected = [];
 
@@ -1817,6 +1811,22 @@ function deselect() {
   }
 }
 
+// ── Phase and moves ──────────────────────────────────────
+// Which overlay shows follows from ui.phase alone, and ui.phase changes only here.
+function setPhase(p) {
+  ui.phase = p;
+  $diffMenu.classList.toggle('hidden', p !== 'menu');
+  $promoOverlay.classList.toggle('hidden', p !== 'promoting');
+  $gameOver.classList.toggle('hidden', p !== 'gameover');
+}
+
+// Every move on the board, by either side and promotions included, becomes the
+// last-move marker. The patient is deaf: the move sounds do not reach him.
+function playMove(move, promoType) {
+  execMove(move, promoType);
+  ui.lastMove = move;
+}
+
 // ── AI Turn ──────────────────────────────────────────────
 function scheduleAI() {
   if (game.turn !== B || ui.phase !== 'playing') return;
@@ -1841,8 +1851,7 @@ function scheduleAI() {
     }
 
     const isCapture = move.flag === 'capture' || move.flag === 'en-passant' || move.flag === 'promo-capture';
-    execMove(move, QUEEN); // AI always promotes to queen
-    ui.lastMove = move;
+    playMove(move, QUEEN); // AI always promotes to queen
 
     if (isCapture) sndCapture(); else sndMove();
     renderBoard();
@@ -1852,7 +1861,7 @@ function scheduleAI() {
 
 // ── Promotion Dialog ─────────────────────────────────────
 function showPromoDialog() {
-  ui.phase = 'promoting';
+  setPhase('promoting');
   ui.promoCursor = 0;
   const color = W;
   const pieces = [
@@ -1872,16 +1881,14 @@ function showPromoDialog() {
     el.onclick = () => { ui.promoCursor = i; action(); };
     $promoChoices.appendChild(el);
   });
-  $promoOverlay.classList.remove('hidden');
 }
 
 // ── Game Over ────────────────────────────────────────────
 function showGameOver(title, info) {
-  ui.phase = 'gameover';
+  setPhase('gameover');
   ui.goCursor = 0;
   $goTitle.textContent = title;
   $goInfo.textContent = info;
-  $gameOver.classList.remove('hidden');
   document.getElementById('go-new').classList.add('cursor');
   document.getElementById('go-portal').classList.remove('cursor');
 }
@@ -1891,32 +1898,19 @@ function showDiffMenu() {
   if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
-  ui.phase = 'menu';
+  setPhase('menu');
   ui.menuCursor = Math.min(aiDepth - 1, 3);
-  // Both overlays were only ever hidden inside action()'s gameover/promoting
-  // branches, which are unreachable once phase is 'playing' again. Pressing N
-  // (the footer advertises it) therefore dealt a new board underneath an 85%
-  // black win screen, or under the promotion dialog — the cursor was alive but
-  // invisible, and only a reload by a second person got the patient out.
-  // muehle.html does this correctly; here it was simply omitted.
-  $gameOver.classList.add('hidden');
-  $promoOverlay.classList.add('hidden');
-  $diffMenu.classList.remove('hidden');
   $diffMenu.querySelectorAll('.diff-opt').forEach((el, i) =>
     el.classList.toggle('cursor', i === ui.menuCursor));
 }
 
 function startGame() {
   if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
-  // Also clear here, not just in showDiffMenu(): a new game can be started
-  // straight from a WebSocket new_game event without passing the menu.
-  $gameOver.classList.add('hidden');
-  $promoOverlay.classList.add('hidden');
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   newGame();
   buildBoardDOM();
-  ui.phase = 'playing';
+  setPhase('playing');
   ui.cursor = [6, 4];
   ui.inBtnCol = false;
   ui.btnCursor = 0;

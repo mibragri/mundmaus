@@ -4,7 +4,7 @@
   "comment": "test:local is the behavioural gate deploy-ota.sh runs. It excludes the six specs that need a live ESP32 (api, ota-files, portal, resilience, updates, websocket) — run those with ESP32_URL set, via npm run test:device.",
   "scripts": {
     "test": "npx playwright test",
-    "test:local": "npx playwright test charge chess connection consistency freecell idle memo muehle ota-manifest regressions settings solitaire vier-gewinnt",
+    "test:local": "npx playwright test charge chess connection consistency freecell idle memo muehle ota-manifest overlays regressions settings solitaire vier-gewinnt",
     "test:device": "npx playwright test",
     "test:portal": "npx playwright test portal",
     "test:chess": "npx playwright test chess",

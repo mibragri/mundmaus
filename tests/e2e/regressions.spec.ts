@@ -408,6 +408,49 @@ test.describe('chess — AI search budget', () => {
 
     expect(captures, 'AI missed a free queen — root loop is breaking early').toBe(5);
   });
+
+  // Finding A5 of the comment review (04.10.2026): level 4 compared the deep values of its first root
+  // moves with one-ply static values of the rest once the budget ran out. A static value cannot see a
+  // recapture, so Qxe4 (the queen for a pawn: dxe4) looked best; level 3 plays e5 here. The budget is
+  // made to trip after 60 clock reads, about 3800 nodes: a full depth-3 search, not depth 4.
+  test('level 4 out of time plays its last complete depth, not a queen blunder', async ({ page }) => {
+    await gotoGame(page, 'chess');
+    await page.waitForSelector('#diff-menu', { timeout: 15_000 });
+
+    const moves = await page.evaluate(`(() => {
+      const P = (color, type) => ({ color, type });
+      const setup = () => {
+        const b = Array.from({ length: 8 }, () => Array(8).fill(null));
+        b[0][0] = P('b', 'r'); b[0][4] = P('b', 'k'); b[0][7] = P('b', 'r');
+        for (const c of [0, 1, 2, 3, 5, 6, 7]) b[1][c] = P('b', 'p');
+        b[1][4] = P('b', 'q');                          // queen e7, the e-file open down to e4
+        b[4][4] = P('w', 'p'); b[5][3] = P('w', 'p');   // e4, defended by d3
+        for (const c of [0, 1, 2, 5, 6, 7]) b[6][c] = P('w', 'p');
+        b[7][0] = P('w', 'r'); b[7][4] = P('w', 'k'); b[7][7] = P('w', 'r');
+        game.board = b; game.turn = 'b'; game.castling = ''; game.enPassant = null; game.history = [];
+      };
+      const realNow = performance.now, realRandom = Math.random;
+      const out = [];
+      try {
+        aiDepth = 4;
+        for (let seed = 1; seed <= 5; seed++) {
+          let s = seed * 1000 + 7;
+          Math.random = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+          let reads = 0;
+          performance.now = () => (reads++ < 60 ? 0 : 1e9);
+          setup();
+          const m = aiMove();
+          out.push('abcdefgh'[m.fc] + (8 - m.fr) + '-' + 'abcdefgh'[m.tc] + (8 - m.tr));
+        }
+      } finally {
+        performance.now = realNow;
+        Math.random = realRandom;
+      }
+      return out;
+    })()`);
+
+    expect(moves, 'Qxe4 gives the queen for a pawn').not.toContain('e7-e4');
+  });
 });
 
 // A network name is attacker-chosen; the WiFi status line interpolated it into
