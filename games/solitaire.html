@@ -657,10 +657,10 @@ function initGame() {
   cancelCharge();
   const deck = shuffle(makeDeck());
   stock=[]; waste=[]; foundations=[[],[],[],[]]; tableau=[[],[],[],[],[],[],[]];
-  moves=0; score=0; undoStack=[]; selectedCard=null; gameWon=false;
+  moves=0; score=0; undoStack=[]; selectedCard=null;
   if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
   if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
-  document.getElementById('message').className='';
+  setWon(false);
   for(let col=0;col<7;col++) for(let row=0;row<=col;row++){const c=deck.pop();c.faceUp=(row===col);tableau[col].push(c);}
   stock=deck.reverse(); stock.forEach(c=>c.faceUp=false);
   navZone='tableau'; navCol=0; navCardIdx=-1;
@@ -705,10 +705,10 @@ function saveUndo() {
 function doUndo() {
   if(!undoStack.length){sndError();return;} const s=undoStack.pop();
   stock=s.stock;waste=s.waste;foundations=s.foundations;tableau=s.tableau;moves=s.moves;score=s.score;
-  selectedCard=null; gameWon=false;
+  selectedCard=null;
   if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
   if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
-  document.getElementById('message').className='';
+  setWon(false);
   sndUndo();render();updateStatus();
 }
 
@@ -757,7 +757,7 @@ function getFaceUpRange(ci) {
   const col=tableau[ci],s=col.findIndex(c=>c.faceUp);
   if(s===-1)return{start:0,end:0,count:0};return{start:s,end:col.length-1,count:col.length-s};
 }
-function checkWin() { if(foundations.every(f=>f.length===13)){gameWon=true;sndWin();showMessage('🎉','win');} }
+function checkWin() { if(foundations.every(f=>f.length===13)){setWon(true);sndWin();} }
 function canAutoComplete() { return stock.length===0&&waste.length===0&&tableau.every(col=>col.every(c=>c.faceUp)); }
 let autoCompleteIv=null,autoCompleteTimer=null;
 function autoComplete() {
@@ -771,16 +771,23 @@ function autoComplete() {
     if(!moved||foundations.every(f=>f.length===13)){clearInterval(autoCompleteIv);autoCompleteIv=null;checkWin();}
   },150);
 }
+// The win banner follows gameWon, and gameWon changes only in setWon(). A short
+// message shows for 1.5 s and then gives way to what gameWon says.
 let msgTimer=null;
-function showMessage(text,cls='') {
-  const el=document.getElementById('message');el.textContent=text;el.className='show '+cls;
-  // Cancel any pending clear first. The auto-complete hint schedules one 1.5s
-  // out; the win banner arrives before that and sets no timer of its own, so
-  // the stale clear used to wipe the 🎉 while gameWon stayed true. Navigation is
-  // dead in that state and the patient is deaf, so he saw an ordinary finished
-  // board whose joystick simply stopped responding.
+function setWon(won) {
+  gameWon=won;
   if(msgTimer){clearTimeout(msgTimer);msgTimer=null;}
-  if(cls!=='win')msgTimer=setTimeout(()=>{el.className='';msgTimer=null;},1500);
+  renderMessage();
+}
+function showMessage(text) {
+  const el=document.getElementById('message');el.textContent=text;el.className='show';
+  if(msgTimer)clearTimeout(msgTimer);
+  msgTimer=setTimeout(()=>{msgTimer=null;renderMessage();},1500);
+}
+function renderMessage() {
+  const el=document.getElementById('message');
+  if(gameWon){el.textContent='🎉';el.className='show win';}
+  else el.className='';
 }
 function updateStatus() {
   document.getElementById('moves').textContent=moves;
@@ -1200,7 +1207,7 @@ function placeSelectedCard() {
     render();updateStatus();return;
   }
   selectedCard=null;render();updateStatus();checkWin();
-  if(canAutoComplete())autoCompleteTimer=setTimeout(()=>{showMessage('✨...','');autoCompleteTimer=setTimeout(autoComplete,800);},400);
+  if(canAutoComplete())autoCompleteTimer=setTimeout(()=>{showMessage('✨...');autoCompleteTimer=setTimeout(autoComplete,800);},400);
 }
 
 function getSrc(z,c) { if(z==='top'&&c===1)return'waste';if(z==='top'&&c>=2)return'foundation';return'tableau'; }

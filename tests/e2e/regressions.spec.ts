@@ -85,11 +85,9 @@ test.describe('memo — mouse operation', () => {
   });
 });
 
-// showMessage() scheduled an unmanaged 1.5 s clear. The auto-complete hint set
-// one, the win banner arrived before it fired and set no timer of its own, and
-// the stale clear then wiped the 🎉 while gameWon stayed true — navigation dead,
-// board looking perfectly normal. The patient is deaf, so the win sound told him
-// nothing and his joystick had simply stopped responding.
+// The win banner must outlast a short message's pending clear: without it the
+// board looks normal while navigation is dead, and the patient cannot hear the
+// win sound.
 for (const game of ['solitaire', 'freecell'] as const) {
   test.describe(`${game} — win banner`, () => {
     test.afterEach(async ({ page }) => { await esp32Cooldown(page); });
@@ -99,9 +97,9 @@ for (const game of ['solitaire', 'freecell'] as const) {
     });
 
     test('survives a pending auto-complete message clear', async ({ page }) => {
-      await page.evaluate(`showMessage('✨...', '')`);   // schedules a clear at +1.5 s
+      await page.evaluate(`showMessage('✨...')`);       // schedules a clear at +1.5 s
       await page.waitForTimeout(200);
-      await page.evaluate(`showMessage('🎉', 'win')`);
+      await page.evaluate(`setWon(true)`);
       await expect(page.locator('#message')).toHaveClass(/win/);
 
       await page.waitForTimeout(1700);                   // past the stale clear
@@ -109,7 +107,7 @@ for (const game of ['solitaire', 'freecell'] as const) {
     });
 
     test('a plain message still clears itself', async ({ page }) => {
-      await page.evaluate(`showMessage('✨...', '')`);
+      await page.evaluate(`showMessage('✨...')`);
       await expect(page.locator('#message')).toHaveClass(/show/);
       await page.waitForTimeout(1700);
       await expect(page.locator('#message')).not.toHaveClass(/show/);

@@ -1449,7 +1449,7 @@ function checkAndHandleWin() {
   const winner = checkWin(game.board, game.phase, game.turn, game.toPlace);
   if (winner) {
     game.phase = 'gameover';
-    ui.phase = 'gameover';
+    setPhase('gameover');
     const title = winner === W ? (multiplayerMode ? 'Weiß gewinnt!' : 'Du gewinnst!') : (multiplayerMode ? 'Schwarz gewinnt!' : 'Computer gewinnt');
     let reason;
     if (countOnBoard(game.board, winner === W ? B_ : W) < 3) reason = 'Weniger als 3 Steine';
@@ -1600,7 +1600,6 @@ function userAction() {
       window.location.href = '/';
       return;
     }
-    $gameOver.classList.add('hidden');
     showMenu();
     return;
   }
@@ -1781,12 +1780,23 @@ function showMenu() {
   aiInProgress = false;
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
-  ui.phase = 'menu';
-  ui.menuCursor = Math.min(aiDifficulty - 1, 2);
-  $gameOver.classList.add('hidden');
-  $mainMenu.classList.remove('hidden');
-  updateMenuCursor();
+  setPhase('menu');
+  setMenuCursor(Math.min(aiDifficulty - 1, 2));
   updateModeLabels();
+}
+
+// ── Phase ────────────────────────────────────────────────
+// Which overlay shows follows from ui.phase alone, and ui.phase changes only here.
+function setPhase(p) {
+  ui.phase = p;
+  $mainMenu.classList.toggle('hidden', p !== 'menu');
+  $gameOver.classList.toggle('hidden', p !== 'gameover');
+}
+
+// The gold menu cursor is drawn wherever the choice changes, mouse included.
+function setMenuCursor(i) {
+  ui.menuCursor = i;
+  updateMenuCursor();
 }
 
 function updateMenuCursor() {
@@ -1803,26 +1813,19 @@ function handleMenuSelect() {
   const idx = ui.menuCursor;
   if (idx < 3) {
     aiDifficulty = idx + 1;
-    $mainMenu.classList.add('hidden');
     startGame();
   } else {
     // Mode toggle
     multiplayerMode = !multiplayerMode;
     updateModeLabels();
     beep(700, 60);
-    // Repaint: a mouse click set menuCursor to this option but nothing moved the
-    // gold cursor here, so the patient — who is deaf and cannot hear the beep —
-    // saw it still on the old option and would toggle the mode again instead of
-    // starting a game.
-    updateMenuCursor();
   }
 }
 
 function navMenu(dir) {
   const opts = $mainMenu.querySelectorAll('.menu-opt');
-  if (dir === 'up' && ui.menuCursor > 0) { ui.menuCursor--; beep(500, 50); }
-  else if (dir === 'down' && ui.menuCursor < opts.length - 1) { ui.menuCursor++; beep(500, 50); }
-  updateMenuCursor();
+  if (dir === 'up' && ui.menuCursor > 0) { setMenuCursor(ui.menuCursor - 1); beep(500, 50); }
+  else if (dir === 'down' && ui.menuCursor < opts.length - 1) { setMenuCursor(ui.menuCursor + 1); beep(500, 50); }
 }
 
 function navGameOver(dir) {
@@ -1836,7 +1839,7 @@ function navGameOver(dir) {
 
 function startGame() {
   newGameState();
-  ui.phase = 'playing';
+  setPhase('playing');
   ui.cursor = 4;  // start at center of top middle square
   ui.inBtnCol = false;
   ui.btnCursor = 0;
@@ -1850,7 +1853,6 @@ function showGameOver(title, info) {
   ui.goCursor = 0;
   $goTitle.textContent = title;
   $goInfo.textContent = info;
-  $gameOver.classList.remove('hidden');
   document.getElementById('go-new').classList.add('cursor');
   document.getElementById('go-portal').classList.remove('cursor');
 }
@@ -2095,7 +2097,7 @@ function cancelCharge() {
 function completeCharge() {
   const t = charge.target;
   if (t) {
-    if (t.kind === 'menu') { ui.menuCursor = t.i; updateMenuCursor(); }
+    if (t.kind === 'menu') setMenuCursor(t.i);
     else if (t.kind === 'go') { ui.goCursor = t.i; document.getElementById('go-new').classList.toggle('cursor', ui.goCursor === 0); document.getElementById('go-portal').classList.toggle('cursor', ui.goCursor === 1); }
     else if (t.kind === 'btn') { ui.inBtnCol = true; ui.btnCursor = t.i; renderBoard(); }
     else if (t.kind === 'board') { ui.cursor = t.pos; ui.inBtnCol = false; renderBoard(); }
@@ -2276,7 +2278,7 @@ document.querySelectorAll('.action-btn[data-btn]').forEach(el => {
 document.querySelectorAll('.menu-opt[data-d]').forEach((el, i) => {
   el.onclick = () => {
     if (ui.phase !== 'menu') return;
-    ui.menuCursor = i;
+    setMenuCursor(i);
     userAction();
   };
 });

@@ -675,11 +675,11 @@ function initGame(seed) {
   freeCells = [null, null, null, null];
   foundations = [[], [], [], []];
   tableau = [[], [], [], [], [], [], [], []];
-  moves = 0; score = 0; undoStack = []; selectedCard = null; gameWon = false;
+  moves = 0; score = 0; undoStack = []; selectedCard = null;
   autoCompleteRunning = false; hintSource = null; hintDest = null;
   if(autoCompleteIv){clearInterval(autoCompleteIv);autoCompleteIv=null;}
   if(autoCompleteTimer){clearTimeout(autoCompleteTimer);autoCompleteTimer=null;}
-  document.getElementById('message').className = '';
+  setWon(false);
 
   // Deal: 4 columns of 7, 4 columns of 6
   let idx = 0;
@@ -740,11 +740,11 @@ function doUndo() {
   const s = undoStack.pop();
   freeCells = s.freeCells; foundations = s.foundations; tableau = s.tableau;
   moves = s.moves; score = s.score;
-  selectedCard = null; gameWon = false;
+  selectedCard = null;
   if (autoCompleteIv) { clearInterval(autoCompleteIv); autoCompleteIv = null; }
   if (autoCompleteTimer) { clearTimeout(autoCompleteTimer); autoCompleteTimer = null; }
   autoCompleteRunning = false;
-  document.getElementById('message').className = '';
+  setWon(false);
   sndUndo(); render(); updateStatus();
 }
 
@@ -854,21 +854,30 @@ function autoComplete() {
 
 function checkWin() {
   if (foundations.every(f => f.length === 13)) {
-    gameWon = true; sndWin(); showMessage('🎉', 'win');
+    setWon(true); sndWin();
   }
 }
 
+// The win banner follows gameWon, and gameWon changes only in setWon(). A short
+// message shows for 1.5 s and then gives way to what gameWon says.
 let msgTimer = null;
-function showMessage(text, cls='') {
-  const el = document.getElementById('message');
-  el.textContent = text; el.className = 'show ' + cls;
-  // Cancel any pending clear first. The auto-complete hint schedules one 1.5s
-  // out; the win banner arrives before that and sets no timer of its own, so
-  // the stale clear used to wipe the 🎉 while gameWon stayed true. Navigation is
-  // dead in that state and the patient is deaf, so he saw an ordinary finished
-  // board whose joystick simply stopped responding.
+function setWon(won) {
+  gameWon = won;
   if (msgTimer) { clearTimeout(msgTimer); msgTimer = null; }
-  if (cls !== 'win') msgTimer = setTimeout(() => { el.className = ''; msgTimer = null; }, 1500);
+  renderMessage();
+}
+
+function showMessage(text) {
+  const el = document.getElementById('message');
+  el.textContent = text; el.className = 'show';
+  if (msgTimer) clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => { msgTimer = null; renderMessage(); }, 1500);
+}
+
+function renderMessage() {
+  const el = document.getElementById('message');
+  if (gameWon) { el.textContent = '🎉'; el.className = 'show win'; }
+  else el.className = '';
 }
 
 function updateStatus() {
@@ -1321,7 +1330,7 @@ function placeSelectedCard() {
   hintSource = null; hintDest = null;
   render(); updateStatus(); checkWin();
   if (!gameWon && canAutoComplete()) {
-    autoCompleteTimer = setTimeout(() => { showMessage('✨...', ''); autoCompleteTimer = setTimeout(autoComplete, 800); }, 400);
+    autoCompleteTimer = setTimeout(() => { showMessage('✨...'); autoCompleteTimer = setTimeout(autoComplete, 800); }, 400);
   }
 }
 

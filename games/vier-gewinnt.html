@@ -1370,7 +1370,6 @@ function action() {
 
   if (ui.phase === 'menu') {
     aiDifficulty = ui.menuCursor + 1;
-    $diffMenu.classList.add('hidden');
     startGame();
     return;
   }
@@ -1380,7 +1379,6 @@ function action() {
       window.location.href = '/';
       return;
     }
-    $gameOver.classList.add('hidden');
     showDiffMenu();
     return;
   }
@@ -1581,13 +1579,20 @@ function undo() {
   renderBoard();
 }
 
+// ── Phase ───────────────────────────────────────────────
+// Which overlay shows follows from ui.phase alone, and ui.phase changes only here.
+function setPhase(p) {
+  ui.phase = p;
+  $diffMenu.classList.toggle('hidden', p !== 'menu');
+  $gameOver.classList.toggle('hidden', p !== 'gameover');
+}
+
 // ── Game Over ───────────────────────────────────────────
 function showGameOver(title, info) {
-  ui.phase = 'gameover';
+  setPhase('gameover');
   ui.goCursor = 0;
   $goTitle.textContent = title;
   $goInfo.textContent = info;
-  $gameOver.classList.remove('hidden');
   document.getElementById('go-new').classList.add('cursor');
   document.getElementById('go-portal').classList.remove('cursor');
 }
@@ -1598,32 +1603,22 @@ function showDiffMenu() {
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   if (typeof ui !== 'undefined') ui.aiThinking = false;
-  ui.phase = 'menu';
+  setPhase('menu');
   ui.menuCursor = Math.min(aiDifficulty - 1, 2);
-  // See chess.html: the win overlay was only hidden inside action()'s gameover
-  // branch, so pressing N left every following game running underneath it.
-  $gameOver.classList.add('hidden');
-  // A pending 400ms game-over timer from the finished game would otherwise fire
-  // into the new one and raise the old result over an empty board.
-  if (goTimer) { clearTimeout(goTimer); goTimer = null; }
-  $diffMenu.classList.remove('hidden');
+  if (goTimer) { clearTimeout(goTimer); goTimer = null; }  // the finished game's delayed game-over
   $diffMenu.querySelectorAll('.diff-opt').forEach((el, i) =>
     el.classList.toggle('cursor', i === ui.menuCursor));
 }
 
 function startGame() {
   if (aiTimer) { clearTimeout(aiTimer); aiTimer = null; }
-  // The game-over screen is delayed by 400ms so the winning pieces can pulse.
-  // Starting a new game inside that window used to let the finished game's
-  // result surface over the empty new board, with gameActive still true.
-  if (goTimer) { clearTimeout(goTimer); goTimer = null; }
-  $gameOver.classList.add('hidden');
+  if (goTimer) { clearTimeout(goTimer); goTimer = null; }  // the finished game's delayed game-over
   if (typeof cancelCharge === 'function') cancelCharge();
   if (typeof $thinking !== 'undefined' && $thinking) $thinking.classList.add('hidden');
   createBoard();
   buildBoardDOM();
   gameActive = true;
-  ui.phase = 'playing';
+  setPhase('playing');
   ui.cursorCol = 3;
   ui.inBtnCol = false;
   ui.btnCursor = 0;

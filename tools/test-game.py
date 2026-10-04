@@ -203,19 +203,15 @@ class StaticChecker:
                     self.warnings.append(f"CARD_H={h} < 14.0 — cards may look squished")
 
     def _check_win_overlay_clear(self):
-        # Win message must be cleared on new game (prevents sticky overlay)
-        # Starting a new game must clear the win overlay. memo once dealt a fresh
-        # board underneath a still-visible full-screen win screen, leaving the
-        # patient driving a game he could not see and could not escape without a
-        # keyboard. The previous form of this check was gated on the literal
-        # "show win", which appears in no game (the games build the class as
-        # 'show ' + cls), so it could never fire.
+        # Starting a new game must hide the win screen, by hand or through
+        # setPhase(), which derives every overlay from the phase. The behaviour
+        # itself is checked in the browser by tests/e2e/overlays.spec.ts.
         if 'id="win-screen"' in self.content:
             for fn in ["createBoard", "initGame", "newGame", "startGame"]:
                 body = self._function_body(fn)
                 if body is None:
                     continue
-                if "winScreen" not in body and "win-screen" not in body:
+                if "winScreen" not in body and "win-screen" not in body and "setPhase(" not in body:
                     self.errors.append(
                         f"{fn}() does not hide #win-screen — a new board would be "
                         f"dealt underneath the win overlay")

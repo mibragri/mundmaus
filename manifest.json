@@ -20,28 +20,28 @@
       "sha256": "2dede88f76837a75403dfac0a26c2a0afb5de8df3fb41793549964c7bdd6e419"
     },
     "www/freecell.html.gz": {
-      "version": 30,
-      "sha256": "0e5969154100c0f065b5da8f488f4e162350ee5653dac8adb053cec5ba87a277"
+      "version": 31,
+      "sha256": "7a2808e54cb9cf3beb608d958f5c9b6b076c94080d59efc2c552e3e072e597bf"
     },
     "www/memo.html.gz": {
-      "version": 25,
-      "sha256": "9f43e60b8a795d2152fd4fb18a85ea4815b910b93ad64ca796ca1201f059739d"
+      "version": 26,
+      "sha256": "56d9e6604b9908115c80228a0d5c18bd0558dd12e3e645cba3667ec6ab1321be"
     },
     "www/muehle.html.gz": {
-      "version": 21,
-      "sha256": "593cf514cb9a5e09d273e9241f00c440994ea8a57e946b27a079d27f050c6229"
+      "version": 22,
+      "sha256": "62532c30bbb824b6838c2babb380ebd6dc41515518df8bd9a1c7c15cb97e50da"
     },
     "www/settings.html.gz": {
       "version": 19,
       "sha256": "53e91e25ab2e381165e1886f0dd08de53669f0a329509e5195d169b39928e6cb"
     },
     "www/solitaire.html.gz": {
-      "version": 42,
-      "sha256": "8633c60fb0d5d7771f91bd23ee697ca8ea54e6f7ed61c6ab0bed6bb0439cb29f"
+      "version": 43,
+      "sha256": "0a2d327ab3287fb1c2682637cec146a16003be02538bb0631262173b176cd102"
     },
     "www/vier-gewinnt.html.gz": {
-      "version": 29,
-      "sha256": "33e45bf99c794541987ab0ab89c14481e6478274d577e2ba9ebfeacebf1d9322"
+      "version": 30,
+      "sha256": "65ffbb04ddf2db7539e4bdb4fd34da14ebd7b5d53fcc0a6801200e90f4282d9d"
     }
   }
 }

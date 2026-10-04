@@ -748,11 +748,6 @@ function shuffle(arr) {
 function createBoard(levelIdx) {
   state.gen++; // invalidate any pending match/no-match setTimeouts
   if (typeof cancelCharge === 'function') cancelCharge();
-  // Dealing a board must always reveal it. The win screen is a full-screen
-  // opaque overlay and the ⟳ button comes straight here without going through
-  // showMenu(), which was the only place that hid it.
-  $winScreen.classList.add('hidden');
-  $diffMenu.classList.add('hidden');
   const level = LEVELS[levelIdx];
   state.level = levelIdx;
   state.cols = level.cols;
@@ -765,7 +760,7 @@ function createBoard(levelIdx) {
   state.cursor = 0;
   state.inBtnCol = false;
   state.btnIdx = 0;
-  state.phase = 'playing';
+  setPhase('playing');
 
   // Symbole auswählen und Paare erstellen
   const chosen = shuffle([...SYMBOLS]).slice(0, level.pairs);
@@ -1115,7 +1110,6 @@ function action() {
   ensureAudio();
 
   if (state.phase === 'menu') {
-    $diffMenu.classList.add('hidden');
     createBoard(state.menuCursor);
     sndFlip();
     return;
@@ -1163,7 +1157,7 @@ function action() {
     state.second = idx;
     state.moves++;
     $moves.textContent = state.moves;
-    state.phase = 'checking';
+    setPhase('checking');
     updateCursor();
 
     const firstCard = state.cards[state.first];
@@ -1182,7 +1176,7 @@ function action() {
 
         state.first = null;
         state.second = null;
-        state.phase = 'playing';
+        setPhase('playing');
         updateCursor();
 
         // Gewonnen?
@@ -1210,16 +1204,24 @@ function action() {
         if (cards[secondIdx]) cards[secondIdx].classList.remove('wrong');
         state.first = null;
         state.second = null;
-        state.phase = 'playing';
+        setPhase('playing');
         updateCursor();
       }, 1200);
     }
   }
 }
 
+// ── Phase ────────────────────────────────────────────────
+// Which overlay shows follows from state.phase alone, and state.phase changes only here.
+function setPhase(p) {
+  state.phase = p;
+  $diffMenu.classList.toggle('hidden', p !== 'menu');
+  $winScreen.classList.toggle('hidden', p !== 'win');
+}
+
 // ── Gewonnen ─────────────────────────────────────────────
 function winGame() {
-  state.phase = 'win';
+  setPhase('win');
   if (state.timerInterval) clearInterval(state.timerInterval);
 
   const elapsed = getElapsed();
@@ -1244,8 +1246,6 @@ function winGame() {
   document.getElementById('btn-new-game').classList.add('cursor');
   document.getElementById('btn-same').classList.remove('cursor');
   document.getElementById('btn-portal').classList.remove('cursor');
-
-  $winScreen.classList.remove('hidden');
   sndWin();
 }
 
@@ -1253,12 +1253,9 @@ function winGame() {
 function showMenu() {
   state.gen++; // invalidate any pending match/no-match setTimeouts
   if (typeof cancelCharge === 'function') cancelCharge();
-  state.phase = 'menu';
+  setPhase('menu');
   state.menuCursor = state.level || 1;
   if (state.timerInterval) clearInterval(state.timerInterval);
-
-  $winScreen.classList.add('hidden');
-  $diffMenu.classList.remove('hidden');
 
   const opts = $diffMenu.querySelectorAll('.diff-option');
   opts.forEach((el, i) => el.classList.toggle('cursor', i === state.menuCursor));
