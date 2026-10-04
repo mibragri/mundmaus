@@ -43,7 +43,8 @@ void init() {
     // brownout during WiFi TX can produce such a transient failure, and
     // format=true would silently wipe the diagnostic log we are trying to
     // capture on exactly that boot. web_server.cpp's start() still mounts
-    // with format=true for game assets (those are reinstallable via OTA).
+    // with format=true for game assets: Updater::checkManifest() offers every
+    // listed file that is missing from LittleFS, so they come back by OTA.
     LittleFS.begin(false);
 
     Preferences prefs;

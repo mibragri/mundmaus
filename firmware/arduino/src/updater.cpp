@@ -9,6 +9,7 @@
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 #include <esp_ota_ops.h>
+#include <esp_system.h>
 #include <Update.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
@@ -239,24 +240,32 @@ CheckResult checkManifest(const String& telemetry) {
             localVer = it->second;
         }
 
-        // After fresh flash: file exists on LittleFS but NVS has no version.
-        // Seed version from manifest instead of offering a redundant re-download.
-        if (localVer == 0 && !isFirmware) {
+        // NVS records which version was installed, LittleFS holds the file, and
+        // the two can disagree. After a fresh flash the file is there but NVS
+        // knows no version: seed it from the manifest instead of offering a
+        // redundant re-download. After start() reformatted LittleFS, or when a
+        // single file is lost, NVS (which survives a format) still knows a
+        // version but the file is gone: treat it as not installed, so the server
+        // offers it again and the unattended install brings it back.
+        if (!isFirmware) {
             String path = "/" + fname;
-            if (LittleFS.exists(path)) {
+            const bool present = LittleFS.exists(path);
+            if (localVer == 0 && present) {
                 _versions[fname] = remoteVer;
                 localVer = remoteVer;
+            } else if (localVer != 0 && !present) {
+                localVer = 0;
             }
         }
 
-        // Firmware version reconciliation: MUNDMAUS_FW_VERSION (build flag)
-        // is the ground truth for the code currently running. If NVS has
-        // a stale value (e.g., USB-reflashed over an older OTA history,
-        // or factory-flashed while NVS retained entries from a previous
-        // install), reconcile upward. Without this, the device would loop
-        // offering "update to self" forever after any USB flash that
-        // skipped the NVS promotion path in markBootOk().
-        if (isFirmware && localVer < MUNDMAUS_FW_VERSION) {
+        // Firmware version reconciliation: MUNDMAUS_FW_VERSION (build flag) is
+        // the ground truth for the code currently running, in both directions.
+        // Upward: NVS is stale after a USB flash over an older OTA history, and
+        // the device would offer an "update to itself" forever. Downward: after
+        // a boot-loop rollback the older image runs while NVS still records the
+        // newer one as installed, and the lost version would never be offered
+        // again.
+        if (isFirmware && localVer != MUNDMAUS_FW_VERSION) {
             localVer = MUNDMAUS_FW_VERSION;
             _versions[fname] = localVer;
         }
@@ -682,20 +691,32 @@ int fetchRemoteSettings() {
 // of setup(), so an image that survives setup() but then panics in loop() or on
 // Core 0 reboots into the SAME image forever with no rollback — an on-site
 // re-flash, which nobody at the patient's bedside can do. This is the second
-// safety net: a persistent counter, bumped early each boot and cleared once the
-// image proves it can run (bootCrashCounterReset() at ~60 s uptime). Five
-// consecutive boots that never reach that reset means a boot loop; if the other
-// OTA partition holds a KNOWN-GOOD image, boot into it.
+// safety net: a persistent count of crash resets, cleared once the image proves
+// it can run (bootCrashCounterReset() at ~60 s uptime). Five crashes without a
+// stable minute in between mean a boot loop; if the other OTA partition holds a
+// KNOWN-GOOD image, boot into it.
 //
-// A power blip is a single reboot: it bumps the counter to 1, then the image
-// reaches 60 s and clears it — so it never accumulates, which is why this does
-// not risk a spurious rollback. Runs before WifiLog/LittleFS, so Serial only.
+// Only resets the chip raises after a fault count: panic, the watchdogs, CPU
+// lock-up. A brownout, a power cut, a carer switching the device off and on, or
+// a restart the firmware asked for neither counts nor clears. At the bedside
+// brownouts come in quick bursts (wifi_log.cpp), and five of them used to roll a
+// healthy device back to older firmware for good. The price: an image that runs
+// out of heap within a minute of every boot reboots through the heap self-heal
+// (a deliberate restart) and is not rolled back. Runs before WifiLog/LittleFS,
+// so Serial only.
 static constexpr uint32_t BOOT_CRASH_LIMIT = 5;
 
+static bool _resetWasCrash(esp_reset_reason_t why) {
+    return why == ESP_RST_PANIC || why == ESP_RST_INT_WDT || why == ESP_RST_TASK_WDT ||
+           why == ESP_RST_WDT || why == ESP_RST_CPU_LOCKUP;
+}
+
 void checkBootCrashLoop() {
+    if (!_resetWasCrash(esp_reset_reason())) return;
+
     Preferences prefs;
     if (!prefs.begin("sys", false)) return;
-    uint32_t crashes = prefs.getUInt("boot_crashes", 0);
+    const uint32_t crashes = prefs.getUInt("boot_crashes", 0) + 1;
 
     const esp_partition_t* running = esp_ota_get_running_partition();
     const bool onOta = running &&
@@ -709,7 +730,7 @@ void checkBootCrashLoop() {
             st == ESP_OTA_IMG_VALID) {
             // Only roll back to a partition proven good before. Clear the counter
             // first so the good image does not immediately see a loop.
-            Serial.printf("  BOOT-LOOP (%u Crashes) — Rueckfall auf %s\n",
+            Serial.printf("  BOOT-LOOP (%u Abstuerze) — Rueckfall auf %s\n",
                           (unsigned)crashes, other->label);
             prefs.putUInt("boot_crashes", 0);
             prefs.end();
@@ -718,18 +739,13 @@ void checkBootCrashLoop() {
             }
             return;
         }
-        Serial.printf("  BOOT-LOOP (%u Crashes), aber keine gueltige "
+        Serial.printf("  BOOT-LOOP (%u Abstuerze), aber keine gueltige "
                       "Rueckfall-Partition — weiter mit aktuellem Image\n",
                       (unsigned)crashes);
-        // No fallback: nothing better to boot. Keep the counter capped so it
-        // does not grow unbounded, and keep running the current image.
-        prefs.putUInt("boot_crashes", BOOT_CRASH_LIMIT);
-        prefs.end();
-        return;
     }
 
-    // Arm for this boot. Cleared by bootCrashCounterReset() if the image runs.
-    prefs.putUInt("boot_crashes", crashes + 1);
+    // Capped, so a crash loop with nothing to fall back to cannot grow it unbounded.
+    prefs.putUInt("boot_crashes", crashes < BOOT_CRASH_LIMIT ? crashes : BOOT_CRASH_LIMIT);
     prefs.end();
 }
 

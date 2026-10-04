@@ -127,20 +127,23 @@ void load() {
     prefs.end();
 }
 
-void save() {
+bool save() {
     Preferences prefs;
-    prefs.begin("settings", false);  // read-write
+    if (!prefs.begin("settings", false)) {  // read-write
+        Serial.println("  FEHLER: NVS-Bereich settings nicht zu oeffnen");
+        return false;
+    }
 
+    bool ok = true;
     for (int i = 0; i < NUM_CONFIGURABLE; i++) {
         volatile int* ptr = _globalPtr(i);
         if (!ptr) continue;
 
         if (*ptr != _defaultVal(i)) {
             if (prefs.putInt(NVS_KEYS[i], *ptr) == 0) {
-                // Fail loudly: a silent no-op here means the carer's tuning is
-                // lost at the next reboot, and nothing on the page says so.
                 Serial.printf("  FEHLER: NVS-Schreiben fuer %s fehlgeschlagen\n",
                               CONFIGURABLE_KEYS[i]);
+                ok = false;
             }
         } else {
             // Remove key if value equals default (keep NVS clean)
@@ -149,6 +152,7 @@ void save() {
     }
 
     prefs.end();
+    return ok;
 }
 
 void reset() {

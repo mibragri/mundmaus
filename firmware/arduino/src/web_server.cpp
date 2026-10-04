@@ -822,11 +822,14 @@ void MundMausServer::_handleWsMessage(AsyncWebSocketClient* client, JsonDocument
     }
 
     if (strcmp(type, "config_save") == 0) {
-        Config::save();
-        _previewActive = false;  // saved — nothing to auto-revert
+        // The settings page shows a failure instead of "Gespeichert" when ok is
+        // false. A failed save does not disarm a running preview, so its
+        // auto-revert brings the device back to what NVS actually holds.
+        const bool saved = Config::save();
+        if (saved) _previewActive = false;  // saved — nothing to auto-revert
         JsonDocument resp;
         resp["type"] = "config_saved";
-        resp["ok"]   = true;
+        resp["ok"]   = saved;
         String buf;
         serializeJson(resp, buf);
         _broadcastText(buf);

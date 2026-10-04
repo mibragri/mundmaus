@@ -368,15 +368,13 @@ void setup() {
     // Mark firmware boot as valid (cancel OTA rollback).
     //
     // Deliberately at the END of setup(), not after minutes of uptime. This
-    // catches the failure that matters — a new image that crashes DURING boot
-    // loops and rolls back to the known-good partition. The residual gap (an
-    // image that survives setup() but starts crashing later keeps rolling
-    // without a fallback) is accepted on purpose: the alternative, delaying
-    // this until long uptime, would roll back to OLDER firmware on any
-    // unrelated reboot inside the window — a power blip would silently downgrade
-    // the patient's device and undo every fix it just received. OTA images are
-    // tested before deploy and the deploy chain verifies provenance, so a
-    // confident promotion here is the safer trade.
+    // catches a new image that crashes DURING boot: it loops and the bootloader
+    // rolls back to the known-good partition. Delaying it until long uptime
+    // would roll back to OLDER firmware on any unrelated reboot inside the
+    // window — a power blip would silently downgrade the patient's device and
+    // undo every fix it just received. An image that survives setup() and
+    // crashes later is Updater::checkBootCrashLoop()'s job, which counts crash
+    // resets only, so brownouts cannot trigger that rollback either.
     Updater::markBootOk();
 
     // OTA check (only in station mode with internet).
@@ -452,8 +450,8 @@ void loop() {
     }
 
     // Once the image has run for 60 s it has cleared setup() and is stable in
-    // loop() — clear the boot-crash counter so a later power blip does not
-    // accumulate toward a spurious rollback.
+    // loop() — clear the boot-crash counter: crashes with a stable minute in
+    // between are not a boot loop.
     static bool crashCounterCleared = false;
     if (!crashCounterCleared && millis() > 60000) {
         crashCounterCleared = true;

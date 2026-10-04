@@ -126,8 +126,9 @@ extern const Range RANGES[NUM_CONFIGURABLE];
 /// Load saved settings from NVS into globals
 void load();
 
-/// Save non-default values to NVS
-void save();
+/// Save non-default values to NVS. false if NVS could not be opened or a write
+/// failed: the carer's tuning would then be lost at the next reboot.
+bool save();
 
 /// Clear NVS and restore all defaults
 void reset();
