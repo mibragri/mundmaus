@@ -108,6 +108,13 @@ if grep -q '"firmware.bin"' "$MANIFEST"; then
         exit 1
     fi
     echo -e "  ${GREEN}firmware.bin contains v$FW_EXPECT${NC}"
+
+    # Every build of a version contains that string; only the hash in manifest.json
+    # names the one build that was released.
+    if ! python3 "$SCRIPT_DIR/update_manifest.py" --check-firmware; then
+        echo -e "${RED}firmware.bin and manifest.json disagree. Aborting deploy.${NC}"
+        exit 1
+    fi
 fi
 
 # --- Game quality gates (skip with --skip-test) ---

@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from update_manifest import scan_files, compute_hash, update_manifest
+from update_manifest import scan_files, compute_hash, firmware_problem, update_manifest
 
 
 @pytest.fixture
@@ -201,6 +201,55 @@ def test_unreadable_firmware_version_fails_loudly(project_dir):
     (project_dir / 'firmware.bin').write_bytes(b'\x00' * 64)   # no platformio.ini
     with pytest.raises(SystemExit):
         update_manifest(project_dir, project_dir / 'manifest.json')
+
+
+# ── manifest and firmware.bin must agree (deploy gate) ────────────────────
+
+def _released(project_dir, fw_version=4216, content=b'\x01' * 128):
+    _with_platformio(project_dir, fw_version)
+    (project_dir / 'firmware.bin').write_bytes(content)
+    update_manifest(project_dir, project_dir / 'manifest.json')
+
+
+def test_the_recorded_firmware_passes(project_dir):
+    _released(project_dir)
+    assert firmware_problem(project_dir) == ''
+
+
+def test_a_rebuild_under_the_same_version_is_reported(project_dir):
+    """Every build of a version carries the same version string; only the hash tells the build
+    the manifest was written for from a later one."""
+    _released(project_dir)
+    (project_dir / 'firmware.bin').write_bytes(b'\x02' * 128)
+    assert 'bump MUNDMAUS_FW_VERSION' in firmware_problem(project_dir)
+
+
+def test_a_manifest_behind_platformio_ini_is_reported(project_dir):
+    _released(project_dir, 4216)
+    _with_platformio(project_dir, 4217)
+    (project_dir / 'firmware.bin').write_bytes(b'\x03' * 128)
+    problem = firmware_problem(project_dir)
+    assert 'v4216' in problem and 'v4217' in problem, problem
+
+
+def test_a_missing_firmware_file_is_reported(project_dir):
+    _released(project_dir)
+    (project_dir / 'firmware.bin').unlink()
+    assert 'missing' in firmware_problem(project_dir)
+
+
+def test_a_firmware_entry_without_hash_is_reported(project_dir):
+    """update_manifest() writes such an entry when firmware.bin is absent, as in a fresh clone."""
+    _released(project_dir)
+    (project_dir / 'firmware.bin').unlink()
+    update_manifest(project_dir, project_dir / 'manifest.json')
+    (project_dir / 'firmware.bin').write_bytes(b'\x01' * 128)
+    assert 'no sha256' in firmware_problem(project_dir)
+
+
+def test_a_manifest_without_firmware_has_nothing_to_check(project_dir):
+    update_manifest(project_dir, project_dir / 'manifest.json')
+    assert firmware_problem(project_dir) == ''
 
 
 def test_shared_scripts_come_before_the_pages_that_load_them(project_dir):

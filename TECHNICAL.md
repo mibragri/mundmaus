@@ -295,10 +295,14 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 ### Deploy-Workflow
 
 1. Code committen
-2. `tools/update_manifest.py` — Versionen bumpen
-3. Arduino-Firmware (nur wenn sie sich geaendert hat):
-   `OTA_AUTH_B64=... pio run -e esp32` → `scp firmware.bin mbs:/srv/mundmaus/ota/`
-4. `tools/deploy-ota.sh` — Manifest + Dateien auf mundmaus.de deployen
+2. Arduino-Firmware (nur wenn sie sich geaendert hat): `MUNDMAUS_VERSION` und
+   `MUNDMAUS_FW_VERSION` in `platformio.ini` erhoehen, `OTA_AUTH_B64=... pio run -e esp32`,
+   Pruefstand (unten), dann `cp firmware/arduino/.pio/build/esp32/firmware.bin firmware.bin`.
+   Was auf dem Pruefstand lief, ist das Release: ein spaeterer Neubau braucht eine neue
+   Version und einen neuen Lauf.
+3. `tools/update_manifest.py` — Versionen bumpen, sha256 von `firmware.bin` eintragen
+4. `tools/deploy-ota.sh` — Manifest + Dateien auf mundmaus.de deployen; bricht ab, wenn
+   `firmware.bin` nicht das im Manifest verzeichnete Binary ist
 5. Das Geraet prueft beim naechsten Boot und danach alle 3 Stunden
 
 **Basic-Auth-Zugangsdaten** liegen je Variante woanders: Arduino als Build-Flag

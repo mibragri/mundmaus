@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Generate/update manifest.json by detecting file changes via SHA256."""
 
+import argparse
 import hashlib
 import json
 import os
@@ -158,9 +159,47 @@ def update_manifest(project_dir, manifest_path=None):
     return manifest
 
 
+def firmware_problem(project_dir, manifest_path=None):
+    """Why manifest.json does not describe the firmware.bin next to it; '' if it does.
+
+    Every build of a version carries the same version string, so the hash is all that ties the
+    file to the build the manifest was written for.
+    """
+    project_dir = Path(project_dir)
+    manifest_path = Path(manifest_path) if manifest_path else project_dir / 'manifest.json'
+    recorded = json.loads(manifest_path.read_text()).get('files', {}).get(FIRMWARE_NAME)
+    if recorded is None:
+        return ''
+    firmware_path = project_dir / FIRMWARE_NAME
+    if not firmware_path.exists():
+        return f"{FIRMWARE_NAME} is listed in manifest.json but missing on disk."
+    version = read_firmware_version(project_dir)
+    if version != recorded.get('version'):
+        return (f"manifest.json lists firmware v{recorded.get('version')}, {PLATFORMIO_INI} says "
+                f"v{version}: run tools/update_manifest.py.")
+    if 'sha256' not in recorded:
+        return f"manifest.json records no sha256 for {FIRMWARE_NAME}: run tools/update_manifest.py."
+    actual = compute_hash(firmware_path)
+    if actual != recorded['sha256']:
+        return (f"{FIRMWARE_NAME} (sha256 {actual[:12]}) is not the build manifest.json records for "
+                f"v{version} (sha256 {recorded['sha256'][:12]}). A rebuild is a new release: bump "
+                f"MUNDMAUS_FW_VERSION, run the bench, then tools/update_manifest.py.")
+    return ''
+
+
 def main():
+    parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
+    parser.add_argument('--check-firmware', action='store_true',
+                        help='change nothing; fail unless manifest.json describes firmware.bin')
+    args = parser.parse_args()
     project_dir = Path(__file__).parent.parent
     manifest_path = project_dir / 'manifest.json'
+
+    if args.check_firmware:
+        if problem := firmware_problem(project_dir, manifest_path):
+            raise SystemExit(f"ERROR: {problem}")
+        print("  firmware.bin is the build manifest.json records")
+        return
 
     manifest = update_manifest(project_dir, manifest_path)
 
