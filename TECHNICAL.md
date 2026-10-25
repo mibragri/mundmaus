@@ -290,7 +290,9 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 
 - **Arduino**: ESP-IDF Dual-Partition. Ein neues Image bestaetigt sich erst, wenn es beim
   Boot das Manifest ueber eine Verbindung mit geprueftem Zertifikat laedt (HTTP 200, dann
-  `markBootOk()`); sonst, auch ausserhalb des Station-Modus, Rollback auf das vorige Image.
+  `markBootOk()`; bis zu vier Versuche im Abstand von 15 s); sonst, auch ausserhalb des
+  Station-Modus, Rollback auf das vorige Image. OTA-Netzabrufe laufen nacheinander, nie zwei
+  TLS-Verbindungen zugleich: zwei passen nicht in den Speicher.
   Ab 4.2.17 prueft der Updater das Zertifikat gegen ISRG Root X1 (`include/ota_ca.h`).
   Scheitert die Pruefung, holt er die Datei ungeprueft und behaelt sie nur, wenn ihre
   `<datei>.sig` zum eingebauten oeffentlichen Schluessel passt (`include/ota_pubkey.h`).

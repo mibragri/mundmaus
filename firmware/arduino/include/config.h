@@ -50,6 +50,10 @@ constexpr const char* OTA_AUTH     = OTA_AUTH_B64;
 #else
 constexpr const char* OTA_AUTH     = "";
 #endif
+// A new image gets this many certificate-checked manifest fetches, this far apart, to confirm
+// itself before it rolls back (main.cpp): one lost handshake or a late clock must not undo it.
+constexpr int      OTA_CONFIRM_ATTEMPTS = 4;
+constexpr uint32_t OTA_CONFIRM_PAUSE_MS = 15000;
 
 // ============================================================
 // RUNTIME-ADJUSTABLE VALUES (defaults + extern globals)

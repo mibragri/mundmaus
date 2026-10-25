@@ -22,7 +22,7 @@ trap 'rm -rf "$OUT"' EXIT
 
 # stubs/ comes first so its Arduino.h, Preferences.h ... win over the core's; the core dir only
 # supplies WString.h, pgmspace.h and stdlib_noniso.h.
-CXXFLAGS=(-std=gnu++17 -O0 -g -Wall -Wno-unused-parameter
+CXXFLAGS=(-std=gnu++17 -O0 -g -Wall -Wno-unused-parameter -pthread
     -I"$HERE/stubs" -I"$HERE" -I"$CORE" -I"$FW/include" -I"$AJ"
     -DARDUINO=10812 -DARDUINOJSON_ENABLE_ARDUINO_STREAM=0 -DARDUINOJSON_ENABLE_ARDUINO_PRINT=0
     -DARDUINOJSON_ENABLE_PROGMEM=0 '-DMUNDMAUS_VERSION="4.2.14"' -DMUNDMAUS_FW_VERSION=4214

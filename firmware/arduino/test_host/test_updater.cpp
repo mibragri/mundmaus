@@ -1,6 +1,7 @@
 // Host tests for the REAL src/updater.cpp, compiled unchanged by run.sh against stubs/ and fakes.cpp.
 // The build sets MUNDMAUS_FW_VERSION=4214, so in every test the running image is 4214.
 #include <Arduino.h>
+#include <thread>
 #include "config.h"
 #include "updater.h"
 #include "fakes.h"
@@ -107,10 +108,71 @@ static void a2Version() {
   CHECK(Updater::checkManifest("").available.empty(), "Kontrolle: aeltere Firmware auf dem Server wird nicht angeboten");
 }
 
+// --- 8b23: OTA network calls run one at a time ---------------------------------------------
+// Bench 25.10.2026: right after an update the portal's /api/updates/check fetched the manifest
+// while the boot task was still on the network, and the second TLS session failed with "SSL -
+// Memory allocation failed". Two threads stand in for the two FreeRTOS tasks.
+static void t8b23Serial() {
+  std::printf("8b23 OTA-Netzabrufe laufen nacheinander\n");
+  const std::set<std::string> games = {"/www/chess.html.gz", "/www/memo.html.gz"};
+  resetFakes(); serveManifest(4214); g_files = games;
+  g_httpGetMs = 50;  // each connection stays open long enough for the other task to arrive
+  Updater::CheckResult boot, portal;
+  std::thread a([&] { boot = Updater::checkManifest(""); });
+  std::thread b([&] { portal = Updater::checkManifest(""); });
+  a.join(); b.join();
+  CHECK(g_httpMaxOpen == 1, "Boot-Task und Portal-Check halten nie zugleich eine Verbindung");
+  CHECK(!boot.offline && !portal.offline, "beide Abrufe kommen durch, der zweite nur spaeter");
+
+  resetFakes(); serveManifest(4214); g_files = games;
+  g_httpGetMs = 50;
+  std::thread c([] { Updater::fetchRemoteSettings(); });
+  std::thread d([] { Updater::checkManifest(""); });
+  c.join(); d.join();
+  CHECK(g_httpMaxOpen == 1, "Remote-Settings und Manifest-Abruf nacheinander");
+
+  resetFakes(); serveManifest(4214); g_files = games;
+  Updater::checkManifest("");
+  CHECK(g_httpMaxOpen == 1 && g_httpOpen == 0, "Kontrolle: ein Abruf oeffnet genau eine Verbindung und schliesst sie");
+}
+
+// --- 8b23: one failed fetch must not roll a good update back ---------------------------------
+// A new image confirms itself only with a certificate-checked manifest; main.cpp rolls back when
+// that fails. One attempt left a transient error (lost handshake, late clock) no second chance.
+static void t8b23Confirm() {
+  std::printf("8b23 Bestaetigung eines neuen Images uebersteht einen gescheiterten Abruf\n");
+  const std::set<std::string> games = {"/www/chess.html.gz", "/www/memo.html.gz"};
+  resetFakes(); serveManifest(4214); g_files = games;
+  g_httpFailNext = 2;  // first attempt: checked connection and fallback both fail
+  auto r = Updater::checkManifestVerified("", 3, 15000);
+  CHECK(r.verified, "zweiter Versuch per Zertifikat bestaetigt das Image");
+  CHECK(g_httpGets == 3, "dafuer genau ein weiterer Abruf");
+
+  resetFakes(); serveManifest(4214); g_files = games;
+  g_httpFailNext = 1000;  // server gone for good
+  const unsigned long t0 = millis();
+  r = Updater::checkManifestVerified("", 3, 15000);
+  CHECK(!r.verified, "Kontrolle: Server dauerhaft weg -> unbestaetigt, der Rueckfall bleibt");
+  CHECK(g_httpGets == 6, "Kontrolle: drei Versuche, je geprueft und Rueckfall");
+  CHECK(millis() - t0 == 2 * 15000, "Kontrolle: zwei Pausen zwischen drei Versuchen, keine danach");
+
+  resetFakes(); serveManifest(4214); g_files = games;
+  g_http[MANIFEST_URL + ".sig"] = {200, "c2ln"};
+  g_httpCertFails = true; g_sigOk = true;  // only the signed fallback ever answers
+  r = Updater::checkManifestVerified("", 3, 15000);
+  CHECK(!r.verified && !r.offline, "Kontrolle: Manifest nur ueber den Signatur-Rueckfall -> geladen, aber nicht bestaetigt");
+
+  resetFakes(); serveManifest(4214); g_files = games;
+  r = Updater::checkManifestVerified("", 3, 15000);
+  CHECK(r.verified && g_httpGets == 1, "Kontrolle: klappt der erste Abruf, gibt es keinen zweiten");
+}
+
 int main() {
   a1();
   a2BootLoop();
   a2Version();
+  t8b23Serial();
+  t8b23Confirm();
   std::printf("%s: %d Fehler\n", failures() ? "ROT" : "GRUEN", failures());
   return failures() ? 1 : 0;
 }

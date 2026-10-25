@@ -59,6 +59,34 @@ static constexpr int SCHEMA_VERSION = 1;
 // so creating the semaphore here is safe and removes the ordering assumption.
 static SemaphoreHandle_t _versionsMutex = xSemaphoreCreateMutex();
 
+// One OTA network call at a time. Each holds a TLS session, and two at once did not fit in the
+// heap: on the bench (25.10.2026) the portal's /api/updates/check started a manifest fetch while
+// the boot task was still on the network, and the second handshake failed with "SSL - Memory
+// allocation failed". Right after an update the boot task's fetch is the one that confirms the new
+// image, so losing it rolled the update back. checkManifest, both installs and fetchRemoteSettings
+// hold it for their whole run; none of them calls another, so a plain mutex is enough.
+static SemaphoreHandle_t _netMutex = xSemaphoreCreateMutex();
+
+class NetLock {
+ public:
+    NetLock() {
+        if (_netMutex == nullptr) return;
+        if (xSemaphoreTake(_netMutex, 0) != pdTRUE) {
+            Serial.println("  OTA: warte, ein anderer Abruf laeuft");
+            if (xSemaphoreTake(_netMutex, portMAX_DELAY) != pdTRUE) return;
+        }
+        _held = true;
+    }
+    ~NetLock() {
+        if (_held) xSemaphoreGive(_netMutex);
+    }
+    NetLock(const NetLock&) = delete;
+    NetLock& operator=(const NetLock&) = delete;
+
+ private:
+    bool _held = false;
+};
+
 // Internal: load versions into _versions. Caller must hold _versionsMutex.
 static void _loadVersionsLocked() {
     _versions.clear();
@@ -278,6 +306,7 @@ static bool _hashSignatureMatches(const String& url) {
 // ============================================================
 
 CheckResult checkManifest(const String& telemetry) {
+    NetLock net;
     CheckResult result;
     result.offline = true;
 
@@ -434,6 +463,18 @@ CheckResult checkManifest(const String& telemetry) {
     return result;
 }
 
+CheckResult checkManifestVerified(const String& telemetry, int attempts, uint32_t pauseMs) {
+    CheckResult result;
+    for (int attempt = 1; attempt <= attempts; ++attempt) {
+        result = checkManifest(telemetry);
+        if (result.verified || attempt == attempts) break;
+        Serial.printf("  OTA: Manifest nicht per Zertifikat (Versuch %d von %d), neuer Versuch in %lu s\n",
+                      attempt, attempts, (unsigned long)(pauseMs / 1000));
+        delay(pauseMs);
+    }
+    return result;
+}
+
 // ============================================================
 // GAME FILE DOWNLOAD + INSTALL
 // ============================================================
@@ -441,6 +482,7 @@ CheckResult checkManifest(const String& telemetry) {
 bool installGameUpdates(const std::vector<UpdateFile>& files,
                         std::function<void(const String&, int, int)> progressCb) {
     if (files.empty()) return true;
+    NetLock net;
 
     // Filter to game files only (skip firmware)
     std::vector<const UpdateFile*> games;
@@ -657,6 +699,7 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
 
 bool installFirmwareUpdate(const UpdateFile& fw,
                            std::function<void(int, int)> progressCb) {
+    NetLock net;
     String url = _otaBase() + "/" + fw.name;
     Serial.printf("  OTA: downloading firmware %s\n", fw.name.c_str());
 
@@ -780,6 +823,7 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 // ============================================================
 
 int fetchRemoteSettings() {
+    NetLock net;
     String url = _otaBase() + "/settings.json";
 
     HTTPClient http;

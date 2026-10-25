@@ -582,6 +582,7 @@ void MundMausServer::_setupHttpRoutes() {
         }
         // Same reasoning as the other two spawn sites: only the task body clears
         // the flag, so an unchecked failure disables update checks for good.
+        // 16 KB like ota_check: a certificate failure verifies an ECDSA signature here too.
         if (xTaskCreate([](void* param) {
             auto* srv = static_cast<MundMausServer*>(param);
             Updater::CheckResult result = Updater::checkManifest();
@@ -591,8 +592,10 @@ void MundMausServer::_setupHttpRoutes() {
             ev.data[0] = '\0';
             xQueueSend(srv->sensorQueue(), &ev, 0);
             srv->_checkRunning = false;
+            Serial.printf("  OTA: %s Stack-Reserve %u Bytes\n", pcTaskGetName(nullptr),
+                          (unsigned)uxTaskGetStackHighWaterMark(nullptr));
             vTaskDelete(nullptr);
-        }, "upd_check", 8192, this, 1, nullptr) != pdPASS) {
+        }, "upd_check", 16384, this, 1, nullptr) != pdPASS) {
             Serial.println("  FEHLER: Task upd_check nicht erstellbar");
             _checkRunning = false;
         }
@@ -1421,6 +1424,8 @@ void MundMausServer::_updateTaskWrapper(void* param) {
 
     self->_updateRunning = false;
 
+    Serial.printf("  OTA: %s Stack-Reserve %u Bytes\n", pcTaskGetName(nullptr),
+                  (unsigned)uxTaskGetStackHighWaterMark(nullptr));
     // Delete this one-shot task
     vTaskDelete(nullptr);
 }

@@ -15,6 +15,11 @@ std::map<std::string, std::map<std::string, std::string>> g_nvs;
 bool g_nvsWritesFail = false;
 std::set<std::string> g_files;
 std::map<std::string, std::pair<int, std::string>> g_http;
+std::atomic<int> g_httpFailNext{0};
+std::atomic<bool> g_httpCertFails{false};
+std::atomic<int> g_httpGetMs{0};
+std::atomic<int> g_httpGets{0}, g_httpOpen{0}, g_httpMaxOpen{0};
+bool g_sigOk = false;
 FakeSerial Serial; FakeESP ESP; FakeFS LittleFS; UpdateClass Update;
 
 static unsigned long g_ms = 0;
@@ -40,15 +45,17 @@ namespace WifiLog {
 bool ntpSynced() { return true; }
 }
 
-// Signature checks run on the device (mbedtls). Host tests stay on the
-// certificate path, which never calls these; the symbols still have to link.
+// Signature checks run on the device (mbedtls). Here they answer g_sigOk, so a test can let the
+// unchecked fallback deliver a file whose signature counts as valid.
 void otaHashReset() {}
 void otaHashUpdate(const uint8_t*, size_t) {}
-bool otaHashMatches(const char*) { return false; }
-bool otaSignatureOk(const uint8_t*, size_t, const char*) { return false; }
+bool otaHashMatches(const char*) { return g_sigOk; }
+bool otaSignatureOk(const uint8_t*, size_t, const char*) { return g_sigOk; }
 
 void resetFakes() {
   g_nvs.clear(); g_nvsWritesFail = false; g_files.clear(); g_http.clear();
+  g_httpFailNext = 0; g_httpCertFails = false; g_httpGetMs = 0; g_httpGets = 0; g_httpOpen = 0; g_httpMaxOpen = 0;
+  g_sigOk = false;
   g_running = &g_ota1; g_state.clear(); g_bootSet = nullptr; g_resetReason = ESP_RST_POWERON;
 }
 

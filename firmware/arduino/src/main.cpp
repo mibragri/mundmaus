@@ -393,10 +393,11 @@ void setup() {
     Serial.println("Bereit.\n");
 
     // An image that is already valid is confirmed here. A newly OTA'd image
-    // stays PENDING_VERIFY until the boot task below sees one certificate-checked
-    // manifest (HTTP 200). That window is the boot fetch, not minutes of uptime:
-    // a power cut inside it rolls back, which is the point. An image that
-    // survives this and crashes later is Updater::checkBootCrashLoop()'s job.
+    // stays PENDING_VERIFY until the boot task below gets a certificate-checked
+    // manifest (HTTP 200), with Config::OTA_CONFIRM_ATTEMPTS tries. That window
+    // is the boot fetch, about a minute at most, not minutes of uptime: a power
+    // cut inside it rolls back, which is the point. An image that survives this
+    // and crashes later is Updater::checkBootCrashLoop()'s job.
     const bool pendingConfirm = _imagePendingVerify();
     if (!pendingConfirm) {
         Updater::markBootOk();
@@ -419,8 +420,12 @@ void setup() {
         xTaskCreatePinnedToCore(
             [](void* param) {
                 auto* s = static_cast<MundMausServer*>(param);
-                Updater::CheckResult otaResult = Updater::checkManifest(_otaTelemetry());
-                if (_imagePendingVerify()) {
+                const bool confirming = _imagePendingVerify();
+                Updater::CheckResult otaResult = confirming
+                    ? Updater::checkManifestVerified(_otaTelemetry(), Config::OTA_CONFIRM_ATTEMPTS,
+                                                     Config::OTA_CONFIRM_PAUSE_MS)
+                    : Updater::checkManifest(_otaTelemetry());
+                if (confirming) {
                     if (otaResult.verified) {
                         Updater::markBootOk();
                         Serial.println("  OTA: Manifest geprueft, Firmware bestaetigt");
@@ -449,6 +454,8 @@ void setup() {
                 // its socket, and that one game stayed stale until the next
                 // check (measured on the bench, 2026-09-21).
                 s->startAutoGameUpdate();
+                Serial.printf("  OTA: %s Stack-Reserve %u Bytes\n", pcTaskGetName(nullptr),
+                              (unsigned)uxTaskGetStackHighWaterMark(nullptr));
                 vTaskDelete(nullptr);
             },
             "ota_boot", 16384, server, 1, nullptr, 1);
@@ -640,6 +647,8 @@ void loop() {
             ev.data[0] = '\0';
             xQueueSend(srv->sensorQueue(), &ev, 0);
             otaCheckRunning = false;
+            Serial.printf("  OTA: %s Stack-Reserve %u Bytes\n", pcTaskGetName(nullptr),
+                          (unsigned)uxTaskGetStackHighWaterMark(nullptr));
             vTaskDelete(nullptr);
         }, "ota_check", 16384, server, 1, nullptr) != pdPASS) {
             // Latching this one shut would block the only route by which a fix

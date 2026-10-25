@@ -42,6 +42,11 @@ struct CheckResult {
 /// access log records sensor health snapshots (no usage data).
 CheckResult checkManifest(const String& telemetry = "");
 
+/// First boot of a new image: fetches the manifest until one fetch came over the
+/// certificate-checked connection (result.verified), at most `attempts` times with
+/// `pauseMs` between them. A single failed fetch must not roll a good update back.
+CheckResult checkManifestVerified(const String& telemetry, int attempts, uint32_t pauseMs);
+
 /// Download and install game file updates to LittleFS.
 /// Skips firmware entries.
 /// progressCb(filename, current, total) called per file.
