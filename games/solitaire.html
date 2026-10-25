@@ -974,6 +974,45 @@ function addBadge(el,type) {
 // NAVIGATION & INPUT
 // ============================================================
 
+// The top row pushes the foundations to the right with a flexible gap, and
+// the seven columns stay packed on the left. An up or down move therefore
+// has to follow the pile that is actually above the cursor.
+function _centers(list) {
+  return [...list].map(el => { const r = el.getBoundingClientRect(); return r.left + r.width / 2; });
+}
+function _nearest(xs, x) {
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < xs.length; i++) {
+    const d = Math.abs(xs[i] - x);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best;
+}
+function nearestPile(colIdx) {
+  const piles = _centers(document.querySelectorAll('#top-row > .pile-slot'));
+  const cols = document.querySelectorAll('#tableau > .tableau-col');
+  if (!piles.length) return 0;
+  let x;
+  if (colIdx >= cols.length) {
+    const ac = document.querySelector('#tableau > .action-col');
+    if (!ac) return piles.length - 1;
+    const r = ac.getBoundingClientRect();
+    x = r.left + r.width / 2;
+  } else {
+    x = _centers(cols)[colIdx];
+    if (x === undefined) return Math.min(colIdx, piles.length - 1);
+  }
+  return _nearest(piles, x);
+}
+function nearestCol(pileIdx) {
+  const cols = _centers(document.querySelectorAll('#tableau > .tableau-col'));
+  const piles = _centers(document.querySelectorAll('#top-row > .pile-slot'));
+  if (!cols.length) return 0;
+  const x = piles[pileIdx];
+  if (x === undefined) return Math.min(pileIdx, cols.length - 1);
+  return _nearest(cols, x);
+}
+
 function computeTarget(dir) {
   let z=navZone, c=navCol, ci=navCardIdx;
   if(dir==='left'||dir==='right'){
@@ -983,15 +1022,15 @@ function computeTarget(dir) {
     ci=-1;
   }
   if(dir==='up'&&z==='tableau'){
-    if(c===7){if(ci>0)ci--;else{z='top';c=5;ci=-1;}}
+    if(c===7){if(ci>0)ci--;else{z='top';c=nearestPile(7);ci=-1;}}
     else{
       const{start,end,count}=getFaceUpRange(c);
-      if(count>1){const cur=resolveNavCardIdx(c);if(cur>start){ci=cur-1;}else{z='top';if(c>1)c=Math.min(c-1,5);ci=-1;}}
-      else{z='top';if(c>1)c=Math.min(c-1,5);ci=-1;}
+      if(count>1){const cur=resolveNavCardIdx(c);if(cur>start){ci=cur-1;}else{z='top';c=nearestPile(c);ci=-1;}}
+      else{z='top';c=nearestPile(c);ci=-1;}
     }
   }
   if(dir==='down'&&z==='top'){
-    z='tableau';if(c>=2)c=Math.min(c+1,6);else c=Math.min(c,6);ci=-1;
+    z='tableau';c=nearestCol(c);ci=-1;
   } else if(dir==='down'&&z==='tableau'){
     if(c===7){if(ci<3)ci++;else return null;}
     else{
@@ -1135,12 +1174,12 @@ function navigate(dir) {
   }
   if(dir==='up'||dir==='down'){
     if(dir==='up'&&navZone==='tableau'){
-      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=5;navCardIdx=-1;sndZone();render();return;}
+      if(navCol===7){if(navCardIdx>0){navCardIdx--;sndNav();render();return;}navZone='top';navCol=nearestPile(7);navCardIdx=-1;sndZone();render();return;}
       const{start,end,count}=getFaceUpRange(navCol);
       if(count>1){const cur=resolveNavCardIdx(navCol);if(cur>start){navCardIdx=cur-1;sndNav();render();return;}}
-      navZone='top';if(navCol>1)navCol=Math.min(navCol-1,5);navCardIdx=-1;sndZone();
+      navZone='top';navCol=nearestPile(navCol);navCardIdx=-1;sndZone();
     } else if(dir==='down'&&navZone==='top'){
-      navZone='tableau';if(navCol>=2)navCol=Math.min(navCol+1,6);else navCol=Math.min(navCol,6);navCardIdx=-1;sndZone();render();return;
+      navZone='tableau';navCol=nearestCol(navCol);navCardIdx=-1;sndZone();render();return;
     } else if(dir==='down'&&navZone==='tableau'){
       if(navCol===7){if(navCardIdx<3){navCardIdx++;sndNav();}render();return;}
       const{start,end,count}=getFaceUpRange(navCol);

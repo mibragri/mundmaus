@@ -951,6 +951,12 @@ let game = {
   positionCounts: {},
 };
 
+// Same pieces, side to move, castling and en passant rights. The halfmove
+// clock is not part of the position, so it stays out of the key.
+function positionKey() {
+  return game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling + '|' + (game.enPassant || '-');
+}
+
 function newGame() {
   game.board = initBoard();
   game.turn = W;
@@ -961,7 +967,11 @@ function newGame() {
   game.history = [];
   game.capturedW = [];
   game.capturedB = [];
+  // The game starts with this position already on the board, so it counts
+  // as the first occurrence. Counting only positions produced by a move
+  // made the opening draw one return late.
   game.positionCounts = {};
+  game.positionCounts[positionKey()] = 1;
 }
 
 function updateCastling(move) {
@@ -1028,7 +1038,7 @@ function execMove(move, promoType) {
   game.turn = game.turn === W ? B : W;
 
   // Track position for threefold repetition
-  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling + '|' + (game.enPassant || '-');
+  const posKey = positionKey();
   game.positionCounts[posKey] = (game.positionCounts[posKey] || 0) + 1;
 }
 
@@ -1397,7 +1407,7 @@ function renderBoard() {
 
 function updateStatus() {
   // Threefold repetition check
-  const posKey = game.board.flat().map(p => p ? p.color + p.type : '.').join(',') + '|' + game.turn + '|' + game.castling + '|' + (game.enPassant || '-');
+  const posKey = positionKey();
   if ((game.positionCounts[posKey] || 0) >= 3) {
     showGameOver('Unentschieden', 'Stellungswiederholung');
     sndError();
