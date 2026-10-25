@@ -393,14 +393,24 @@ void MundMausServer::_setupHttpRoutes() {
         }
     );
 
-    // --- GET /api/scan ---
+    // --- POST /api/scan ---
     // P1-4: WiFi.scanNetworks() blocks the caller for 2-5 seconds. If we run
     // it inline here we stall the AsyncTCP task on Core 0 — that starves WS
     // sensor traffic for the patient and may drop in-flight HTTP requests.
     // Spawn a one-shot task that performs the blocking scan off-thread, then
     // broadcasts results via WS so both the portal and any WS clients see
     // them. The HTTP caller gets an immediate "scan_started" acknowledgment.
-    _httpServer.on("/api/scan", HTTP_GET, [this](AsyncWebServerRequest* req) {
+    //
+    // POST plus the same-origin gate, same as /api/reboot. A GET is fired by
+    // <img src>, and a request with neither Origin nor Referer is allowed on
+    // purpose (curl, e2e). The settings page does not use this route; it sends
+    // the WebSocket message wifi_scan.
+    _httpServer.on("/api/scan", HTTP_POST, [this](AsyncWebServerRequest* req) {
+        if (!_sameOriginOk(req)) {
+            req->send(403, "application/json",
+                      "{\"ok\":false,\"error\":\"fremde Origin\"}");
+            return;
+        }
         _startAsyncScan();
         JsonDocument doc;
         doc["ok"]      = true;

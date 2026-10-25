@@ -222,7 +222,7 @@ Beide Firmware-Varianten implementieren dieselben Endpoints.
 | `/api/info` | GET | `{board, version, free_ram, ...}` |
 | `/api/wifi` | GET | WiFi-Status `{mode, ssid, ip, connected}` |
 | `/api/wifi` | POST | Credentials speichern `{ssid, password}` → Reboot |
-| `/api/scan` | GET | WLAN-Scan `{networks: ["SSID1", ...]}` |
+| `/api/scan` | POST | WLAN-Scan starten, nur gleiche Origin; Antwort `{ok, status: "scan_started"}`, Ergebnis per WebSocket |
 | `/api/settings` | GET | Aktuelle Konfig-Werte (Deadzone, Threshold, ...) |
 | `/api/reboot` | GET | ESP32 Neustart |
 | `/api/updates` | GET | Verfuegbare OTA-Updates `{available, games, firmware}` |

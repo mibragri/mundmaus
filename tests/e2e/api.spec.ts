@@ -36,8 +36,8 @@ test.describe('API endpoints', () => {
     expect(wifi).toHaveProperty('rssi');
   });
 
-  test('4. GET /api/scan — returns scan_started (async scan)', async ({ page }) => {
-    const { status, data } = await fetchJSON(page, '/api/scan');
+  test('4. POST /api/scan — returns scan_started (async scan)', async ({ page }) => {
+    const { status, data } = await fetchJSON(page, '/api/scan', { method: 'POST' });
     expect(status).toBe(200);
     const scan = data as Record<string, unknown>;
     expect(scan.ok).toBe(true);
