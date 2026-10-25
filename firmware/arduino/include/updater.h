@@ -24,7 +24,11 @@ struct UpdateFile {
 
 struct CheckResult {
     std::vector<UpdateFile> available;
-    bool offline = true;       // true until a successful manifest fetch
+    bool offline = true;       // true until a manifest was accepted
+    // True only when that manifest came back HTTP 200 on the certificate-checked
+    // connection. A signature accepted over the unchecked fallback is not enough
+    // to confirm a new image: the first boot must prove the certificate path.
+    bool verified = false;
 };
 
 // ============================================================

@@ -10,6 +10,7 @@ class HTTPClient {
  public:
   void setConnectTimeout(int32_t) {} void setTimeout(uint16_t) {} void setFollowRedirects(followRedirects_t) {}
   bool begin(const String& url) { std::string u = url.c_str(); url_ = u.substr(0, u.find('?')); return true; }
+  bool begin(const String& url, const char*) { return begin(url); }
   void setUserAgent(const String&) {} void addHeader(const String&, const String&) {}
   int GET() { return g_http.count(url_) ? g_http[url_].first : 404; }
   String getString() { return String(g_http[url_].second.c_str()); }

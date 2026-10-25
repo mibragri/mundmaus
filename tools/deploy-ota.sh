@@ -149,6 +149,26 @@ if [[ "${1:-}" != "--skip-test" ]]; then
     fi
 fi
 
+# --- Sign ---
+# Detached signatures. The running firmware ignores them while the certificate
+# check succeeds, and requires them the moment that check fails. A deploy
+# without them would leave the fallback with nothing it can accept.
+echo -e "\n${YELLOW}--- Signing OTA payloads ---${NC}"
+python3 "$SCRIPT_DIR/sign_ota.py" "$MANIFEST" || exit 1
+while read -r fname; do
+    if [[ "$fname" == www/* ]]; then
+        src="$PROJECT_DIR/firmware/arduino/data/www/$(basename "$fname")"
+    else
+        src="$PROJECT_DIR/$fname"
+    fi
+    python3 "$SCRIPT_DIR/sign_ota.py" "$src" || exit 1
+done < <(MANIFEST="$MANIFEST" python3 -c "
+import json, os
+m = json.load(open(os.environ['MANIFEST']))
+for name in m['files']:
+    print(name)
+")
+
 # --- Deploy ---
 echo -e "\n${YELLOW}--- Deploying to $REMOTE_HOST:$REMOTE_DIR ---${NC}"
 
@@ -171,6 +191,7 @@ for name in m['files']:
         print(name)
 " | while read -r fname; do
     rsync -avz "$PROJECT_DIR/$fname" "$REMOTE_HOST:$REMOTE_DIR/$fname"
+    rsync -avz "$PROJECT_DIR/$fname.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
 done
 
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/www"
@@ -192,10 +213,12 @@ for name in m['files']:
         exit 1
     fi
     rsync -avz "$src" "$REMOTE_HOST:$REMOTE_DIR/$fname"
+    rsync -avz "$src.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
 done
 
 # Manifest last — it is what makes the new versions visible to devices.
 rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
+rsync -avz "$MANIFEST.sig" "$REMOTE_HOST:$REMOTE_DIR/manifest.json.sig"
 
 # --- Verify ---
 #
@@ -224,11 +247,16 @@ if ! cmp -s "$MANIFEST" "$REMOTE_MANIFEST"; then
     exit 1
 fi
 echo -e "  ${GREEN}manifest matches local${NC}"
+if ! curl -sfI "$OTA_URL/manifest.json.sig" > /dev/null; then
+    echo -e "${RED}ERROR: manifest.json.sig is not retrievable.${NC}"
+    exit 1
+fi
+echo -e "  ${GREEN}manifest.json.sig present${NC}"
 
 # Every file the manifest points at must actually be retrievable.
 MISSING=0
 while read -r fname; do
-    if curl -sfI "$OTA_URL/$fname" > /dev/null; then
+    if curl -sfI "$OTA_URL/$fname" > /dev/null && curl -sfI "$OTA_URL/$fname.sig" > /dev/null; then
         echo -e "  ${GREEN}ok${NC}   $fname"
     else
         echo -e "  ${RED}FEHLT${NC} $fname"

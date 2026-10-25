@@ -288,8 +288,12 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 (Basic Auth). Das Portal zeigt verfuegbare Updates an — der User klickt
 "Installieren".
 
-- **Arduino**: ESP-IDF Dual-Partition + `markBootOk()` → automatischer Rollback
-  bei fehlgeschlagenem Firmware-Update
+- **Arduino**: ESP-IDF Dual-Partition. Ein neues Image bestaetigt sich erst, wenn es beim
+  Boot das Manifest ueber eine Verbindung mit geprueftem Zertifikat laedt (HTTP 200, dann
+  `markBootOk()`); sonst, auch ausserhalb des Station-Modus, Rollback auf das vorige Image.
+  Ab 4.2.17 prueft der Updater das Zertifikat gegen ISRG Root X1 (`include/ota_ca.h`).
+  Scheitert die Pruefung, holt er die Datei ungeprueft und behaelt sie nur, wenn ihre
+  `<datei>.sig` zum eingebauten oeffentlichen Schluessel passt (`include/ota_pubkey.h`).
 - **MicroPython**: `.bak`-Dateien + `boot.py` Counter + Recovery-AP
 
 ### Deploy-Workflow
@@ -302,7 +306,9 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
    Version und einen neuen Lauf.
 3. `tools/update_manifest.py` — Versionen bumpen, sha256 von `firmware.bin` eintragen
 4. `tools/deploy-ota.sh` — Manifest + Dateien auf mundmaus.de deployen; bricht ab, wenn
-   `firmware.bin` nicht das im Manifest verzeichnete Binary ist
+   `firmware.bin` nicht das im Manifest verzeichnete Binary ist. Signiert jede Datei des
+   Manifests und das Manifest selbst mit `ota_signing_key.pem` (Projektwurzel, gitignored)
+   und laedt die `.sig` mit hoch
 5. Das Geraet prueft beim naechsten Boot und danach alle 3 Stunden
 
 **Basic-Auth-Zugangsdaten** liegen je Variante woanders: Arduino als Build-Flag

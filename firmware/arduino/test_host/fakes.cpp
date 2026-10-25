@@ -35,6 +35,18 @@ esp_err_t esp_ota_mark_app_valid_cancel_rollback() { return ESP_OK; }
 esp_reset_reason_t esp_reset_reason() { return g_resetReason; }
 void esp_restart() { throw Restart{}; }
 
+// updater.cpp waits on this before a verified TLS handshake. The host has no clock.
+namespace WifiLog {
+bool ntpSynced() { return true; }
+}
+
+// Signature checks run on the device (mbedtls). Host tests stay on the
+// certificate path, which never calls these; the symbols still have to link.
+void otaHashReset() {}
+void otaHashUpdate(const uint8_t*, size_t) {}
+bool otaHashMatches(const char*) { return false; }
+bool otaSignatureOk(const uint8_t*, size_t, const char*) { return false; }
+
 void resetFakes() {
   g_nvs.clear(); g_nvsWritesFail = false; g_files.clear(); g_http.clear();
   g_running = &g_ota1; g_state.clear(); g_bootSet = nullptr; g_resetReason = ESP_RST_POWERON;

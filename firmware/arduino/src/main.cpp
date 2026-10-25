@@ -5,6 +5,7 @@
 #include <WiFi.h>
 #include <esp_task_wdt.h>
 #include <esp_system.h>
+#include <esp_ota_ops.h>
 #include <atomic>
 
 #include "config.h"
@@ -221,6 +222,32 @@ static void sensorTask(void* param) {
 // SETUP
 // ============================================================
 
+// Arduino-ESP32 3.3.7 confirms a new OTA image inside initArduino(), before
+// setup() runs (cores/esp32/esp32-hal-misc.c). Its verifyOta() returns true
+// unless verifyRollbackLater() says to wait. Measured on the bench: an image
+// that restarted before markBootOk() was marked VALID and looped, because the
+// core had already cancelled the bootloader rollback. Returning true leaves
+// the image PENDING_VERIFY until a certificate-checked manifest fetch returns
+// HTTP 200. markBootOk() is that confirmation. A fetch that never succeeds
+// rolls back to the previous firmware, which can still update.
+extern "C" bool verifyRollbackLater() {
+    return true;
+}
+
+static bool _imagePendingVerify() {
+    const esp_partition_t* running = esp_ota_get_running_partition();
+    esp_ota_img_states_t state = ESP_OTA_IMG_UNDEFINED;
+    if (running == nullptr) return false;
+    if (esp_ota_get_state_partition(running, &state) != ESP_OK) return false;
+    return state == ESP_OTA_IMG_PENDING_VERIFY;
+}
+
+static void _rollbackUnconfirmed() {
+    Serial.println("  OTA: Manifest nicht geprueft, Rueckfall");
+    const esp_err_t err = esp_ota_mark_app_invalid_rollback_and_reboot();
+    Serial.printf("  OTA: Rueckfall fehlgeschlagen (%d)\n", (int)err);
+}
+
 // cppcheck-suppress unusedFunction -- the Arduino core calls it (cores/esp32/main.cpp, core 3.3.7)
 void setup() {
     Serial.begin(115200);
@@ -365,17 +392,19 @@ void setup() {
     Serial.printf("\n[Start] Heap frei: %lu bytes\n", (unsigned long)ESP.getFreeHeap());
     Serial.println("Bereit.\n");
 
-    // Mark firmware boot as valid (cancel OTA rollback).
-    //
-    // Deliberately at the END of setup(), not after minutes of uptime. This
-    // catches a new image that crashes DURING boot: it loops and the bootloader
-    // rolls back to the known-good partition. Delaying it until long uptime
-    // would roll back to OLDER firmware on any unrelated reboot inside the
-    // window — a power blip would silently downgrade the patient's device and
-    // undo every fix it just received. An image that survives setup() and
-    // crashes later is Updater::checkBootCrashLoop()'s job, which counts crash
-    // resets only, so brownouts cannot trigger that rollback either.
-    Updater::markBootOk();
+    // An image that is already valid is confirmed here. A newly OTA'd image
+    // stays PENDING_VERIFY until the boot task below sees one certificate-checked
+    // manifest (HTTP 200). That window is the boot fetch, not minutes of uptime:
+    // a power cut inside it rolls back, which is the point. An image that
+    // survives this and crashes later is Updater::checkBootCrashLoop()'s job.
+    const bool pendingConfirm = _imagePendingVerify();
+    if (!pendingConfirm) {
+        Updater::markBootOk();
+    } else if (wifiMode != "station") {
+        _rollbackUnconfirmed();
+    } else {
+        Serial.println("  OTA: neue Firmware, Bestaetigung erst nach geprueftem Manifest");
+    }
 
     // OTA check (only in station mode with internet).
     //
@@ -391,6 +420,14 @@ void setup() {
             [](void* param) {
                 auto* s = static_cast<MundMausServer*>(param);
                 Updater::CheckResult otaResult = Updater::checkManifest(_otaTelemetry());
+                if (_imagePendingVerify()) {
+                    if (otaResult.verified) {
+                        Updater::markBootOk();
+                        Serial.println("  OTA: Manifest geprueft, Firmware bestaetigt");
+                    } else {
+                        _rollbackUnconfirmed();
+                    }
+                }
                 s->setUpdateResult(otaResult);
                 if (!otaResult.offline) {
                     Serial.printf("[OTA] %d Updates verfuegbar\n", otaResult.available.size());
@@ -414,7 +451,7 @@ void setup() {
                 s->startAutoGameUpdate();
                 vTaskDelete(nullptr);
             },
-            "ota_boot", 12288, server, 1, nullptr, 1);
+            "ota_boot", 16384, server, 1, nullptr, 1);
     }
 }
 
@@ -593,8 +630,9 @@ void loop() {
             // announced but uninstalled until a human POSTed /api/update/start —
             // which, on a device meant to need no handling and whose carers
             // cannot do it, meant never. Firmware is excluded inside; that stays
-            // a deliberate act. Runs in its own 16 KB task (TLS needs the stack,
-            // this one has 8 KB).
+            // a deliberate act. Runs in its own 16 KB task (TLS needs the stack).
+            // This task is 16 KB too: a certificate failure verifies an ECDSA
+            // signature here, and 8 KB was no longer enough for that on top of TLS.
             srv->startAutoGameUpdate();
             // Push WS notification to connected clients
             SensorEvent ev;
@@ -603,7 +641,7 @@ void loop() {
             xQueueSend(srv->sensorQueue(), &ev, 0);
             otaCheckRunning = false;
             vTaskDelete(nullptr);
-        }, "ota_check", 8192, server, 1, nullptr) != pdPASS) {
+        }, "ota_check", 16384, server, 1, nullptr) != pdPASS) {
             // Latching this one shut would block the only route by which a fix
             // ever reaches the patient's device.
             Serial.println("  FEHLER: Task ota_check nicht erstellbar");

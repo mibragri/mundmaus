@@ -2,6 +2,12 @@
 
 #include "updater.h"
 #include "config.h"
+#include "ota_ca.h"
+#include "ota_sig.h"
+
+// Declared in wifi_log.h. Not included here: that header names Print, which the
+// host-test stub of Arduino.h does not provide, and this file only needs the clock.
+namespace WifiLog { bool ntpSynced(); }
 
 #include <HTTPClient.h>
 #include <WiFi.h>
@@ -129,27 +135,141 @@ static String _chipId() {
     return String(buf);
 }
 
-/// Configure HTTPClient for OTA server with device identification.
-static bool _beginHttps(HTTPClient& http, const String& url) {
-    http.setConnectTimeout(8000);
-    http.setTimeout(15000);
-    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-
-    if (!http.begin(url)) {
-        Serial.printf("  OTA: HTTP begin failed: %s\n", url.c_str());
-        return false;
+/// mbedTLS rejects a certificate whose notBefore is still in the future, and
+/// the clock is 1970 until SNTP arrives. startNtp() does not wait. One wait
+/// per boot is enough: the ota tasks are not on the WDT, and a later call
+/// during the same boot finds the clock already set or the wait already spent.
+static void _waitForClock() {
+    static bool waited = false;
+    if (WifiLog::ntpSynced() || waited) return;
+    Serial.println("  OTA: warte auf die Uhr, sonst scheitert die Zertifikatspruefung");
+    const unsigned long start = millis();
+    while (!WifiLog::ntpSynced() && millis() - start < 20000) {
+        delay(250);
     }
+    waited = true;
+    if (!WifiLog::ntpSynced()) {
+        Serial.println("  OTA: Uhr nicht synchron");
+    }
+}
 
-    // Device identification via User-Agent
+static void _identify(HTTPClient& http) {
     http.setUserAgent("MundMaus/" MUNDMAUS_VERSION " (ESP32; " + _chipId() + ")");
-
-    // Basic Auth (transition period — server accepts both auth and no-auth)
     if (strlen(Config::OTA_AUTH) > 0) {
         String auth = "Basic ";
         auth += Config::OTA_AUTH;
         http.addHeader("Authorization", auth);
     }
+}
 
+static String _otaBase() {
+#ifdef MUNDMAUS_REHEARSAL_OTA_URL
+    return String(MUNDMAUS_REHEARSAL_OTA_URL);
+#else
+    return String(Config::OTA_BASE_URL);
+#endif
+}
+
+// Strip a query string so the detached signature is the one next to the file.
+static String _sigUrl(const String& url) {
+    const int q = url.indexOf('?');
+    return (q >= 0 ? url.substring(0, q) : url) + ".sig";
+}
+
+/// Configure HTTPClient for OTA server with device identification.
+static bool _beginHttps(HTTPClient& http, const String& url) {
+    _waitForClock();
+    http.setConnectTimeout(8000);
+    http.setTimeout(15000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+
+#ifdef MUNDMAUS_REHEARSAL_BAD_CA
+    // Bench only: a CA the real server does not chain to, so the checked
+    // connection fails and the signature fallback has to carry the fetch.
+    const char* ca = "not-a-certificate";
+#else
+    // OTA_CA_PEM, not begin(url): the one-argument call disables verification.
+    const char* ca = OTA_CA_PEM;
+#endif
+    if (!http.begin(url, ca)) {
+        Serial.printf("  OTA: HTTP begin failed: %s\n", url.c_str());
+        return false;
+    }
+    _identify(http);
+    return true;
+}
+
+// The unchecked connection. HTTPClient::begin(url) on https calls setInsecure().
+// Used only after the certificate check failed, and the body is kept only when
+// its .sig matches the key compiled into this image.
+static bool _beginInsecure(HTTPClient& http, const String& url) {
+    http.setConnectTimeout(8000);
+    http.setTimeout(15000);
+    http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+    if (!http.begin(url)) {
+        Serial.printf("  OTA: insecure begin failed: %s\n", url.c_str());
+        return false;
+    }
+    _identify(http);
+    return true;
+}
+
+// On HTTP 200, leaves http positioned at the body and sets sigRequired when
+// that 200 came from the unchecked fallback. 404 is returned as-is: the
+// certificate path reached the server and the file is absent. Any other
+// result, including a failed handshake, retries once without a certificate.
+static int _openGet(HTTPClient& http, const String& url, bool& sigRequired) {
+    sigRequired = false;
+    if (_beginHttps(http, url)) {
+        const int code = http.GET();
+        if (code == 200 || code == 404) return code;
+        Serial.printf("  OTA: HTTP %d, Signatur-Fallback\n", code);
+        http.end();
+    } else {
+        Serial.println("  OTA: Zertifikat abgelehnt, Signatur-Fallback");
+    }
+    sigRequired = true;
+    if (!_beginInsecure(http, url)) return -1;
+    return http.GET();
+}
+
+static bool _signatureMatches(const String& url, const uint8_t* msg, size_t len) {
+    HTTPClient sigHttp;
+    if (!_beginInsecure(sigHttp, _sigUrl(url))) return false;
+    const int code = sigHttp.GET();
+    if (code != 200) {
+        Serial.printf("  OTA: Signatur HTTP %d\n", code);
+        sigHttp.end();
+        return false;
+    }
+    String sig = sigHttp.getString();
+    sigHttp.end();
+    sig.trim();
+    if (!otaSignatureOk(msg, len, sig.c_str())) {
+        Serial.println("  OTA: Signatur abgelehnt");
+        return false;
+    }
+    Serial.println("  OTA: Signatur gueltig");
+    return true;
+}
+
+static bool _hashSignatureMatches(const String& url) {
+    HTTPClient sigHttp;
+    if (!_beginInsecure(sigHttp, _sigUrl(url))) return false;
+    const int code = sigHttp.GET();
+    if (code != 200) {
+        Serial.printf("  OTA: Signatur HTTP %d\n", code);
+        sigHttp.end();
+        return false;
+    }
+    String sig = sigHttp.getString();
+    sigHttp.end();
+    sig.trim();
+    if (!otaHashMatches(sig.c_str())) {
+        Serial.println("  OTA: Signatur abgelehnt");
+        return false;
+    }
+    Serial.println("  OTA: Signatur gueltig");
     return true;
 }
 
@@ -163,27 +283,32 @@ CheckResult checkManifest(const String& telemetry) {
 
     // Build manifest URL — optional telemetry as query string so the OTA
     // server's access log records sensor health (no usage data).
-    String url = String(Config::OTA_BASE_URL) + "/manifest.json";
+    String url = _otaBase() + "/manifest.json";
     if (telemetry.length() > 0) {
         url += "?";
         url += telemetry;
     }
 
     HTTPClient http;
-    if (!_beginHttps(http, url)) {
-        return result;
-    }
-
-    int code = http.GET();
+    bool sigRequired = false;
+    const int code = _openGet(http, url, sigRequired);
     if (code != 200) {
         Serial.printf("  OTA: manifest HTTP %d\n", code);
         http.end();
         return result;
     }
 
-    // Parse manifest JSON
     String body = http.getString();
     http.end();
+    if (sigRequired && !_signatureMatches(url, reinterpret_cast<const uint8_t*>(body.c_str()), body.length())) {
+        return result;
+    }
+    if (!sigRequired) {
+        result.verified = true;
+        Serial.println("  OTA: Manifest per Zertifikat geladen");
+    } else {
+        Serial.println("  OTA: Manifest per Signatur geladen");
+    }
 
     JsonDocument manifest;
     DeserializationError err = deserializeJson(manifest, body);
@@ -340,22 +465,18 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             progressCb(uf->name, current, total);
         }
 
-        String url = String(Config::OTA_BASE_URL) + "/" + uf->name;
+        String url = _otaBase() + "/" + uf->name;
         HTTPClient http;
 
-        if (!_beginHttps(http, url)) {
-            Serial.printf("  OTA: download begin failed: %s\n", uf->name.c_str());
-            allOk = false;
-            continue;
-        }
-
-        int code = http.GET();
+        bool sigRequired = false;
+        const int code = _openGet(http, url, sigRequired);
         if (code != 200) {
             Serial.printf("  OTA: download %s HTTP %d\n", uf->name.c_str(), code);
             http.end();
             allOk = false;
             continue;
         }
+        if (sigRequired) otaHashReset();
 
         int contentLen = http.getSize();
 
@@ -423,6 +544,7 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
                 writeFailed = true;
                 break;
             }
+            if (sigRequired) otaHashUpdate(buf, (size_t)n);
             written += n;
             if (contentLen > 0) {
                 contentLen -= n;
@@ -458,6 +580,10 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
             // would never offer to repair. Refuse instead and keep the old file.
             Serial.printf("  OTA: %s chunked response (no Content-Length) — abgelehnt\n",
                           uf->name.c_str());
+            downloadOk = false;
+        }
+
+        if (downloadOk && sigRequired && !_hashSignatureMatches(url)) {
             downloadOk = false;
         }
 
@@ -531,21 +657,18 @@ bool installGameUpdates(const std::vector<UpdateFile>& files,
 
 bool installFirmwareUpdate(const UpdateFile& fw,
                            std::function<void(int, int)> progressCb) {
-    String url = String(Config::OTA_BASE_URL) + "/" + fw.name;
+    String url = _otaBase() + "/" + fw.name;
     Serial.printf("  OTA: downloading firmware %s\n", fw.name.c_str());
 
     HTTPClient http;
-    if (!_beginHttps(http, url)) {
-        Serial.println("  OTA: firmware HTTPS failed");
-        return false;
-    }
-
-    int code = http.GET();
+    bool sigRequired = false;
+    const int code = _openGet(http, url, sigRequired);
     if (code != 200) {
         Serial.printf("  OTA: firmware HTTP %d\n", code);
         http.end();
         return false;
     }
+    if (sigRequired) otaHashReset();
 
     int contentLen = http.getSize();
     if (contentLen <= 0) {
@@ -591,6 +714,7 @@ bool installFirmwareUpdate(const UpdateFile& fw,
             http.end();
             return false;
         }
+        if (sigRequired) otaHashUpdate(buf, (size_t)n);
 
         written += n;
         if (progressCb) {
@@ -599,6 +723,11 @@ bool installFirmwareUpdate(const UpdateFile& fw,
     }
 
     http.end();
+
+    if (sigRequired && !_hashSignatureMatches(url)) {
+        Update.abort();
+        return false;
+    }
 
     // P2-3: Explicit truncation check. The loop above can exit via `break`
     // on read error (n <= 0) with written < contentLen. Without this check,
@@ -651,12 +780,11 @@ bool installFirmwareUpdate(const UpdateFile& fw,
 // ============================================================
 
 int fetchRemoteSettings() {
-    String url = String(Config::OTA_BASE_URL) + "/settings.json";
+    String url = _otaBase() + "/settings.json";
 
     HTTPClient http;
-    if (!_beginHttps(http, url)) return -1;
-
-    int code = http.GET();
+    bool sigRequired = false;
+    const int code = _openGet(http, url, sigRequired);
     if (code != 200) {
         // 404 = no remote settings file, not an error
         if (code != 404) {
@@ -668,6 +796,9 @@ int fetchRemoteSettings() {
 
     String body = http.getString();
     http.end();
+    if (sigRequired && !_signatureMatches(url, reinterpret_cast<const uint8_t*>(body.c_str()), body.length())) {
+        return -1;
+    }
 
     JsonDocument doc;
     DeserializationError err = deserializeJson(doc, body);
