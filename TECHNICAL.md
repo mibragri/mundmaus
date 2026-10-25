@@ -307,7 +307,8 @@ Beide Firmware-Varianten pruefen beim Boot `mundmaus.de/ota/manifest.json`
 3. `tools/update_manifest.py` — Versionen bumpen, sha256 von `firmware.bin` eintragen
 4. `tools/deploy-ota.sh` — Manifest + Dateien auf mundmaus.de deployen; bricht ab, wenn
    `firmware.bin` nicht das im Manifest verzeichnete Binary ist. Signiert jede Datei des
-   Manifests und das Manifest selbst mit `ota_signing_key.pem` (Projektwurzel, gitignored)
+   Manifests und das Manifest selbst mit `~/data/mundmaus/ota_signing_key.pem` (Rechte 600,
+   ausserhalb des Repos)
    und laedt die `.sig` mit hoch
 5. Das Geraet prueft beim naechsten Boot und danach alle 3 Stunden
 

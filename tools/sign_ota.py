@@ -3,16 +3,15 @@
 
 The signature is the base64 of the DER signature over the SHA-256 of the
 file bytes, in <path>.sig. The firmware checks it only when the certificate
-check failed. The private key is ota_signing_key.pem in the project root
-and is not committed.
+check failed. The private key is ~/data/mundmaus/ota_signing_key.pem
+(mode 600), outside the repository.
 """
 
 import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-KEY = ROOT / "ota_signing_key.pem"
+KEY = Path.home() / "data" / "mundmaus" / "ota_signing_key.pem"
 
 
 def sign(path: Path) -> None:

@@ -41,9 +41,11 @@ enclosure/bambu-profiles/printer.env
 
 # OTA authentication (contains credentials)
 ota_auth.py
-# Private half of the OTA signature key. The public half is compiled into the
-# firmware (include/ota_pubkey.h). Losing this file disables the fallback that
-# still accepts an update when the server certificate does not verify.
+# Private half of the OTA signature key. It lives in ~/data/mundmaus/ (see
+# tools/sign_ota.py) and is ignored here so that a copy dropped into the tree is
+# never committed. The public half is compiled into the firmware
+# (include/ota_pubkey.h). Losing the key disables the fallback that still
+# accepts an update when the server certificate does not verify.
 ota_signing_key.pem
 # OTA Basic-Auth token read by tests/e2e/ota-files.spec.ts. Same class as .env
 # above: referenced but not previously ignored, so `git add -A` would commit it.

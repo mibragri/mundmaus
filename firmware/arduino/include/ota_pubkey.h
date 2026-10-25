@@ -1,6 +1,6 @@
 #pragma once
 // Public half of the OTA signing key (ECDSA P-256). The private half lives in
-// ota_signing_key.pem, which is gitignored, and is used by tools/sign_ota.py.
+// ~/data/mundmaus/ota_signing_key.pem, outside the repo, used by tools/sign_ota.py.
 // A certificate failure falls back to an unchecked connection and accepts a
 // file only when its detached .sig matches this key.
 
