@@ -182,6 +182,10 @@ ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
 # of stale content is recorded as the new version and that content is then
 # pinned forever. Publishing the manifest last makes the window harmless: the
 # device simply sees the old manifest and tries again later.
+#
+# Every upload sets the server mode itself (--chmod=F644). rsync -a copies the
+# local mode, so a firmware.bin kept at 600 went up as 600 and Caddy answered
+# 403 while the new manifest was already live (2026-11-01).
 
 MANIFEST="$MANIFEST" python3 -c "
 import json, os
@@ -190,8 +194,8 @@ for name in m['files']:
     if not name.startswith('www/'):
         print(name)
 " | while read -r fname; do
-    rsync -avz "$PROJECT_DIR/$fname" "$REMOTE_HOST:$REMOTE_DIR/$fname"
-    rsync -avz "$PROJECT_DIR/$fname.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
+    rsync -avz --chmod=F644 "$PROJECT_DIR/$fname" "$REMOTE_HOST:$REMOTE_DIR/$fname"
+    rsync -avz --chmod=F644 "$PROJECT_DIR/$fname.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
 done
 
 ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR/www"
@@ -212,13 +216,13 @@ for name in m['files']:
         echo -e "${RED}ERROR: $src missing — run tools/check-games.sh${NC}"
         exit 1
     fi
-    rsync -avz "$src" "$REMOTE_HOST:$REMOTE_DIR/$fname"
-    rsync -avz "$src.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
+    rsync -avz --chmod=F644 "$src" "$REMOTE_HOST:$REMOTE_DIR/$fname"
+    rsync -avz --chmod=F644 "$src.sig" "$REMOTE_HOST:$REMOTE_DIR/$fname.sig"
 done
 
 # Manifest last — it is what makes the new versions visible to devices.
-rsync -avz "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
-rsync -avz "$MANIFEST.sig" "$REMOTE_HOST:$REMOTE_DIR/manifest.json.sig"
+rsync -avz --chmod=F644 "$MANIFEST" "$REMOTE_HOST:$REMOTE_DIR/manifest.json"
+rsync -avz --chmod=F644 "$MANIFEST.sig" "$REMOTE_HOST:$REMOTE_DIR/manifest.json.sig"
 
 # --- Verify ---
 #
