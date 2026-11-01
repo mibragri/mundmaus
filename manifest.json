@@ -9,6 +9,12 @@
       "version": 1,
       "sha256": "d03b6fc38ae568af830b9190985d47c877fd70e5215d54c47c4f3a4c8c313756"
     },
+    "firmware.bin": {
+      "version": 4217,
+      "firmware": true,
+      "sha256": "5cab1453c9adf59665eb834540587cde1b5f784a871a54d5766e46673fdd132f",
+      "size": 1349280
+    },
     "www/chess.html.gz": {
       "version": 32,
       "sha256": "b2670c97e71ac67cb88bd8359bf2800226dee5202d57e9cc1b791894228005f8"
@@ -36,12 +42,6 @@
     "www/vier-gewinnt.html.gz": {
       "version": 29,
       "sha256": "65ffbb04ddf2db7539e4bdb4fd34da14ebd7b5d53fcc0a6801200e90f4282d9d"
-    },
-    "firmware.bin": {
-      "version": 4214,
-      "firmware": true,
-      "sha256": "cf6f9ba4c71dc8a46e4200c5e74b5530900e8bad64b013bcae326705b2b3cf88",
-      "size": 1346400
     }
   }
 }
