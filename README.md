@@ -91,7 +91,7 @@ CAD-Modell (OnShape): [Mundstueck oeffnen](https://cad.onshape.com/documents/95d
 
 ### Halterung
 
-Das Gehaeuse wird in eine handelsueblliche **Mikrofonklemme** auf einem **Mikrofon-Bodenstaender** eingespannt (wie fuer Musiker). Der Staender steht neben dem Bett und positioniert den Joystick vor dem Mund des Patienten. Alternative: ein **Schwanenhals-Tischstaender** fuer kleinere Aufbauten.
+Das Gehaeuse wird direkt auf einen handelsueblichen **Mikrofon-Bodenstaender** geschraubt: In einer Schmalseite sitzt eine eingelegte Sechskantmutter, in die das Gewinde des Staenders greift (Masse der Muttertasche in `enclosure/mundmaus_v58_enclosure.py`). Der Staender steht neben dem Bett und positioniert den Joystick vor dem Mund des Patienten. Alternative: ein **Schwanenhals-Tischstaender** mit demselben Gewinde fuer kleinere Aufbauten.
 
 > **Wichtig:** Das USB-Kabel muss ein **Datenkabel** sein, nicht nur ein Ladekabel! Datenkabel haben 4 Adern (2 Strom + 2 Daten), Ladekabel nur 2. Im Zweifel: wenn der Computer das ESP32 nicht erkennt, anderes Kabel probieren.
 
