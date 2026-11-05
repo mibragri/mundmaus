@@ -120,8 +120,8 @@ PILLAR_BASE_TOP_Z_OFFSET = 0.2  # Lücke zwischen Base-Säulen-Top und Lid-Häng
 # und eine dritte Kandidatin kommt hinzu: 3/8-16 BSW, das europaeische
 # Mikrofonstaender-Gewinde, gleiche 16 Gaenge wie UNC, anderer Flankenwinkel.
 # Entschieden wird das an der Mutter, nicht am Schreibtisch. Genau deshalb
-# verwendet die Stativ-Manschette (brami3dmaker, models/mundmaus-
-# stativmanschette) die vorhandene Mutter weiter, statt ein Gewinde nachzubauen.
+# verwendet die separat gedruckte Stativ-Manschette die vorhandene Mutter
+# weiter, statt ein Gewinde nachzubauen.
 #
 # MIC_NUT_H (5.56) stand hier bis 05.11.2026 und war in allen vier
 # Generatorfassungen toter Code: die Tasche kommt aus MIC_NUT_POCKET_D, und

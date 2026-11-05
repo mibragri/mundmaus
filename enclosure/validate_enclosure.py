@@ -205,8 +205,8 @@ if _unchecked:
          f"in der Freigangpruefung — dieselbe Krankheit, nur kleiner.)")
 
 # ── Traegt die Stativaufnahme ihre Last? ────────────────────────
-# Diese Pruefung gab es nicht, und deshalb steht sie jetzt hier: am 04.11.2026
-# ist die Aufnahme im Betrieb gebrochen. Der Validator prueft Maße, Abstaende
+# Diese Pruefung gab es nicht, und deshalb steht sie jetzt hier: die Aufnahme
+# hat sich im Betrieb als zu schwach erwiesen. Der Validator prueft Maße, Abstaende
 # und Druckbarkeit — nie, ob ein Teil die Kraft aushaelt, die an ihm zieht. Ein
 # Mass kann stimmen und das Teil trotzdem reissen; genau das ist passiert.
 # Lastfall: 75 N am fernen Gehaeuseende, Hebel EXT_X. Massgeblich ist der
@@ -221,11 +221,13 @@ if _f_wall < _LOAD_N:
     warn(f"Stativaufnahme traegt ihre Last nicht: die {WALL}mm-Stirnwand um den "
          f"Ø{MIC_COLLAR_D}mm-Kragen haelt rechnerisch {_f_wall:.1f}N am "
          f"{EXT_X:.0f}mm-Hebel, noetig waeren {_LOAD_N:.0f}N. Dafuer braeuchte die "
-         f"Wand {_t_need:.1f}mm statt {WALL}mm. Am 04.11.2026 ist sie gebrochen. "
-         f"Behoben ist das derzeit AUSSERHALB dieses Modells, durch die "
-         f"Stativ-Manschette (brami3dmaker, models/mundmaus-stativmanschette); "
-         f"am Gehaeuse selbst ist nichts geaendert. Wer das Unterteil neu "
-         f"druckt, bekommt dieselbe Schwachstelle wieder.")
+         f"Wand {_t_need:.1f}mm statt {WALL}mm; im Betrieb hat sie sich als zu "
+         f"schwach erwiesen. Aufgefangen wird die Last derzeit AUSSERHALB dieses "
+         f"Modells, durch eine separat gedruckte Manschette, die ueber die "
+         f"letzten 34 mm des Gehaeusekoerpers greift und die Stativmutter "
+         f"aufnimmt; sie liegt nicht in diesem Repo. Am Gehaeuse selbst ist "
+         f"nichts geaendert: wer das Unterteil neu druckt, bekommt dieselbe "
+         f"Schwachstelle wieder.")
 else:
     ok(f"Stativaufnahme traegt {_f_wall:.0f}N am {EXT_X:.0f}mm-Hebel ✓")
 
