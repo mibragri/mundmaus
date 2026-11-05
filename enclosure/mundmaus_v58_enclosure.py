@@ -111,8 +111,23 @@ PILLAR_X = 58.0         # Säulen-X-Position (innen, in der Eckkurve mit INNER_R
 PILLAR_Y = 18.0         # Säulen-Y-Position (symmetrisch ±, mit ESP_POS_Y=0 → 1.0mm Abstand zu ESP32, 1.6mm zur Innenwand)
 PILLAR_BASE_TOP_Z_OFFSET = 0.2  # Lücke zwischen Base-Säulen-Top und Lid-Hänger-Bottom
 
-# ── 3/8"-16 UNC mic stand mount (-X wall) ──────────────────────────
-MIC_CLEAR_D, MIC_NUT_SW, MIC_NUT_H = 10.5, 16.9, 5.56  # SW measured 16.8-16.9mm
+# ── Stativaufnahme (-X-Wand) ─────────────────────────────────────
+# Welches Gewinde der Staender traegt, ist UNBESTIMMT. Hier stand bis
+# 05.11.2026 "3/8-16 UNC", ohne dass das je geprueft worden waere. Belegt ist
+# allein die Schluesselweite der vorhandenen Mutter: 16.8-16.9, gemessen. Sie
+# passt zu M10 (DIN 934, SW 17.0 abzueglich Toleranz) und nicht zu 3/8-16 UNC
+# (SW 14.29) — aber eine Schluesselweite sagt nichts ueber das Gewinde darin,
+# und eine dritte Kandidatin kommt hinzu: 3/8-16 BSW, das europaeische
+# Mikrofonstaender-Gewinde, gleiche 16 Gaenge wie UNC, anderer Flankenwinkel.
+# Entschieden wird das an der Mutter, nicht am Schreibtisch. Genau deshalb
+# verwendet die Stativ-Manschette (brami3dmaker, models/mundmaus-
+# stativmanschette) die vorhandene Mutter weiter, statt ein Gewinde nachzubauen.
+#
+# MIC_NUT_H (5.56) stand hier bis 05.11.2026 und war in allen vier
+# Generatorfassungen toter Code: die Tasche kommt aus MIC_NUT_POCKET_D, und
+# gemessen worden ist die Hoehe nie. Eine Datenblattzahl, die nichts tut, liest
+# sich wie ein Beleg.
+MIC_CLEAR_D, MIC_NUT_SW = 10.5, 16.9  # SW am vorhandenen Teil gemessen
 MIC_NUT_TOL, MIC_NUT_POCKET_D, MIC_COLLAR_D = 0.205, 7.9, 24.0
 MIC_POS_Y = 0.0
 # MIC_POS_Z is derived below (collar sits on floor, top clears lip)

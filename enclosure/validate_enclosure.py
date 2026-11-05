@@ -37,12 +37,45 @@ SPEC = {
         "board_h": (5.0, "mm — with sensor element"),
         "barb_od": (3.0, "mm — silicone tube barb"),
     },
-    "3/8\"-16 UNC (Mic Stand)": {
-        "clear_d": (10.5, "mm — through-hole"),
-        "nut_sw": (14.29, "mm — across flats"),
-        "nut_h": (5.56, "mm"),
+    # Keine Datenblattzeile, sondern eine Messung. Hier stand bis 05.11.2026
+    # '3/8"-16 UNC (Mic Stand)' mit nut_sw 14.29 — eine Datenblattzahl fuer eine
+    # Annahme, waehrend der Generator mit der gemessenen 16.9 baute. Beide
+    # Zahlen standen vier Generatorfassungen lang nebeneinander, ohne dass
+    # irgendetwas sie verglichen haette. Dagegen steht jetzt SPEC_VS_MODEL.
+    # Welches Gewinde der Staender traegt, bleibt unbestimmt: M10, 3/8-16 UNC
+    # und 3/8-16 BSW sind alle moeglich, eine Schluesselweite entscheidet das
+    # nicht. nut_h 5.56 ist mit entfallen — nie gemessen, nie benutzt.
+    "Stativmutter (gemessen, Gewinde unbestimmt)": {
+        "clear_d": (10.5, "mm — Durchgang fuer den Zapfen"),
+        "nut_sw": (16.9, "mm — Schluesselweite, am vorhandenen Teil gemessen"),
     },
 }
+
+# Was die Tabelle oben mit dem Modell verbindet. Ohne diese Liste ist SPEC
+# Dekoration: eine Tabelle, die wie eine Pruefung aussieht und keine ist.
+#   (SPEC-Gruppe, Feld, Modellkonstante, erlaubte Abweichung, Grund)
+# Der Grund ist Pflicht, sobald eine Abweichung erlaubt wird — eine Toleranz
+# ohne Begruendung ist nur eine Zahl, die gross genug gewaehlt wurde.
+SPEC_VS_MODEL = [
+    ("ESP32 DevKitC V4 (Espressif)", "pcb_l", "ESP_L", 0.0, None),
+    ("ESP32 DevKitC V4 (Espressif)", "pcb_w", "ESP_W", 0.15,
+     "Espressif nennt 27.9, das Modell rundet auf 28.0 auf — zugunsten der Passung"),
+    ("ESP32 DevKitC V4 (Espressif)", "pcb_h", "ESP_H", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "pcb_l", "JOY_PCB_L", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "pcb_w", "JOY_PCB_W", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "hole_grid_x", "JOY_HOLE_GRID_X", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "hole_grid_y", "JOY_HOLE_GRID_Y", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "housing_size", "JOY_HOUSING", 0.0, None),
+    ("KY-023 Joystick (AZDelivery)", "stick_h", "JOY_STICK_H", 0.0, None),
+    ("MPS20N0040D-S + HX710B", "board_l", "PRES_PCB_W", 1.0,
+     "Board nur ungefaehr bekannt; PCB_W ist die Z-Richtung am +X-Wand-Einbau"),
+    ("MPS20N0040D-S + HX710B", "board_w", "PRES_PCB_H", 1.0,
+     "dito, PCB_H ist die Y-Richtung"),
+    ("MPS20N0040D-S + HX710B", "barb_od", "PRES_BARB_HOLE_D", 0.25,
+     "Bohrung absichtlich enger als der Nippel: Presssitz"),
+    ("Stativmutter (gemessen, Gewinde unbestimmt)", "clear_d", "MIC_CLEAR_D", 0.0, None),
+    ("Stativmutter (gemessen, Gewinde unbestimmt)", "nut_sw", "MIC_NUT_SW", 0.0, None),
+]
 
 # ═══════════════════════════════════════════════════════════════════
 # IMPORT ENCLOSURE CONSTANTS
@@ -135,14 +168,66 @@ elif JOY_PIN_D > 3.8:
 else:
     ok(f"Joystick pin Ø{JOY_PIN_D}mm in Ø4.2mm hole — clearance {4.2-JOY_PIN_D:.1f}mm ✓")
 
-_spec_pres = SPEC["MPS20N0040D-S + HX710B"]
-if abs(PRES_PCB_W - _spec_pres["board_l"][0]) > 1.0 or abs(PRES_PCB_H - _spec_pres["board_w"][0]) > 1.0:
-    warn(f"Pressure sensor PCB {PRES_PCB_W}×{PRES_PCB_H}mm differs from the approximate spec "
-         f"{_spec_pres['board_l'][0]}×{_spec_pres['board_w'][0]}mm by more than 1mm")
+# ── SPEC gegen das Modell ────────────────────────────────────
+# Bis 05.11.2026 wurde SPEC genau EINMAL gelesen, von Hand, fuer den
+# Drucksensor. Die Stativmutter-Zeile nannte darum vier Generatorfassungen lang
+# SW 14.29, waehrend der Generator mit 16.9 baute, und die Zeile darunter gab
+# die 16.9 brav aus, ohne zu vergleichen. Eine Referenztabelle, die niemand
+# gegen das Modell haelt, ist keine Pruefung, sondern Dekoration mit dem
+# Ansehen einer Pruefung — und das ist schlechter als gar keine Tabelle.
+_checked = set()
+for _grp, _field, _const, _tol, _why in SPEC_VS_MODEL:
+    _checked.add((_grp, _field))
+    if _grp not in SPEC or _field not in SPEC[_grp]:
+        err(f"SPEC_VS_MODEL verweist auf {_grp}/{_field}, das es in SPEC nicht gibt")
+        continue
+    if _const not in globals():
+        err(f"SPEC_VS_MODEL verweist auf {_const}, diese Modellkonstante gibt es nicht")
+        continue
+    _spec_v = SPEC[_grp][_field][0]
+    _model_v = globals()[_const]
+    _d = abs(_model_v - _spec_v)
+    if _d > _tol + 1e-9:
+        err(f"{_const} = {_model_v} weicht {_d:.2f}mm von SPEC {_grp}/{_field} "
+            f"= {_spec_v} ab (erlaubt {_tol})")
+    elif _d > 1e-9:
+        ok(f"{_const} = {_model_v} vs SPEC {_spec_v} — {_why}")
+    else:
+        ok(f"{_const} = {_model_v} deckt sich mit SPEC {_grp}/{_field} ✓")
+
+# Eine Pruefung muss sagen, was sie NICHT prueft, sonst ist ihr Gruen wertlos.
+_unchecked = sorted(f"{_g}/{_f}" for _g, _fs in SPEC.items() for _f in _fs
+                    if (_g, _f) not in _checked)
+if _unchecked:
+    warn(f"{len(_unchecked)} SPEC-Werte werden mit nichts verglichen: "
+         f"{', '.join(_unchecked)}. Entweder in SPEC_VS_MODEL aufnehmen oder aus "
+         f"SPEC streichen. (hole_d steckt weiter unten als fest verdrahtete 4.2 "
+         f"in der Freigangpruefung — dieselbe Krankheit, nur kleiner.)")
+
+# ── Traegt die Stativaufnahme ihre Last? ────────────────────────
+# Diese Pruefung gab es nicht, und deshalb steht sie jetzt hier: am 04.11.2026
+# ist die Aufnahme im Betrieb gebrochen. Der Validator prueft Maße, Abstaende
+# und Druckbarkeit — nie, ob ein Teil die Kraft aushaelt, die an ihm zieht. Ein
+# Mass kann stimmen und das Teil trotzdem reissen; genau das ist passiert.
+# Lastfall: 75 N am fernen Gehaeuseende, Hebel EXT_X. Massgeblich ist der
+# Streifen Stirnwand um den Kragen, auf Biegung. 30 MPa konservativ, weil die
+# Richtung der Schichten an dieser Stelle nicht festgelegt ist. Die Zahl ist
+# eine Groessenordnung, kein Gutachten — und die Groessenordnung genuegt.
+_LOAD_N, _PETG_Z = 75.0, 30.0
+_w_wall = MIC_COLLAR_D * WALL ** 2 / 6
+_f_wall = _PETG_Z * _w_wall / EXT_X
+_t_need = math.sqrt(6 * _LOAD_N * EXT_X / (MIC_COLLAR_D * _PETG_Z))
+if _f_wall < _LOAD_N:
+    warn(f"Stativaufnahme traegt ihre Last nicht: die {WALL}mm-Stirnwand um den "
+         f"Ø{MIC_COLLAR_D}mm-Kragen haelt rechnerisch {_f_wall:.1f}N am "
+         f"{EXT_X:.0f}mm-Hebel, noetig waeren {_LOAD_N:.0f}N. Dafuer braeuchte die "
+         f"Wand {_t_need:.1f}mm statt {WALL}mm. Am 04.11.2026 ist sie gebrochen. "
+         f"Behoben ist das derzeit AUSSERHALB dieses Modells, durch die "
+         f"Stativ-Manschette (brami3dmaker, models/mundmaus-stativmanschette); "
+         f"am Gehaeuse selbst ist nichts geaendert. Wer das Unterteil neu "
+         f"druckt, bekommt dieselbe Schwachstelle wieder.")
 else:
-    ok(f"Pressure sensor PCB: {PRES_PCB_W}×{PRES_PCB_H}mm "
-       f"(spec ≈{_spec_pres['board_l'][0]}×{_spec_pres['board_w'][0]}) ✓")
-ok(f"Mic mount: Ø{MIC_CLEAR_D}mm clear, nut SW{MIC_NUT_SW}mm")
+    ok(f"Stativaufnahme traegt {_f_wall:.0f}N am {EXT_X:.0f}mm-Hebel ✓")
 
 # ── 2. Cavity bounds check ───────────────────────────────────────
 
