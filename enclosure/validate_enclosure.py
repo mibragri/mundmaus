@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""MundMaus v5.8 Enclosure Validator — checks dimensions, clearances, printability.
+"""MundMaus v5.9 Enclosure Validator — checks dimensions, clearances, printability.
 
-Complements the generator instead of repeating it: mundmaus_v58_enclosure.py
+Complements the generator instead of repeating it: mundmaus_v59_enclosure.py
 raises at import on a lip-zone collision, a sensor/ESP32 overlap and a screw
 pillar cutting the corner curve, so importing it already runs those checks.
 """
@@ -86,11 +86,11 @@ SPEC_VS_MODEL = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # The model this validator actually knows how to check.
-VALIDATED_MODEL = "mundmaus_v58_enclosure"
+VALIDATED_MODEL = "mundmaus_v59_enclosure"
 
 # The generator's own guards raise ValueError at import: a finding, not a crash.
 try:
-    from mundmaus_v58_enclosure import *  # noqa: F403 - all names of the model are under test
+    from mundmaus_v59_enclosure import *  # noqa: F403 - all names of the model are under test
 except ValueError as _e:
     print(f"\n🔴 ERROR: the generator rejects its own geometry: {_e}\n")
     sys.exit(1)
@@ -130,7 +130,7 @@ def ok(msg):
 
 
 print("=" * 65)
-print("  MundMaus v5.8 Enclosure Validation")
+print("  MundMaus v5.9 Enclosure Validation")
 print("=" * 65)
 
 # ── 1. Component dimensions vs specs ─────────────────────────────
@@ -209,27 +209,35 @@ if _unchecked:
 # hat sich im Betrieb als zu schwach erwiesen. Der Validator prueft Maße, Abstaende
 # und Druckbarkeit — nie, ob ein Teil die Kraft aushaelt, die an ihm zieht. Ein
 # Mass kann stimmen und das Teil trotzdem reissen; genau das ist passiert.
-# Lastfall: 75 N am fernen Gehaeuseende, Hebel EXT_X. Massgeblich ist der
+# Lastfall: 75 N am fernen Gehaeuseende, Hebel SHELL_X. Massgeblich ist der
 # Streifen Stirnwand um den Kragen, auf Biegung. 30 MPa konservativ, weil die
 # Richtung der Schichten an dieser Stelle nicht festgelegt ist. Die Zahl ist
 # eine Groessenordnung, kein Gutachten — und die Groessenordnung genuegt.
+# Gerechnet wird mit MIC_WALL_T und nicht mit WALL: in v5.9 ist genau diese
+# eine Wand dicker, und sie waechst nach aussen, was den Hebel auf SHELL_X
+# verlaengert. Beides gehoert in dieselbe Zeile, sonst rechnet der Nachweis die
+# Verbesserung hoch und den Nachteil nicht mit.
 _LOAD_N, _PETG_Z = 75.0, 30.0
-_w_wall = MIC_COLLAR_D * WALL ** 2 / 6
-_f_wall = _PETG_Z * _w_wall / EXT_X
-_t_need = math.sqrt(6 * _LOAD_N * EXT_X / (MIC_COLLAR_D * _PETG_Z))
+_w_wall = MIC_COLLAR_D * MIC_WALL_T ** 2 / 6
+_f_wall = _PETG_Z * _w_wall / SHELL_X
+_t_need = math.sqrt(6 * _LOAD_N * SHELL_X / (MIC_COLLAR_D * _PETG_Z))
+_f_old = _PETG_Z * (MIC_COLLAR_D * WALL ** 2 / 6) / (SHELL_X - MIC_WALL_BOOST)
 if _f_wall < _LOAD_N:
-    warn(f"Stativaufnahme traegt ihre Last nicht: die {WALL}mm-Stirnwand um den "
-         f"Ø{MIC_COLLAR_D}mm-Kragen haelt rechnerisch {_f_wall:.1f}N am "
-         f"{EXT_X:.0f}mm-Hebel, noetig waeren {_LOAD_N:.0f}N. Dafuer braeuchte die "
-         f"Wand {_t_need:.1f}mm statt {WALL}mm; im Betrieb hat sie sich als zu "
-         f"schwach erwiesen. Aufgefangen wird die Last derzeit AUSSERHALB dieses "
-         f"Modells, durch eine separat gedruckte Manschette, die ueber die "
-         f"letzten 34 mm des Gehaeusekoerpers greift und die Stativmutter "
-         f"aufnimmt; sie liegt nicht in diesem Repo. Am Gehaeuse selbst ist "
-         f"nichts geaendert: wer das Unterteil neu druckt, bekommt dieselbe "
-         f"Schwachstelle wieder.")
+    warn(f"Stativaufnahme traegt ihre Last nicht: die {MIC_WALL_T:.0f}mm-Stirnwand um "
+         f"den Ø{MIC_COLLAR_D}mm-Kragen haelt rechnerisch {_f_wall:.1f}N am "
+         f"{SHELL_X:.0f}mm-Hebel, noetig waeren {_LOAD_N:.0f}N. Dafuer braeuchte die "
+         f"Wand {_t_need:.1f}mm. Das ist das {_f_wall / _f_old:.1f}-fache der "
+         f"{WALL:.0f}mm-Wand aus v5.8 ({_f_old:.1f}N), die sich im Betrieb als zu "
+         f"schwach erwiesen hat — aber immer noch ein Faktor "
+         f"{_LOAD_N / _f_wall:.0f} zu wenig. Belegt ist nur, dass {_f_old:.1f}N "
+         f"nicht genuegt haben; mit welcher Kraft die Wand nachgegeben hat, ist "
+         f"nicht gemessen, und die {_LOAD_N:.0f}N sind eine Annahme. Aufgefangen wird die Last AUSSERHALB dieses Modells, durch "
+         f"eine separat gedruckte Manschette, die ueber die letzten 34 mm des "
+         f"Gehaeusekoerpers greift und die Stativmutter aufnimmt; sie liegt nicht "
+         f"in diesem Repo. Wer das Unterteil ohne sie betreibt, laeuft auf "
+         f"denselben Bruch zu, nur spaeter.")
 else:
-    ok(f"Stativaufnahme traegt {_f_wall:.0f}N am {EXT_X:.0f}mm-Hebel ✓")
+    ok(f"Stativaufnahme traegt {_f_wall:.0f}N am {SHELL_X:.0f}mm-Hebel ✓")
 
 # ── 2. Cavity bounds check ───────────────────────────────────────
 
@@ -575,6 +583,33 @@ else:
             f"the base would print without ventilation")
     else:
         ok(f"Vent slots: all {len(VENT_CENTER_XS)} cut through the -Y wall (probed; control hits material) ✓")
+
+    # Verstaerkte Stirnwand, im gebauten Volumen geprobt und nicht am Parameter.
+    # Dieselbe Krankheit wie bei den Lueftungsschlitzen (97fb175) ist hier
+    # besonders teuer: MIC_WALL_BOOST koennte gesetzt sein, ohne dass die Huelle
+    # ihn verwendet, und ein um 2 mm zu kurzes Gehaeuse sieht auf dem Bild aus
+    # wie ein richtiges. Drei Punkte auf der Mittelachse, bei Y=0 also fern der
+    # R12-Ecken: in der Zulage muss Material sein, in der Bohrung Luft, und
+    # vor der neuen Stirnflaeche wieder Luft.
+    _x_mid = MIC_WALL_OUTER_X + MIC_WALL_BOOST / 2       # -69, Mitte der Zulage
+    _z_solid = MIC_POS_Z + MIC_CLEAR_D / 2 + 1.5         # ueber der Bohrung
+    _p_add = cq.Vector(_x_mid, 0.0, _z_solid)
+    _p_bore = cq.Vector(_x_mid, 0.0, MIC_POS_Z)
+    _p_out = cq.Vector(MIC_WALL_OUTER_X - 0.5, 0.0, _z_solid)
+    if not _solid.isInside(_p_add):
+        err(f"Stirnwand nicht verstaerkt: bei X={_x_mid:.1f} ist keine Materie — "
+            f"die Huelle ignoriert MIC_WALL_BOOST, das Gehaeuse bleibt {WALL:.0f}mm")
+    elif _solid.isInside(_p_bore):
+        err(f"Ø{MIC_CLEAR_D}-Durchgang reicht nicht durch die {MIC_WALL_T:.0f}mm-Wand: "
+            f"bei X={_x_mid:.1f}, Z={MIC_POS_Z:.1f} steht Material im Weg — "
+            f"der Stativzapfen kommt nicht hinein")
+    elif _solid.isInside(_p_out):
+        err(f"Gehaeuse reicht ueber X={MIC_WALL_OUTER_X:.0f} hinaus — Stirnflaeche "
+            f"liegt nicht da, wo die Manschettenplatte sie erwartet")
+    else:
+        ok(f"Stirnwand an der Stativaufnahme: {MIC_WALL_T:.0f}mm statt {WALL:.0f}mm, "
+           f"Stirnflaeche X={MIC_WALL_OUTER_X:.0f}, Ø{MIC_CLEAR_D}-Durchgang frei "
+           f"(alle drei geprobt) ✓")
 
 # ── Summary ──────────────────────────────────────────────────────
 
