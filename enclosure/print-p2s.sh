@@ -13,7 +13,7 @@ AMS_SLOT=4  # Grau PETG
 
 # Die einzige Stelle, an der die Gehaeuse-Version steht. Pfade und Anzeige leiten
 # sich davon ab; beim naechsten Versionssprung nur hier aendern.
-VERSION="v59"
+VERSION="v60"
 OUTPUT_DIR="${SCRIPT_DIR}/output_${VERSION}"
 GENERATOR="${SCRIPT_DIR}/mundmaus_${VERSION}_enclosure.py"
 

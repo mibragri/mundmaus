@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""MundMaus v5.9 Enclosure Validator — checks dimensions, clearances, printability.
+"""MundMaus v6.0 Enclosure Validator — checks dimensions, clearances, printability.
 
-Complements the generator instead of repeating it: mundmaus_v59_enclosure.py
+Complements the generator instead of repeating it: mundmaus_v60_enclosure.py
 raises at import on a lip-zone collision, a sensor/ESP32 overlap and a screw
 pillar cutting the corner curve, so importing it already runs those checks.
 """
@@ -86,11 +86,11 @@ SPEC_VS_MODEL = [
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 # The model this validator actually knows how to check.
-VALIDATED_MODEL = "mundmaus_v59_enclosure"
+VALIDATED_MODEL = "mundmaus_v60_enclosure"
 
 # The generator's own guards raise ValueError at import: a finding, not a crash.
 try:
-    from mundmaus_v59_enclosure import *  # noqa: F403 - all names of the model are under test
+    from mundmaus_v60_enclosure import *  # noqa: F403 - all names of the model are under test
 except ValueError as _e:
     print(f"\n🔴 ERROR: the generator rejects its own geometry: {_e}\n")
     sys.exit(1)
@@ -130,7 +130,7 @@ def ok(msg):
 
 
 print("=" * 65)
-print("  MundMaus v5.9 Enclosure Validation")
+print("  MundMaus v6.0 Enclosure Validation")
 print("=" * 65)
 
 # ── 1. Component dimensions vs specs ─────────────────────────────
@@ -610,6 +610,30 @@ else:
         ok(f"Stirnwand an der Stativaufnahme: {MIC_WALL_T:.0f}mm statt {WALL:.0f}mm, "
            f"Stirnflaeche X={MIC_WALL_OUTER_X:.0f}, Ø{MIC_CLEAR_D}-Durchgang frei "
            f"(alle drei geprobt) ✓")
+
+    # Joystick-Saeule gegen den USB-Stecker, im gebauten Volumen statt in der
+    # Arithmetik. Abschnitt 6 rechnet die Luft aus JOY_POS_Y aus und meldet
+    # dieselbe Zahl auch dann, wenn _add_joystick_pillars aus der Liste in
+    # make_base herausfaellt — genau der Fehler, den 97fb175 bei den
+    # Lueftungsschlitzen hatte. Geprobt wird die Flanke des angenommenen
+    # Steckers. Der Kontrollpunkt liegt im Saeulenfleisch und nicht in ihrer
+    # Mitte, damit die Probe nicht an einer Bohrung vorbeizeigt.
+    _jpy = JOY_POS_Y + JOY_HOLE_GRID_Y / 2
+    _jpx = JOY_POS_X + JOY_HOLE_GRID_X / 2
+    _z_probe = FLOOR_T + 1.0
+    _flanke = cq.Vector(_jpx, USB_PLUG_W / 2, _z_probe)
+    _kern = cq.Vector(_jpx, _jpy + JOY_PILLAR_D / 4, _z_probe)
+    if not _solid.isInside(_kern):
+        err(f"Joystick-Saeulenprobe zielt ins Leere: bei ({_jpx:.1f}, "
+            f"{_jpy + JOY_PILLAR_D / 4:.1f}) steht keine Saeule — die "
+            f"Steckerpruefung in Abschnitt 6 rechnet dann gegen nichts")
+    elif _solid.isInside(_flanke):
+        err(f"USB-Stecker trifft die Joystick-Saeule im gebauten Teil: bei "
+            f"Y={USB_PLUG_W / 2:.1f}, der Flanke eines {USB_PLUG_W:.0f}mm-"
+            f"Steckers, steht Material")
+    else:
+        ok(f"Joystick-Saeulen geprobt: Flanke eines {USB_PLUG_W:.0f}mm-Steckers "
+           f"frei, Saeulenfleisch getroffen ✓")
 
 # ── Summary ──────────────────────────────────────────────────────
 

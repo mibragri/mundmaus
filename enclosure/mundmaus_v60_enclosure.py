@@ -1,0 +1,1045 @@
+#!/usr/bin/env python3
+# UNITS: mm
+# SPEC: Der USB-Stecker am ESP32 soll mit Luft hineinpassen, ohne dass seine
+# SPEC: Breite gemessen vorliegt. Dafuer rueckt der Joystick um 2 mm auf Y=0,
+# SPEC: also zurueck auf die Mitte des Steckers.
+# SPEC: Die Stirnwand an der Stativaufnahme (-X, Mutterseite) wird von 2 auf
+# SPEC: 4 mm verstaerkt, und zwar nach AUSSEN. Die 2-mm-Wand hat sich im
+# SPEC: Betrieb als zu schwach erwiesen. 4 mm ist eine bewusste Teilmassnahme
+# SPEC: und keine Loesung des Lastfalls — dafuer waeren 9,3 mm noetig.
+"""MundMaus Enclosure v6.0 — Joystick zurueck auf die Mitte des USB-Steckers.
+
+v6.0 changes from v5.9:
+  - JOY_POS_Y von -2,0 auf 0,0. Damit stehen die vier Joystick-Saeulen wieder
+    symmetrisch zum USB-Stecker: der naechste Saeulenrand liegt 1,2 mm neben
+    dem angenommenen 12-mm-Stecker, statt 0,8 mm in ihm.
+
+Das ist keine freie Wahl, sondern die Wiederherstellung dessen, was der
+Kommentar an JOY_POS_Y seit jeher behauptet: "centered on USB plug Y for equal
+clearance". In v5.8 wanderte ESP_POS_Y von -2 auf 0, fuer die Symmetrie der
+Eckschrauben. Der Joystick blieb bei -2 zurueck, und genau dieser Versatz von
+2 mm IST die Kollision, die der Validator seitdem meldet.
+
+Die Gegenprobe ist gelaufen, nicht ueberlegt: ESP_POS_Y zurueck auf -2 bringt
+dieselben 1,2 mm, ohne den Joystick anzufassen — erzeugt aber "Screw pillar
+cuts into the ESP32 PCB by 1.0mm". Dieser Weg ist also versperrt, und der
+Joystick bleibt der einzige Hebel. Weiter als Y=0 hilft nichts: jeder
+Millimeter darueber nimmt der gegenueberliegenden Saeule genau das, was er
+dieser gibt. Y=0 ist das Optimum und nicht ein Kompromiss.
+
+In Zahlen: ein Stecker passt jetzt bis 14,3 mm Breite statt bis 10,3 mm, und
+bis 11,3 mm mit 1,5 mm Luft ringsum. Gemessen ist keine dieser Breiten.
+USB_PLUG_W = 12,0 ist eine Datenblattannahme und kein Mass am Teil; deshalb
+bleiben die 1,2 mm als Warnung stehen, und das sollen sie auch.
+
+NEBENWIRKUNG, die kein Mass im Gehaeuse ist und deshalb leicht untergeht: der
+Joystick ist die Bedienung. Er wandert 2 mm in +Y, und die Oeffnung im Deckel
+wandert mit. Wer das Geraet bedient, findet den Stick 2 mm versetzt.
+
+v5.9 changes from v5.8:
+  - MIC_WALL_BOOST = 2.0: die -X-Stirnwand waechst nach aussen von 2 auf 4 mm.
+    Umgesetzt ueber die Aussenhuelle, nicht ueber WALL: organic_box wird
+    MIC_WALL_BOOST laenger gebaut und um die Haelfte nach -X verschoben. Damit
+    bleiben Kavitaet, Schraubsaeulen, Lip, Vents, USB-Notch, Drucksensor-Tuelle
+    und der Ø24-Kragen auf ihren alten Koordinaten; die Stirnflaeche allein
+    wandert von X=-68 auf X=-70, und MIC_WALL_INNER_X bleibt -66.
+  - Der Deckel waechst mit, sonst stuende an der Naht eine 2-mm-Stufe. Sein
+    Lip bleibt auf CAV_X-Mass und greift unveraendert in die Kavitaet.
+  - Der Ø10,5-Durchgang fuer den Stativzapfen geht jetzt durch 4 statt 2 mm.
+
+GANZE Stirnwand und nicht nur ein Kragen um die Mutter: auf dieser Flaeche
+sitzt die Stativ-Manschette mit ihrer Platte plan auf. Ein lokaler Buckel waere
+genau der Stummel, dessen Fehlen ihre Konstruktion ausnutzt. Ausserdem
+versteift die ganze Wand die Ecken mit, wo eine 2-mm-Wand wirklich ausreisst,
+statt nur eine Scheibe um das Loch.
+
+WAS DIE 4 mm NICHT LEISTEN: Nach dem Lastfall in validate_enclosure.py haelt
+die Stirnwand damit rechnerisch 13,9 N am 138-mm-Hebel statt 3,5 N. Gefordert
+sind dort 75 N, dafuer braeuchte sie 9,3 mm. Der Validator warnt also weiter,
+und das soll er: die Verstaerkung ist eine bewusste Teilmassnahme. Belegt ist
+nur, dass 3,5 N nicht genuegt haben — mit welcher Kraft die Wand nachgegeben
+hat, ist nicht gemessen, und die 75 N sind eine Annahme. Die Last faengt
+weiterhin die separat gedruckte Manschette ausserhalb dieses Gehaeuses ab.
+
+v5.8 changes from v5.7:
+  - Detent-Klick-Verschluss entfernt (RIDGE_*, GROOVE_*, _add_detent_groove).
+  - 4 Schraubsäulen in den Eck-Innenbereichen (D=6mm, Bohrung 2.5mm in Base-Säule
+    für selbstschneidende 3.5er Spanplattenschraube).
+  - Lid: 4 hängende Säulen mit Durchgangsloch 4.0mm + Senkkopf-Senkung 7.5mm/2.1mm.
+  - ESP-Side-Guide-Rails gekürzt (ESP_L*0.4 → 14mm fix), damit die Ecksäulen
+    kollisionsfrei bei (±58, ±16.5) sitzen können.
+  - Tiefenrechnung: Schraube 20mm = 9mm Lid-Korpus + 3mm Lip-Hänger + 8mm
+    Eindringen in Base-Säule (Säulenoberkante Z=26.8, 0.2mm Spiel zum Lid-Hänger).
+
+Was v5.8 gegenueber v5.7 unveraendert liess: Außenmaße, Wandstärke,
+ESP/Joystick/Sensor/Mic-Mount-Geometrie, Lip-Zentrierung (LIP_H, LIP_GAP,
+LIP_T), USB-Notch, Vent-Slots.
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import math
+import re
+import textwrap
+import warnings
+from dataclasses import dataclass
+from itertools import pairwise
+from pathlib import Path
+from xml.etree import ElementTree as ET
+
+import cadquery as cq  # type: ignore[import-not-found]  # only the CadQuery mamba env has cadquery, not the workspace venv mypy runs in
+from PIL import Image, ImageDraw
+
+warnings.filterwarnings("ignore")
+logging.getLogger("OCC").setLevel(logging.ERROR)
+
+# ── Core shell ──────────────────────────────────────────────────────
+CAV_X, CAV_Y, WALL = 132.0, 46.0, 2.0  # thinner walls (5 perimeters @ 0.4mm)
+FLOOR_T, CEIL_T, INNER_R = 2.0, 2.0, 10.0  # INNER_R = CORNER_R - WALL
+BASE_INNER_H, LID_INNER_H = 28.0, 7.0
+CORNER_R, LID_TOP_R, BASE_BOT_R = 12.0, 1.5, 2.0  # LID_TOP_R must be <= CEIL_T to avoid paper-thin walls when printed flipped
+LIP_H, LIP_T, LIP_GAP = 3.0, 1.8, 0.15  # LIP_H 4.0→3.0 for sensor PCB clearance
+TOL, TOL_LOOSE = 0.2, 0.2  # tighter guide rails — slight press-fit for ESP32
+
+# ── ESP32-WROOM-32 DevKitC V4 ──────────────────────────────────────
+ESP_L, ESP_W, ESP_H = 54.4, 28.0, 1.2  # Espressif DevKitC V4 spec (was 51.5)
+ESP_MODULE_H = 3.1                      # WROOM-32 metal shield height
+ESP_STANDOFF_H, ESP_GUIDE_H = 3.0, 3.0  # back to 3.0 — USB connector needs clearance below PCB
+ESP_POS_X, ESP_POS_Y = 31.0, 0.0       # v5.8 rev4: X=35→31 (4mm -X) für DuPont-Service-Raum zum Drucksensor; Y=0 für Säulen-Symmetrie
+ESP_USB_PROTRUSION = 2.4
+# ESP32 is mounted UPSIDE DOWN: WROOM module faces floor for cooling,
+# buttons (EN/BOOT) face floor, pin headers face up.
+# EN (reset) button position relative to USB end of PCB:
+ESP_EN_BTN_FROM_USB = 7.5   # mm from USB end along long axis
+ESP_EN_BTN_FROM_EDGE = 4.8  # mm from RIGHT edge (J2 side, when USB faces you)
+ESP_EN_BTN_HOLE_D = 3.0     # access hole diameter in floor
+HOLD_DOWN_CLEARANCE = 1.0   # mm gap between hold-down wall bottom and ESP32 PCB top
+
+# ── KY-023 Joystick ────────────────────────────────────────────────
+JOY_PCB_L, JOY_PCB_W, JOY_PCB_H = 34.0, 26.0, 1.6
+JOY_HOUSING, JOY_STICK_H = 16.0, 17.0
+JOY_PLATFORM_H = 21.0  # was 21.5 — 0.5mm lower per user feedback
+JOY_PIN_D, JOY_PIN_H = 2.8, 3.0
+JOY_HOLE_GRID_X, JOY_HOLE_GRID_Y = 26.67, 20.32  # 1.05" x 0.80" M4 holes
+# Pillar feet under the four holes. Module-level so validate_enclosure.py reads
+# them instead of keeping its own copies, which had drifted to two different sizes.
+JOY_PILLAR_D = 6.0          # shaft, thin for USB plug clearance (1.7mm/side)
+JOY_PILLAR_FLARE_D = 9.0    # wider foot for stability
+JOY_PILLAR_FLARE_H = 3.0
+JOY_OPENING = 16.3  # was 17.0 — snug fit to center housing (0.15mm/side)
+JOY_LID_HOLE_D = 14.0   # circular lid opening — rotation circle + 1mm clearance/side
+JOY_LID_HOLE_OFFSET_X = 1.1   # calculated from measured housing center X=-17.9 vs JOY_POS=-19
+JOY_LID_HOLE_OFFSET_Y = -0.8   # +0.3 was too far +Y, user says 1.1mm more toward -Y: 0.3 - 1.1 = -0.8
+# Y=0 heisst: zentriert auf die Y-Mitte des USB-Steckers, und die ist
+# ESP_POS_Y. Der Kommentar stand hier schon, als die Zahl ihn nicht mehr
+# einloeste — bis v5.9 stand -2, waehrend ESP_POS_Y seit v5.8 auf 0 liegt.
+# Wer eines von beiden verschiebt, verschiebt das andere mit.
+JOY_POS_X, JOY_POS_Y = -19.0, 0.0  # left side, Y centered on USB plug (= ESP_POS_Y)
+JOY_PLATFORM_MAIN_X, JOY_PLATFORM_MAIN_Y = JOY_PCB_L + 3.0, JOY_PCB_W - 6.0
+JOY_PLATFORM_MAIN_SHIFT_Y = -2.0
+JOY_PLATFORM_FRONT_X, JOY_PLATFORM_FRONT_Y = JOY_PCB_L, 6.0
+JOY_PLATFORM_FRONT_SHIFT_Y = JOY_PCB_W / 2 - JOY_PLATFORM_FRONT_Y / 2 - 0.2
+
+# ── Pressure Sensor (MPS20N0040D-S + HX710B) ───────────────────────
+PRES_PCB_W = 20.0         # mm (Z direction when mounted flat against +X wall)
+PRES_PCB_H = 15.0         # mm (Y direction when mounted flat against +X wall)
+PRES_MOUNT_DEPTH = 5.0    # mm depth from +X inner wall into enclosure
+PRES_POS_Y = 0.0          # centered on Y axis
+PRES_POS_Z = 15.5         # center Z (lowered from 18.0 — PCB 20mm tall in Z, top must clear lip zone at Z=26)
+PRES_BARB_HOLE_D = 2.8    # mm (was 3.0, tighter for press-fit)
+PRES_BARB_CHAMFER_D = 5.0 # mm entry chamfer on exterior
+PRES_SHELF_T = 1.5        # mm shelf thickness
+
+# ── USB cable exit notch (+Y wall, at lid seam) ────────────────────
+USB_NOTCH_W, USB_NOTCH_H = 8.0, 5.0
+USB_NOTCH_X = ESP_POS_X - ESP_L / 2  # USB faces -X (center), cable routes left
+
+# ── USB plug channel (cut into joystick platform base) ─────────────
+USB_PLUG_W, USB_PLUG_H, USB_PLUG_DEPTH = 12.0, 9.0, 15.0
+
+# ── Screw fastening (Spax 3.5x20 Senkkopf, selbstschneidend in PETG) ───
+SCREW_THREAD_D = 3.5    # Gewinde-Außendurchmesser (Spax 3.5)
+SCREW_LEN = 20.0        # Gesamtlänge
+SCREW_HEAD_D = 7.0      # Senkkopf-Außendurchmesser (Standard für 3.5er Spax)
+SCREW_HEAD_H = 2.1      # Senkkopf-Höhe = Senkungs-Tiefe
+SCREW_PILOT_D = 2.5     # Vorbohr-Loch in Base-Säule (selbstschneidend, etwas unter Kerndurchmesser)
+SCREW_CLEAR_D = 4.0     # Durchgangsloch im Lid (Schraube 3.5 + 0.5mm Spiel)
+SCREW_CSK_D = 7.5       # Senkungs-Außendurchmesser (Kopf 7.0 + 0.5 für sauberen Sitz)
+SCREW_PENETRATION = 8.0 # Soll-Eindringtiefe in die Base-Säule
+
+# Eck-Säulen-Geometrie
+PILLAR_OD = 6.0         # Säulen-Außendurchmesser (Wand 1.75mm um 2.5mm Bohrung — solide für PETG)
+PILLAR_X = 58.0         # Säulen-X-Position (innen, in der Eckkurve mit INNER_R=10)
+PILLAR_Y = 18.0         # Säulen-Y-Position (symmetrisch ±, mit ESP_POS_Y=0 → 1.0mm Abstand zu ESP32, 1.6mm zur Innenwand)
+PILLAR_BASE_TOP_Z_OFFSET = 0.2  # Lücke zwischen Base-Säulen-Top und Lid-Hänger-Bottom
+
+# ── Stativaufnahme (-X-Wand) ─────────────────────────────────────
+# Welches Gewinde der Staender traegt, ist UNBESTIMMT. Hier stand bis
+# 05.11.2026 "3/8-16 UNC", ohne dass das je geprueft worden waere. Belegt ist
+# allein die Schluesselweite der vorhandenen Mutter: 16.8-16.9, gemessen. Sie
+# passt zu M10 (DIN 934, SW 17.0 abzueglich Toleranz) und nicht zu 3/8-16 UNC
+# (SW 14.29) — aber eine Schluesselweite sagt nichts ueber das Gewinde darin,
+# und eine dritte Kandidatin kommt hinzu: 3/8-16 BSW, das europaeische
+# Mikrofonstaender-Gewinde, gleiche 16 Gaenge wie UNC, anderer Flankenwinkel.
+# Entschieden wird das an der Mutter, nicht am Schreibtisch. Genau deshalb
+# verwendet die separat gedruckte Stativ-Manschette die vorhandene Mutter
+# weiter, statt ein Gewinde nachzubauen.
+#
+# MIC_NUT_H (5.56) stand hier bis 05.11.2026 und war in allen vier
+# Generatorfassungen toter Code: die Tasche kommt aus MIC_NUT_POCKET_D, und
+# gemessen worden ist die Hoehe nie. Eine Datenblattzahl, die nichts tut, liest
+# sich wie ein Beleg.
+MIC_CLEAR_D, MIC_NUT_SW = 10.5, 16.9  # SW am vorhandenen Teil gemessen
+MIC_NUT_TOL, MIC_NUT_POCKET_D, MIC_COLLAR_D = 0.205, 7.9, 24.0
+MIC_POS_Y = 0.0
+# MIC_POS_Z is derived below (collar sits on floor, top clears lip)
+# v5.9: die Stirnwand allein ist dicker, alles andere bleibt bei WALL. Nach
+# AUSSEN, weil innen der Ø24-Kragen mit der Mutter steht und dahinter Joystick
+# und ESP32 sitzen — nach innen waere Platz weggenommen worden, den es nicht
+# gibt.
+MIC_WALL_BOOST = 2.0
+MIC_WALL_T = WALL + MIC_WALL_BOOST  # 4.0
+
+# ── Ventilation (-Y wall) ──────────────────────────────────────────
+VENT_N, VENT_W, VENT_LEN, VENT_PITCH = 6, 1.6, 14.0, 6.0
+
+# ── Derived geometry ───────────────────────────────────────────────
+EXT_X, EXT_Y = CAV_X + 2 * WALL, CAV_Y + 2 * WALL  # 136 x 50 (symmetrischer Kern)
+# Die Aussenhuelle ist um MIC_WALL_BOOST laenger und sitzt um die Haelfte davon
+# nach -X verschoben: +X-Flaeche bleibt bei +68, -X-Flaeche geht auf -70. Alle
+# Features rechnen weiter gegen EXT_X/OUTER_POS_X und wandern daher nicht mit.
+SHELL_X = EXT_X + MIC_WALL_BOOST          # 138, aeussere Laenge des Gehaeuses
+SHELL_X_OFFSET = -MIC_WALL_BOOST / 2      # -1, Verschiebung der Huelle
+EXT_H_BASE, EXT_H_LID = FLOOR_T + BASE_INNER_H, CEIL_T + LID_INNER_H
+OUTER_POS_X = EXT_X / 2    # +68
+OUTER_POS_Y = EXT_Y / 2    # +25
+INNER_POS_X = CAV_X / 2    # +66
+INNER_POS_Y = EXT_Y / 2 - WALL  # +23
+# Vent slot centres in the -Y wall; module-level so the validator probes the same spots.
+VENT_CENTER_XS = [(idx - (VENT_N - 1) / 2.0) * VENT_PITCH for idx in range(VENT_N)]  # -15..+15
+VENT_CENTER_Z = EXT_H_BASE * 0.55  # = 16.5
+
+# Collar sits on floor: center = FLOOR_T + radius, top must clear lip (EXT_H_BASE - LIP_H)
+MIC_POS_Z = FLOOR_T + MIC_COLLAR_D / 2 - 0.5  # 13.5mm, collar top = 25.5mm (0.5mm below lip at 26mm)
+MIC_NUT_SW_TOL = MIC_NUT_SW + 2 * MIC_NUT_TOL
+MIC_WALL_OUTER_X = -(OUTER_POS_X + MIC_WALL_BOOST)  # -70, neue Stirnflaeche
+MIC_WALL_INNER_X = MIC_WALL_OUTER_X + MIC_WALL_T    # -66, unveraendert
+MIC_COLLAR_INNER_X = MIC_WALL_INNER_X + MIC_NUT_POCKET_D
+MIC_Y_EDGE_MARGIN = (EXT_Y - MIC_COLLAR_D) / 2
+
+STICK_TIP_Z = FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H + JOY_STICK_H
+LID_TOP_Z = EXT_H_BASE + EXT_H_LID
+STICK_PROTRUSION = STICK_TIP_Z - LID_TOP_Z
+
+ESP_USB_FACE_X = ESP_POS_X - ESP_L / 2 - ESP_USB_PROTRUSION  # USB faces -X
+
+# Joystick derived
+JOY_PCB_TOP_Y = JOY_POS_Y + JOY_PCB_W / 2
+JOY_WALL_RELIEF_DEPTH = max(0.0, JOY_PCB_TOP_Y - INNER_POS_Y)
+JOY_REMAINING_TOP_WALL = WALL - JOY_WALL_RELIEF_DEPTH
+JOY_FRONT_PIN_Y = JOY_POS_Y + (JOY_PCB_W / 2 - 2.5)
+JOY_FRONT_PIN_TO_WALL_CLEAR = INNER_POS_Y - JOY_FRONT_PIN_Y
+JOY_PLATFORM_MIN_X = JOY_POS_X - JOY_PLATFORM_MAIN_X / 2
+JOY_PLATFORM_MAX_X = JOY_POS_X + JOY_PLATFORM_MAIN_X / 2
+
+# Pressure sensor derived (v5.6: flat mount on +X inner wall)
+PRES_INNER_X = CAV_X / 2          # = 66.0 (inner surface of +X wall)
+PRES_SHELF_X_START = PRES_INNER_X - PRES_MOUNT_DEPTH  # = 61.0
+PRES_Z_BOT = PRES_POS_Z - PRES_PCB_W / 2   # = 5.5 (bottom of PCB)
+PRES_Z_TOP = PRES_POS_Z + PRES_PCB_W / 2    # = 25.5 (top of PCB)
+# The shelf carries the PCB, so its TOP must land on PRES_Z_BOT. It used to be
+# built upward FROM PRES_Z_BOT, which lifted the board by PRES_SHELF_T: the PCB
+# really spanned 7.0 to 27.0 and LIP_ZONE_BOTTOM is 27.0 — zero clearance, the
+# descending lid lip landing on the sensor. The guard below checked PRES_Z_TOP
+# and reported a comfortable 1.5 mm, because it modelled the board exactly one
+# shelf thickness too low.
+PRES_SHELF_Z_BOT = PRES_Z_BOT - PRES_SHELF_T   # = 4.0 (underside of the shelf)
+# Nipple position (offset from PCB center, estimated from datasheet)
+PRES_NIPPLE_Z = PRES_POS_Z + PRES_PCB_W / 2 - 5.0   # = 20.5
+PRES_NIPPLE_Y = PRES_POS_Y + PRES_PCB_H / 2 - 4.0    # = 3.5
+
+# Lip insertion zone: Z = EXT_H_BASE - LIP_H to EXT_H_BASE
+# ALL internal features must have their top BELOW this zone
+LIP_ZONE_BOTTOM = EXT_H_BASE - LIP_H
+MIC_COLLAR_TOP_Z = MIC_POS_Z + MIC_COLLAR_D / 2
+MIC_TO_LIP_CLEARANCE = LIP_ZONE_BOTTOM - MIC_COLLAR_TOP_Z
+
+# Guard: all internal features must clear the lip insertion zone
+_LIP_CLEARANCE_CHECKS = {
+    "Mic collar top": (MIC_COLLAR_TOP_Z, LIP_ZONE_BOTTOM),
+    "Sensor PCB top": (PRES_Z_TOP, LIP_ZONE_BOTTOM),
+    "Joystick PCB top": (FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H, LIP_ZONE_BOTTOM),
+}
+for _name, (_top, _limit) in _LIP_CLEARANCE_CHECKS.items():
+    if _top > _limit:
+        raise ValueError(
+            f"COLLISION: {_name} at Z={_top:.1f}mm extends into lip zone "
+            f"(Z={_limit:.1f}mm). Reduce height or move component down."
+        )
+    elif _top > _limit - 0.5:
+        import warnings
+        warnings.warn(f"{_name} at Z={_top:.1f}mm is only {_limit - _top:.1f}mm below lip zone")
+
+# Clearances (layout: Collar → Joy → ESP32, Sensor on +X wall)
+COLLAR_TO_JOY_CLEARANCE = JOY_PLATFORM_MIN_X - MIC_COLLAR_INNER_X
+ESP_LEFT_EDGE_X = ESP_POS_X - ESP_L / 2
+ESP_RIGHT_EDGE_X = ESP_POS_X + ESP_L / 2
+ESP_TO_WALL_CLEARANCE = INNER_POS_X - ESP_RIGHT_EDGE_X
+# Sensor vs ESP32 vertical clearance. NEGATIVE in the current layout: the sensor
+# PCB bottom sits below the ESP32 PCB top, so the two are kept apart by X
+# separation alone. The report printed this as an ordinary row with no guard,
+# and the comment claimed "= 1.8mm" — stale since PRES_POS_Z was lowered from
+# 18.0 to 15.5. At the previously committed ESP_POS_X = 35 the boards also
+# overlapped by 1.2 mm in X, i.e. real interference that nothing would catch.
+PRES_ESP_Z_GAP = PRES_Z_BOT - (FLOOR_T + ESP_STANDOFF_H + ESP_H)  # = -0.7mm
+PRES_ESP_X_GAP = PRES_SHELF_X_START - ESP_RIGHT_EDGE_X
+
+if PRES_ESP_Z_GAP < 0 and PRES_ESP_X_GAP < 0:
+    raise ValueError(
+        f"COLLISION: sensor shelf and ESP32 overlap on both axes "
+        f"(Z gap {PRES_ESP_Z_GAP:.1f}mm, X gap {PRES_ESP_X_GAP:.1f}mm). "
+        f"Move the sensor up or the ESP32 further -X."
+    )
+
+# Schraub-Säulen-Geometrie (Base- und Lid-Hänger-Positionen identisch)
+PILLAR_BASE_TOP_Z = EXT_H_BASE - LIP_H - PILLAR_BASE_TOP_Z_OFFSET  # 26.8mm in base coords
+# Thread that actually reaches the base pillar: the countersunk head sits inside
+# the lid body, so the lid, the lip and the gap are spent before the pillar starts.
+SCREW_ACTUAL_PENETRATION = SCREW_LEN - (EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET)  # = 7.8
+MIN_THREAD_ENGAGEMENT = 6.0
+PILLAR_POSITIONS = [(PILLAR_X, PILLAR_Y), (PILLAR_X, -PILLAR_Y),
+                    (-PILLAR_X, PILLAR_Y), (-PILLAR_X, -PILLAR_Y)]
+# Sanity: Säule darf die Innenwand-Eckkurve (INNER_R=10) nicht durchstechen
+_PILLAR_CORNER_DIST = math.hypot(PILLAR_X - (CAV_X / 2 - INNER_R), PILLAR_Y - (CAV_Y / 2 - INNER_R))
+if _PILLAR_CORNER_DIST + PILLAR_OD / 2 + 0.3 > INNER_R:
+    raise ValueError(
+        f"Eck-Säule bei (±{PILLAR_X}, ±{PILLAR_Y}) kollidiert mit Innenwand-Eckkurve: "
+        f"Distanz zur Eckmitte = {_PILLAR_CORNER_DIST:.2f}mm, "
+        f"erlaubt = {INNER_R - PILLAR_OD/2 - 0.3:.2f}mm."
+    )
+
+# ── Helper functions ───────────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class RenderView:
+    filename: str
+    projection_dir: tuple[float, float, float]
+    assembled: bool
+    target: str = "default"  # "default" → assembly/base, "lid" → lid only
+
+
+def organic_box(
+    length: float, width: float, height: float, corner_r: float,
+    top_r: float = 0.0, bot_r: float = 0.0,
+) -> cq.Workplane:
+    r_v = min(corner_r, length / 2 - 0.5, width / 2 - 0.5)
+    shape = cq.Workplane("XY").rect(length, width).extrude(height).edges("|Z").fillet(r_v)
+    for sel, radius in [("<Z", bot_r), (">Z", top_r)]:
+        if radius > 0.01:
+            try:
+                shape = shape.edges(sel).fillet(min(radius, r_v - 0.5, height / 2 - 0.5))
+            except Exception:
+                pass
+    return shape
+
+
+def rounded_cavity(length: float, width: float, height: float, radius: float) -> cq.Workplane:
+    return cq.Workplane("XY").rect(length, width).extrude(height).edges("|Z").fillet(
+        min(radius, length / 2 - 0.1, width / 2 - 0.1)
+    )
+
+
+# ── Base features ──────────────────────────────────────────────────
+
+
+def _add_screw_pillars_base(base: cq.Workplane) -> cq.Workplane:
+    """4 Schraubsäulen in den Eck-Innenbereichen mit Vorbohr-Loch von oben.
+
+    Säule steht vom Floor (Z=FLOOR_T) bis PILLAR_BASE_TOP_Z (= 26.8mm in base coords).
+    Bohrung von oben SCREW_PENETRATION+0.5mm tief mit SCREW_PILOT_D — selbstschneidend
+    für 3.5er Spanplattenschraube. Säulenoberkante hat 0.2mm Lücke zum Lid-Hänger
+    (PILLAR_BASE_TOP_Z_OFFSET) damit Lid auf Wandkante aufsitzt, nicht auf Säule.
+    """
+    pillar_h = PILLAR_BASE_TOP_Z - FLOOR_T
+    pilot_depth = SCREW_PENETRATION + 0.5  # 0.5mm Sackloch-Reserve unter Schraubenspitze
+    for cx, cy in PILLAR_POSITIONS:
+        pillar = (cq.Workplane("XY")
+                  .workplane(offset=FLOOR_T)
+                  .center(cx, cy)
+                  .circle(PILLAR_OD / 2)
+                  .extrude(pillar_h))
+        base = base.union(pillar)
+        pilot = (cq.Workplane("XY")
+                 .workplane(offset=PILLAR_BASE_TOP_Z + 0.01)
+                 .center(cx, cy)
+                 .circle(SCREW_PILOT_D / 2)
+                 .extrude(-(pilot_depth + 0.02)))
+        base = base.cut(pilot)
+    return base
+
+
+def _add_esp_cradle(base: cq.Workplane) -> cq.Workplane:
+    """ESP32 cradle — board mounted UPSIDE DOWN (WROOM module faces floor).
+
+    WROOM module (18×25.5×3.1mm) protrudes through a floor cutout for cooling.
+    PCB edges rest on standoffs. Guide rails hold PCB. EN button through floor.
+    """
+    post_sz, rail_t = 3.5, 1.5
+    # Standoff lifts PCB so module can protrude through floor
+    guide_total = ESP_STANDOFF_H + ESP_H + ESP_GUIDE_H
+    # Corner posts
+    for dx, dy in [(-1, -1), (-1, 1), (1, -1), (1, 1)]:
+        cx = ESP_POS_X + dx * (ESP_L / 2 - post_sz / 2)
+        cy = ESP_POS_Y + dy * (ESP_W / 2 - post_sz / 2)
+        post = cq.Workplane("XY").workplane(offset=FLOOR_T).center(cx, cy).rect(
+            post_sz, post_sz
+        ).extrude(ESP_STANDOFF_H)
+        base = base.union(post)
+    # Side guide rails (Y axis) — gekürzt auf 14mm in v5.8 für Eck-Säulen-Clearance.
+    # 14mm ist mehr als ausreichend für Y-Führung des PCB; die Eck-Säulen bei
+    # X=±58 dürfen nicht von den Rails (PCB-Rand bei Y=±15.95) überlappt werden.
+    rail_len = 14.0
+    for side in [-1, 1]:
+        gy = ESP_POS_Y + side * (ESP_W / 2 + TOL_LOOSE + rail_t / 2)
+        rail = cq.Workplane("XY").workplane(offset=FLOOR_T).center(ESP_POS_X, gy).rect(
+            rail_len, rail_t
+        ).extrude(guide_total)
+        base = base.union(rail)
+    # WROOM module pocket: hole in floor (16×18mm) with raised collar to guide module
+    # Standoff=3.0mm, module=3.1mm → module bottom is 0.1mm below floor inner surface
+    # Collar extends up from floor to meet the module and hold it aligned
+    wroom_hole_w = 16.0 + 0.5   # 16mm across + clearance
+    wroom_hole_l = 18.0 + 0.5   # 18mm along + clearance
+    collar_wall = 1.5            # collar wall thickness
+    collar_h = ESP_STANDOFF_H - (ESP_MODULE_H - FLOOR_T) + 1.0  # guide height above floor
+    # Shield center: at non-antenna end of WROOM module
+    antenna_end_x = ESP_POS_X + ESP_L / 2
+    shield_start_x = antenna_end_x - 25.5  # module start
+    wroom_x = shield_start_x + 18.0 / 2   # shield center
+    wroom_y = ESP_POS_Y
+    # Collar: raised ring around the hole
+    collar_outer_w = wroom_hole_w + 2 * collar_wall
+    collar_outer_l = wroom_hole_l + 2 * collar_wall
+    collar = cq.Workplane("XY").workplane(offset=FLOOR_T).center(
+        wroom_x, wroom_y
+    ).rect(collar_outer_l, collar_outer_w).extrude(collar_h)
+    collar_inner = cq.Workplane("XY").workplane(offset=FLOOR_T - 0.01).center(
+        wroom_x, wroom_y
+    ).rect(wroom_hole_l, wroom_hole_w).extrude(collar_h + 0.02)
+    base = base.union(collar).cut(collar_inner)
+    # Cut hole through floor
+    wroom_cut = cq.Workplane("XY").workplane(offset=-0.01).center(
+        wroom_x, wroom_y
+    ).rect(wroom_hole_l, wroom_hole_w).extrude(FLOOR_T + 0.02)
+    base = base.cut(wroom_cut)
+    # EN reset button access hole through floor
+    # Board upside down: USB at -X, EN is 6.1mm from USB end, 4.8mm from left edge (+Y)
+    en_x = ESP_POS_X - ESP_L / 2 + ESP_EN_BTN_FROM_USB
+    en_y = ESP_POS_Y - ESP_W / 2 + ESP_EN_BTN_FROM_EDGE  # -Y side (J2/EN side)
+    btn_hole = cq.Workplane("XY").workplane(offset=-0.01).center(en_x, en_y).circle(
+        ESP_EN_BTN_HOLE_D / 2
+    ).extrude(FLOOR_T + 0.02)
+    base = base.cut(btn_hole)
+    return base
+
+
+def _add_joystick_pillars(base: cq.Workplane) -> cq.Workplane:
+    """4 pillar feet — USB cable routes between pillars (plug first, then seat joystick)."""
+    _floor_overlap = 0.5
+    pillar_d, base_flare_d, base_flare_h = JOY_PILLAR_D, JOY_PILLAR_FLARE_D, JOY_PILLAR_FLARE_H
+
+    for dx in [-1, 1]:
+        for dy in [-1, 1]:
+            px = JOY_POS_X + dx * (JOY_HOLE_GRID_X / 2)
+            py = JOY_POS_Y + dy * (JOY_HOLE_GRID_Y / 2)
+            if py > INNER_POS_Y - 0.5:
+                continue
+            # Flared base for stability
+            flare = cq.Workplane("XY").workplane(offset=FLOOR_T - _floor_overlap).center(
+                px, py
+            ).circle(base_flare_d / 2).workplane(offset=base_flare_h + _floor_overlap).circle(
+                pillar_d / 2
+            ).loft()
+            # Main pillar shaft
+            shaft = cq.Workplane("XY").workplane(offset=FLOOR_T + base_flare_h).center(
+                px, py
+            ).circle(pillar_d / 2).extrude(JOY_PLATFORM_H - base_flare_h)
+            # Alignment pin on top (tapered for easy PCB insertion)
+            pin = cq.Workplane("XY").workplane(offset=FLOOR_T + JOY_PLATFORM_H).center(
+                px, py
+            ).circle(JOY_PIN_D / 2).workplane(offset=JOY_PIN_H).circle(
+                JOY_PIN_D / 2 - 0.2
+            ).loft()
+            base = base.union(flare).union(shaft).union(pin)
+    return base
+
+
+def _relieve_joystick_wall(base: cq.Workplane) -> cq.Workplane:
+    if JOY_WALL_RELIEF_DEPTH <= 0.0:
+        return base
+    relief = cq.Workplane("XZ").workplane(offset=INNER_POS_Y).center(
+        JOY_POS_X, FLOOR_T + JOY_PLATFORM_H + JOY_PCB_H / 2
+    ).rect(JOY_PCB_L + 2.0, JOY_PCB_H + 2.4).extrude(JOY_WALL_RELIEF_DEPTH + 0.02)
+    return base.cut(relief)
+
+
+def _add_pressure_sensor_mount(base: cq.Workplane) -> cq.Workplane:
+    """Bottom shelf on +X inner wall to support pressure sensor breakout board.
+
+    PCB lies FLAT against +X inner wall. Shelf supports from below, lid retains above.
+    """
+    # Absolute positions (CadQuery coordinate rule)
+    inner_x = PRES_INNER_X                          # = 66.0 (inner surface of +X wall)
+    shelf_x_start = inner_x - PRES_MOUNT_DEPTH      # = 61.0
+    shelf_z_bot = PRES_SHELF_Z_BOT                   # = 4.0 (underside of shelf)
+    shelf_center_x = shelf_x_start + PRES_MOUNT_DEPTH / 2  # = 63.5
+    # Create shelf as a box on the +X inner wall. Built upward from its
+    # UNDERSIDE so the top face lands on PRES_Z_BOT and the PCB resting on it
+    # spans PRES_Z_BOT..PRES_Z_TOP, which is what the lip-clearance guard checks.
+    shelf = (
+        cq.Workplane("XY")
+        .workplane(offset=shelf_z_bot)  # Z = 4.0, top face at 5.5
+        .center(shelf_center_x, PRES_POS_Y)  # X=63.5, Y=0.0
+        .box(PRES_MOUNT_DEPTH, PRES_PCB_H, PRES_SHELF_T, centered=[True, True, False])
+    )
+    return base.union(shelf)
+
+
+def _cut_pressure_barb_port(base: cq.Workplane) -> cq.Workplane:
+    """Barb hole through +X wall for pressure sensor nipple (press-fit).
+
+    Nipple estimated at ~5mm from PCB top edge, ~4mm from right edge.
+    """
+    # Absolute positions (CadQuery coordinate rule)
+    nipple_z = PRES_NIPPLE_Z   # = 23.0
+    nipple_y = PRES_NIPPLE_Y   # = 3.5
+    wall_x = OUTER_POS_X       # = 68.0 (outer surface of +X wall)
+
+    # YZ workplane normal is +X: offset=wall_x places plane at X=+68
+    # Extrude negative goes into the wall (-X direction)
+    hole = (
+        cq.Workplane("YZ")
+        .workplane(offset=wall_x + 0.01)  # at outer +X surface
+        .center(nipple_y, nipple_z)
+        .circle(PRES_BARB_HOLE_D / 2)
+        .extrude(-(WALL + 0.02))  # through the wall into the enclosure
+    )
+    base = base.cut(hole)
+
+    # Exterior chamfer — conical entry on outside of +X wall
+    try:
+        chamfer = (
+            cq.Workplane("YZ")
+            .workplane(offset=wall_x + 0.01)  # at outer +X surface
+            .center(nipple_y, nipple_z)
+            .circle(PRES_BARB_CHAMFER_D / 2)
+            .workplane(offset=-1.0)  # 1mm into the wall
+            .circle(PRES_BARB_HOLE_D / 2)
+            .loft()
+        )
+        base = base.cut(chamfer)
+    except Exception:
+        pass
+    return base
+
+
+def _cut_usb_cable_notch(base: cq.Workplane) -> cq.Workplane:
+    """Cut a notch in the +Y wall at seam height for USB cable exit."""
+    # +Y wall: offset=-OUTER_POS_Y places plane at Y=+25 (outer +Y surface)
+    # Extrude positive to cut through wall toward -Y (into cavity)
+    notch = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
+        USB_NOTCH_X, EXT_H_BASE - USB_NOTCH_H / 2
+    ).rect(USB_NOTCH_W, USB_NOTCH_H).extrude(WALL + 0.02)
+    return base.cut(notch)
+
+
+# _cut_usb_plug_channel() was removed here. It was defined but never called, and
+# re-enabling it as written would have cut in the wrong place: it anchored on
+# JOY_PLATFORM_MIN_X (ch_x0 = -38.0, the platform's -X end next to the mic mount)
+# while the ESP32's USB face sits at ESP_USB_FACE_X = +1.4, and make_base builds
+# four joystick pillars rather than a platform solid, so it would also have cut
+# through air. USB cable access is provided by _cut_usb_cable_notch(), which IS
+# called. Dead code that cuts in the wrong place is a trap for whoever revives it.
+
+
+def _add_mic_mount(base: cq.Workplane) -> cq.Workplane:
+    nut_ac_tol = MIC_NUT_SW_TOL / math.cos(math.radians(30))
+    # Overlap collar 0.5mm into wall to avoid OCCT coplanar-face boolean failure
+    _collar_overlap = 0.5
+    collar = cq.Workplane("YZ").workplane(offset=MIC_WALL_INNER_X - _collar_overlap).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).circle(MIC_COLLAR_D / 2).extrude(MIC_NUT_POCKET_D + _collar_overlap)
+    try:
+        collar = collar.faces(">X").chamfer(1.0)
+    except Exception:
+        pass
+    base = base.union(collar)
+    bolt_hole = cq.Workplane("YZ").workplane(offset=MIC_WALL_OUTER_X - 0.01).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).circle(MIC_CLEAR_D / 2).extrude(MIC_WALL_T + 0.02)
+    pocket = cq.Workplane("YZ").workplane(offset=MIC_COLLAR_INNER_X + 0.01).center(
+        MIC_POS_Y, MIC_POS_Z
+    ).polygon(6, nut_ac_tol).extrude(-(MIC_NUT_POCKET_D + 0.02))
+    return base.cut(bolt_hole).cut(pocket)
+
+
+def _cut_vent_slots(base: cq.Workplane) -> cq.Workplane:
+    """Cut vent slots through -Y wall (offset positive, extrude negative)."""
+    for slot_x in VENT_CENTER_XS:
+        vent = cq.Workplane("XZ").workplane(offset=OUTER_POS_Y + 0.01).center(
+            slot_x, VENT_CENTER_Z
+        ).rect(VENT_W, VENT_LEN).extrude(-(WALL + 0.02))
+        base = base.cut(vent)
+    return base
+
+
+# ── Assembly ───────────────────────────────────────────────────────
+
+
+def make_base() -> cq.Workplane:
+    base = organic_box(SHELL_X, EXT_Y, EXT_H_BASE, CORNER_R, bot_r=BASE_BOT_R).translate(
+        (SHELL_X_OFFSET, 0, 0)
+    )
+    cavity = rounded_cavity(CAV_X, CAV_Y, BASE_INNER_H + 1.0, INNER_R).translate((0, 0, FLOOR_T))
+    base = base.cut(cavity)
+    for fn in [
+        _add_screw_pillars_base,
+        _add_esp_cradle,
+        _add_joystick_pillars,
+        _add_pressure_sensor_mount,
+        _cut_pressure_barb_port,
+        _cut_usb_cable_notch,
+        # Was silently missing from this list, so the printed base had NO
+        # ventilation at all while the module docstring still claimed the vent
+        # slots were unchanged from v5.7 (the lid has none either). Verified
+        # before re-enabling: the cut removes exactly VENT_N*VENT_W*VENT_LEN*WALL
+        # = 268.8 mm³ and leaves the bounding box untouched, so it goes through
+        # the -Y wall rather than into air.
+        _cut_vent_slots,
+        _add_mic_mount,
+    ]:
+        base = fn(base)
+    return base
+
+
+def make_lid() -> cq.Workplane:
+    lip_x, lip_y = CAV_X - 2 * LIP_GAP, CAV_Y - 2 * LIP_GAP
+    lip_r = max(0.5, INNER_R - LIP_GAP)
+    lid = organic_box(SHELL_X, EXT_Y, EXT_H_LID, CORNER_R, top_r=LID_TOP_R).translate(
+        (SHELL_X_OFFSET, 0, 0)
+    )
+    lid = lid.cut(rounded_cavity(CAV_X, CAV_Y, LID_INNER_H + 0.01, INNER_R))
+    # Two-zone inner wall for overhang-free printing (flipped, ceiling-down):
+    # 1. LIP zone (Z=-LIP_H to Z=0): at lip_x dimensions, inserts into base
+    #    with LIP_GAP clearance. This is the functional retention lip.
+    # 2. SUPPORT zone (Z=0 to Z=LID_INNER_H): at CAV_X dimensions, flush with
+    #    cavity inner wall. Stays inside the lid body, never enters the base.
+    #    Provides continuous wall from ceiling to lip — no overhang at Z=9 in print.
+    # Lip (lower zone — inserts into base)
+    lip_outer = cq.Workplane("XY").workplane(offset=-LIP_H).rect(
+        lip_x, lip_y
+    ).extrude(LIP_H).edges("|Z").fillet(lip_r)
+    lip_inner = cq.Workplane("XY").workplane(offset=-LIP_H - 0.01).rect(
+        lip_x - 2 * LIP_T, lip_y - 2 * LIP_T
+    ).extrude(LIP_H + 0.02).edges("|Z").fillet(max(0.3, lip_r - LIP_T))
+    lid = lid.union(lip_outer.cut(lip_inner))
+    # Support wall (upper zone — flush with cavity, stays in lid)
+    support_outer = cq.Workplane("XY").rect(
+        CAV_X, CAV_Y
+    ).extrude(LID_INNER_H).edges("|Z").fillet(INNER_R)
+    support_inner = cq.Workplane("XY").workplane(offset=-0.01).rect(
+        CAV_X - 2 * LIP_T, CAV_Y - 2 * LIP_T
+    ).extrude(LID_INNER_H + 0.02).edges("|Z").fillet(max(0.3, INNER_R - LIP_T))
+    lid = lid.union(support_outer.cut(support_inner))
+    # Joystick opening — circular, only rotation circle of stick
+    # Offset compensates for observed housing position vs lid hole
+    joy_hole_x = JOY_POS_X + JOY_LID_HOLE_OFFSET_X
+    joy_hole_y = JOY_POS_Y + JOY_LID_HOLE_OFFSET_Y
+    joy_cut = (cq.Workplane("XY").workplane(offset=-LIP_H - 0.01)
+               .center(joy_hole_x, joy_hole_y)
+               .circle(JOY_LID_HOLE_D / 2)
+               .extrude(EXT_H_LID + LIP_H + 0.02))
+    lid = lid.cut(joy_cut)
+    try:
+        # Chamfer on exterior edge — 2mm wide bevel for clean look
+        joy_chamfer_outer = (cq.Workplane("XY").workplane(offset=EXT_H_LID - 0.01)
+                             .center(joy_hole_x, joy_hole_y)
+                             .circle(JOY_LID_HOLE_D / 2 + 2.0)
+                             .workplane(offset=-2.0)
+                             .circle(JOY_LID_HOLE_D / 2)
+                             .loft())
+        lid = lid.cut(joy_chamfer_outer)
+    except Exception:
+        pass
+    # Schraubsäulen-Hänger: 4 hängende Säulen von Lid-Decke bis Lip-Boden.
+    # Lid-Koord: hanger Z=-LIP_H bis Z=LID_INNER_H (= -3..7), also 10mm Hängerlänge.
+    # Bohrung durchgehend von Z=EXT_H_LID (Lid-Außen oben) bis Z=-LIP_H (Lip-Boden).
+    # Senkkopf-Senkung an der Außenseite (Z=EXT_H_LID nach unten SCREW_HEAD_H tief).
+    hanger_z_bot = -LIP_H
+    hanger_z_top = LID_INNER_H
+    hanger_h = hanger_z_top - hanger_z_bot
+    csk_z_top = EXT_H_LID
+    bore_total = csk_z_top - hanger_z_bot  # 12.0mm Bohrungslänge durch Lid+Hänger
+    for cx, cy in PILLAR_POSITIONS:
+        hanger = (cq.Workplane("XY")
+                  .workplane(offset=hanger_z_bot)
+                  .center(cx, cy)
+                  .circle(PILLAR_OD / 2)
+                  .extrude(hanger_h))
+        lid = lid.union(hanger)
+        clear_hole = (cq.Workplane("XY")
+                      .workplane(offset=csk_z_top + 0.01)
+                      .center(cx, cy)
+                      .circle(SCREW_CLEAR_D / 2)
+                      .extrude(-(bore_total + 0.02)))
+        lid = lid.cut(clear_hole)
+        try:
+            csk = (cq.Workplane("XY")
+                   .workplane(offset=csk_z_top + 0.01)
+                   .center(cx, cy)
+                   .circle(SCREW_CSK_D / 2)
+                   .workplane(offset=-(SCREW_HEAD_H + 0.01))
+                   .circle(SCREW_CLEAR_D / 2)
+                   .loft())
+            lid = lid.cut(csk)
+        except Exception as e:
+            # Do not swallow this one. A failed loft here means the screw heads
+            # are not countersunk, and nothing would say so until after a
+            # multi-hour print — at which point four 2.1mm heads stand proud of
+            # the lid of a device the patient rests his face against. A pillar
+            # move is enough to upset the loft, so this must fail the build.
+            raise RuntimeError(
+                f"Senkkopf-Loft fehlgeschlagen bei ({cx}, {cy}): {e}") from e
+    # ESP32 hold-down: continuous wall hangs from lid ceiling, presses PCB onto standoffs.
+    # Runs along X axis between pin header rows (3mm Y width).
+    # A wall is much stronger than isolated pillars — FDM layers run unbroken.
+    # Wires route on both sides (+Y and -Y of wall).
+    esp_pcb_top_z = FLOOR_T + ESP_STANDOFF_H + ESP_H  # 6.2mm in base coords
+    rib_bot_z = -(EXT_H_BASE - esp_pcb_top_z - HOLD_DOWN_CLEARANCE)  # -22.8mm in lid coords (1mm shorter)
+    rib_height = LID_INNER_H - rib_bot_z  # 29.8mm total
+    wall_len, wall_t = 24.0, 3.0
+    wall = (cq.Workplane("XY")
+            .workplane(offset=rib_bot_z)
+            .center(ESP_POS_X, ESP_POS_Y)
+            .rect(wall_len, wall_t)
+            .extrude(rib_height))
+    lid = lid.union(wall)
+    # Triangular gussets on both sides of wall where it meets the ceiling.
+    # Each gusset: 5mm along Y (out from wall), 5mm along Z (down from ceiling).
+    gusset_h, gusset_d = 5.0, 5.0  # height (Z) and depth (Y)
+    wall_top_z = LID_INNER_H  # ceiling in lid coords
+    # = 19.0 with ESP_POS_X = 31.0. The annotation said 23.0, left over from
+    # ESP_POS_X = 35; the assert below only checks the sign, so nothing caught
+    # it. These derived-position comments are what CLAUDE.md names as the main
+    # defence against workplane sign errors, so a stale one is worse than none.
+    wall_x_start = ESP_POS_X - wall_len / 2  # = 19.0 (ESP32 area, must be +X)
+    assert wall_x_start > 0, f"wall_x_start={wall_x_start} must be positive (+X = ESP32 side)"
+    for side in [-1, 1]:
+        gy = ESP_POS_Y + side * wall_t / 2  # wall surface Y
+        gusset = (cq.Workplane("YZ")
+                  .workplane(offset=wall_x_start)
+                  .moveTo(gy, wall_top_z)
+                  .lineTo(gy + side * gusset_d, wall_top_z)
+                  .lineTo(gy, wall_top_z - gusset_h)
+                  .close()
+                  .extrude(wall_len))
+        lid = lid.union(gusset)
+    # USB cable relief — notch in lid lip on +Y side matching base notch
+    cable_relief = cq.Workplane("XZ").workplane(offset=-OUTER_POS_Y - 0.01).center(
+        USB_NOTCH_X, -LIP_H / 2
+    ).rect(USB_NOTCH_W, LIP_H + 0.02).extrude(WALL + LIP_GAP + LIP_T + 0.02)
+    lid = lid.cut(cable_relief)
+    # No lid vents — WROOM floor cutout provides ventilation
+    return lid
+
+
+# ── Export ─────────────────────────────────────────────────────────
+
+
+def export_stl(shape: cq.Workplane, filepath: Path) -> None:
+    cq.exporters.export(shape, str(filepath), exportType="STL", tolerance=0.01, angularTolerance=0.1)
+
+
+def _parse_svg_path(path_data: str) -> list[tuple[float, float]]:
+    tokens = re.findall(r"[ML]|-?\d+(?:\.\d+)?", path_data)
+    points: list[tuple[float, float]] = []
+    idx = 0
+    while idx < len(tokens):
+        if tokens[idx] in {"M", "L"}:
+            points.append((float(tokens[idx + 1]), float(tokens[idx + 2])))
+            idx += 3
+        else:
+            idx += 1
+    return points
+
+
+def _rgb(stroke: str) -> tuple[int, int, int]:
+    match = re.match(r"rgb\((\d+),(\d+),(\d+)\)", stroke.replace(" ", ""))
+    return (int(match.group(1)), int(match.group(2)), int(match.group(3))) if match else (0, 0, 0)
+
+
+def _collect_svg_lines(
+    node: ET.Element,
+    stroke: str,
+    hidden: bool,
+    lines: list[tuple[tuple[float, float], tuple[float, float], tuple[int, int, int], bool]],
+) -> None:
+    tag = node.tag.rsplit("}", 1)[-1]
+    stroke = node.attrib.get("stroke", stroke)
+    hidden = hidden or "stroke-dasharray" in node.attrib
+    if tag == "path":
+        points = _parse_svg_path(node.attrib.get("d", ""))
+        for start, end in pairwise(points):
+            lines.append((start, end, _rgb(stroke), hidden))
+    for child in list(node):
+        _collect_svg_lines(child, stroke, hidden, lines)
+
+
+def _svg_to_png(svg_path: Path, png_path: Path, width: int = 1400, height: int = 1000) -> None:
+    root = ET.fromstring(svg_path.read_text())
+    lines: list[tuple[tuple[float, float], tuple[float, float], tuple[int, int, int], bool]] = []
+    _collect_svg_lines(root, "rgb(0,0,0)", False, lines)
+    xs = [point[0] for line in lines for point in line[:2]]
+    ys = [point[1] for line in lines for point in line[:2]]
+    min_x, max_x = min(xs), max(xs)
+    min_y, max_y = min(ys), max(ys)
+    pad = 60
+    scale = min(
+        (width - 2 * pad) / max(max_x - min_x, 1.0),
+        (height - 2 * pad) / max(max_y - min_y, 1.0),
+    )
+
+    def map_point(point: tuple[float, float]) -> tuple[float, float]:
+        return (pad + (point[0] - min_x) * scale, height - (pad + (point[1] - min_y) * scale))
+
+    image = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(image)
+    for hidden_pass in [True, False]:
+        for start, end, color, is_hidden in lines:
+            if is_hidden == hidden_pass:
+                draw.line(
+                    [map_point(start), map_point(end)],
+                    fill=color,
+                    width=1 if hidden_pass else 3,
+                )
+    image.save(png_path)
+    svg_path.unlink(missing_ok=True)
+
+
+def _assembly_shape(base: cq.Workplane, lid: cq.Workplane) -> cq.Shape:
+    return cq.Compound.makeCompound([base.val(), lid.translate((0, 0, EXT_H_BASE)).val()])
+
+
+def render_pngs(base: cq.Workplane, lid: cq.Workplane, outdir: Path) -> None:
+    views = [
+        RenderView("mundmaus_v60_assembly.png", (1.0, -1.0, 0.8), True),
+        RenderView("mundmaus_v60_top.png", (0.0, 0.0, 1.0), True),
+        RenderView("mundmaus_v60_side.png", (0.0, 1.0, 0.0), False),
+        RenderView("mundmaus_v60_back.png", (-1.0, 0.0, 0.0), False),
+        RenderView("mundmaus_v60_lid_underside.png", (0.0, 0.0, -1.0), False, target="lid"),
+    ]
+    assembly = _assembly_shape(base, lid)
+    for view in views:
+        svg_path = outdir / view.filename.replace(".png", ".svg")
+        if view.target == "lid":
+            shape = lid
+        elif view.assembled:
+            shape = assembly
+        else:
+            shape = base
+        cq.exporters.export(
+            shape,
+            str(svg_path),
+            opt={
+                "width": 1400,
+                "height": 1000,
+                "projectionDir": view.projection_dir,
+                "showHidden": True,
+            },
+        )
+        _svg_to_png(svg_path, outdir / view.filename)
+
+
+# ── Report ─────────────────────────────────────────────────────────
+
+
+def write_report(report_path: Path) -> None:
+    pillar_corner_clearance = INNER_R - _PILLAR_CORNER_DIST - PILLAR_OD / 2
+    base_pillar_height = PILLAR_BASE_TOP_Z - FLOOR_T
+    # What a SCREW_LEN screw actually reaches into the pillar. The report used to
+    # add SCREW_HEAD_H to the full lid height and print "Summe 22.1 mm" for a
+    # 20 mm screw — the countersunk head sits INSIDE those 12 mm, so it was
+    # counted twice. Harmless on the bench (the screw reaches 7.8 mm instead of
+    # the nominal 8.0), but a build document that tells an assembler a 20 mm
+    # screw needs 22.1 mm of travel is not.
+    screw_actual_penetration = SCREW_ACTUAL_PENETRATION
+    if screw_actual_penetration < MIN_THREAD_ENGAGEMENT:
+        raise ValueError(
+            f"Schraube zu kurz: nur {screw_actual_penetration:.1f}mm Gewindeeingriff "
+            f"in der Säule (SCREW_LEN={SCREW_LEN}). Mindestens {MIN_THREAD_ENGAGEMENT:.0f}mm nötig.")
+    report = textwrap.dedent(
+        f"""\
+        # MundMaus v6.0 Enclosure — Joystick auf der Mitte des USB-Steckers
+        ## Summary
+        v6.0 rueckt den Joystick von Y=-2 auf Y=0 und damit zurueck auf die
+        Y-Mitte des USB-Steckers. Der naechste Saeulenrand liegt dadurch
+        1,2 mm neben dem angenommenen 12-mm-Stecker statt 0,8 mm in ihm; ein
+        Stecker passt bis 14,3 mm Breite statt bis 10,3 mm. Die Bedienung
+        wandert dabei 2 mm in +Y, die Deckeloeffnung mit.
+
+        Aus v5.9 unveraendert:
+        v5.9 verstärkt allein die -X-Stirnwand (Mutterseite) von {WALL:.0f} auf
+        {MIC_WALL_T:.0f} mm, und zwar nach außen: Außenlänge {SHELL_X:.0f} statt
+        {EXT_X:.0f} mm, Stirnfläche von X=-{EXT_X / 2:.0f} auf X={MIC_WALL_OUTER_X:.0f}.
+        Kavität, Säulen, Lip und alle Durchbrüche bleiben auf ihren Koordinaten.
+        Der Deckel wächst mit, damit an der Naht keine Stufe steht.
+
+        Diese Wand trägt damit rechnerisch das Vierfache, aber nicht die
+        angesetzte Last — siehe die Warnung in validate_enclosure.py. Die
+        Stativlast fängt die separat gedruckte Manschette außerhalb des
+        Gehäuses ab.
+
+        Aus v5.8 unverändert übernommen: Schraubverschluss mit 4 Spax 3.5x20
+        Senkkopf in den Eck-Innenbereichen.
+
+        Geometrie:
+        - 4 Schraubsäulen im Base bei (±{PILLAR_X:.0f}, ±{PILLAR_Y:.1f}), D={PILLAR_OD:.1f}mm,
+          Vorbohr-Loch {SCREW_PILOT_D:.1f}mm.
+        - 4 hängende Säulen im Lid (gleiche XY-Position) mit Durchgangsloch {SCREW_CLEAR_D:.1f}mm
+          und Senkung {SCREW_CSK_D:.1f}mm × {SCREW_HEAD_H:.1f}mm tief an der Lid-Außenseite.
+        - ESP-Side-Guide-Rails von ESP_L*0.4 (21.8mm) auf 14.0mm gekürzt — Rails standen
+          sonst im Weg der +X- und +Y-Eck-Säulen.
+        - Lip ({LIP_H:.1f}mm) bleibt zur Zentrierung beim Zusammenbau und für Staubdichtigkeit.
+
+        ## Schrauben-Tiefenrechnung
+        | Strecke | Wert |
+        |---|---:|
+        | Schraubenlänge gesamt | {SCREW_LEN:.1f} mm |
+        | Senkung im Lid (Kopf bündig, im Lid-Korpus enthalten) | {SCREW_HEAD_H:.1f} mm |
+        | Lid-Korpus durchquert (Decke + Lip-Hänger) | {EXT_H_LID + LIP_H:.1f} mm |
+        | Spiel Lid-Hänger zu Säulen-Top | {PILLAR_BASE_TOP_Z_OFFSET:.1f} mm |
+        | Eindringtiefe in Base-Säule (tatsächlich) | {screw_actual_penetration:.1f} mm |
+        | Summe (= Schraubenlänge) | {EXT_H_LID + LIP_H + PILLAR_BASE_TOP_Z_OFFSET + screw_actual_penetration:.1f} mm |
+        | Säulenoberkante Z (base coords) | {PILLAR_BASE_TOP_Z:.1f} mm |
+        | Spiel Säulen-Top zu Lid-Hänger-Boden | {PILLAR_BASE_TOP_Z_OFFSET:.1f} mm |
+        | Boden-Reserve unter Bohrung | {(PILLAR_BASE_TOP_Z - SCREW_PENETRATION) - FLOOR_T:.1f} mm |
+        | Säulen-Kollisions-Abstand zur Eckkurve | {pillar_corner_clearance:.2f} mm |
+
+        ## Komponenten-Layout (unverändert von v5.7)
+        - Mic mount collar: -X wall (internal, {MIC_COLLAR_INNER_X:.1f} inner edge)
+        - Joystick center: X={JOY_POS_X:.1f} (platform {JOY_PLATFORM_MIN_X:.1f} to {JOY_PLATFORM_MAX_X:.1f})
+        - ESP32 center: X={ESP_POS_X:.1f} (PCB {ESP_LEFT_EDGE_X:.1f} to {ESP_RIGHT_EDGE_X:.1f}, USB at -X end)
+        - Sensor shelf: +X inner wall, shelf X={PRES_SHELF_X_START:.1f} to {PRES_INNER_X:.1f}, Z={PRES_Z_BOT:.1f} to {PRES_Z_TOP:.1f}
+
+        ## Clearance Analysis
+        | Item | Value |
+        |---|---:|
+        | Lip zone bottom | {LIP_ZONE_BOTTOM:.1f} mm |
+        | Sensor PCB top to lip zone | {LIP_ZONE_BOTTOM - PRES_Z_TOP:.1f} mm |
+        | Mic collar to joystick platform | {COLLAR_TO_JOY_CLEARANCE:.2f} mm |
+        | ESP32 right edge to +X inner wall | {ESP_TO_WALL_CLEARANCE:.2f} mm |
+        | Sensor bottom Z to ESP32 PCB top Z | {PRES_ESP_Z_GAP:.1f} mm |
+        | Hold-down wall gap (lid closed) | {HOLD_DOWN_CLEARANCE:.1f} mm |
+        | Barb hole diameter | {PRES_BARB_HOLE_D:.1f} mm (press-fit) |
+        | Pressure barb wall | +X |
+        | Lid attachment | 4 Schrauben Spax 3.5x{SCREW_LEN:.0f} Senkkopf |
+
+        ## Changes vs v5.9
+        | Feature | v5.9 | v6.0 |
+        |---|---|---|
+        | Joystick Y | -2,0 mm | {JOY_POS_Y:.1f} mm (= ESP_POS_Y) |
+        | Luft Stecker zu Saeule | -0,8 mm (Kollision) | +1,2 mm |
+        | Stecker passt bis | 10,3 mm Breite | 14,3 mm Breite |
+
+        ## Changes v5.8 → v5.9 (historisch)
+        | Feature | v5.8 | v5.9 |
+        |---|---|---|
+        | Stirnwand -X (Mutterseite) | {WALL:.0f} mm | {MIC_WALL_T:.0f} mm |
+        | Außenlänge | {EXT_X:.0f} mm | {SHELL_X:.0f} mm |
+        | Ø{MIC_CLEAR_D:.1f}-Durchgang für den Zapfen | {WALL:.0f} mm tief | {MIC_WALL_T:.0f} mm tief |
+        | Alles andere | — | unverändert |
+
+        ## Changes v5.7 → v5.8 (historisch)
+        | Feature | v5.7 | v5.8 |
+        |---|---|---|
+        | Verschluss | Detent-Klick (7 Ridges/Grooves) | 4× Schraube Spax 3.5x20 |
+        | RIDGE_H/GROOVE_D | 0.6 / 0.55 mm | entfallen |
+        | Base-Säulen | — | 4× D={PILLAR_OD:.0f}mm, h={base_pillar_height:.1f}mm, Bohrung {SCREW_PILOT_D:.1f}mm |
+        | Lid-Säulen-Hänger | — | 4× D={PILLAR_OD:.0f}mm, h={LID_INNER_H + LIP_H:.1f}mm, Senkung {SCREW_CSK_D:.1f}/{SCREW_HEAD_H:.1f} |
+        | ESP-Side-Rails | 21.8 mm | 14.0 mm |
+        | Base STL | v5.6 unchanged | NEU (Säulen + kürzere Rails) |
+        | Lid STL | v5.7 | NEU (Hänger + Senkungen, ohne Detents) |
+
+        ## External Dimensions
+        - Base footprint: {SHELL_X:.1f} x {EXT_Y:.1f} mm (-X-Stirnwand {MIC_WALL_T:.0f} mm)
+        - Closed enclosure height: {EXT_H_BASE + EXT_H_LID:.1f} mm
+        - Joystick protrusion above lid: {STICK_PROTRUSION:.1f} mm
+
+        ## Print Notes
+        - Material: PETG preferred, PLA acceptable for quick fit checks
+        - Base orientation: floor-down, no support intended
+        - Lid orientation: flip 180 deg, ceiling-down. Senkungen liegen damit an der Druckplatte;
+          die 40°-Konuswand druckt support-frei (Material drumherum, nicht darüber).
+        - Schrauben: 4× Spax/Spanplattenschraube 3.5×20 mm Senkkopf, Torx oder Kreuzschlitz.
+          In PETG selbstschneidend — kein Brass-Insert nötig.
+        - Anzugsmoment: handfest, nicht überdrehen (PETG-Säulenwand 1.75mm).
+        - USB cable: plug Micro-USB with lid off, route cable to -Y wall notch, close lid.
+        - External hose path: mouthpiece -> +X wall barb (straight run, minimal bending).
+        - Pressure sensor: place PCB flat against +X inner wall, nipple through barb hole, lid retains from above.
+        - The -X collar remains internal-only; the outer -X wall stays flat for the mic stand.
+        - Suggested slicer baseline: 0.2 mm layer height, 4 walls, 25% gyroid, 240 C nozzle, 75 C bed, 40% fan.
+        """
+    )
+    report_path.write_text(report)
+
+
+# ── Main ───────────────────────────────────────────────────────────
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="MundMaus v6.0 enclosure (Joystick auf Steckermitte, Stirnwand 4mm)"
+    )
+    parser.add_argument("--outdir", default=".", type=str)
+    parser.add_argument("--skip-renders", action="store_true")
+    args = parser.parse_args()
+    outdir = Path(args.outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+
+    base_path = outdir / "mundmaus_v60_base.stl"
+    lid_path = outdir / "mundmaus_v60_lid.stl"
+    base_step_path = outdir / "mundmaus_v60_base.step"
+    lid_step_path = outdir / "mundmaus_v60_lid.step"
+    report_path = outdir / "mundmaus_v60_report.md"
+
+    print(f"MundMaus v6.0 — CadQuery {cq.__version__}")
+    print(f"  External: {SHELL_X:.1f} x {EXT_Y:.1f} x {EXT_H_BASE + EXT_H_LID:.1f} mm")
+    print(f"  Stirnwand an der Stativaufnahme: {MIC_WALL_T:.1f}mm (sonst {WALL:.1f}mm)")
+    print(f"  Joystick: Y={JOY_POS_Y:.1f} (= ESP_POS_Y {ESP_POS_Y:.1f}, Steckermitte)")
+    print(f"  Schrauben: 4x Spax {SCREW_THREAD_D}x{SCREW_LEN:.0f} Senkkopf in den 4 Ecken")
+    print(f"  Säulen: D={PILLAR_OD}mm bei (±{PILLAR_X}, ±{PILLAR_Y}), Vorbohr-Loch {SCREW_PILOT_D}mm")
+
+    base = make_base()
+    lid = make_lid()
+
+    # STEP first (R9 — STEP ist Quelle der Wahrheit)
+    cq.exporters.export(base, str(base_step_path), exportType="STEP")
+    cq.exporters.export(lid, str(lid_step_path), exportType="STEP")
+
+    export_stl(base, base_path)
+    # Flip lid for printing — explicit rotation to avoid rotateAboutCenter Y-offset bug
+    lid_flipped = lid.rotate((0, 0, 0), (1, 0, 0), 180)
+    bb = lid_flipped.val().BoundingBox()
+    lid_flipped = lid_flipped.translate((0, 0, -bb.zmin))
+    export_stl(lid_flipped, lid_path)
+
+    write_report(report_path)
+    if not args.skip_renders:
+        render_pngs(base, lid, outdir)
+    print("Done.")
+
+
+if __name__ == "__main__":
+    main()
