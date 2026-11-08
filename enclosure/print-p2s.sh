@@ -9,7 +9,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 BAMBU_PRINT="/home/ai/claude/projects/bambu-p2s/bambu-print.py"
 PROFILE_DIR="${SCRIPT_DIR}/bambu-profiles"
-AMS_SLOT=4  # Grau PETG
+AMS_SLOT=4  # PETG. Absichtlich ohne Farbangabe: welche Spule im Fach liegt,
+            # wechselt, ein Farbname im Kommentar wechselt nicht mit.
 
 # Die einzige Stelle, an der die Gehaeuse-Version steht. Pfade und Anzeige
 # leiten sich davon ab.
